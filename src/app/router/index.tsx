@@ -10,12 +10,24 @@ import SitePlanListPage from '@/features/siteplan/pages/SitePlanListPage';
 import SitePlanDetailPage from '@/features/siteplan/pages/SitePlanDetailPage';
 import VerificationPage from '@/features/verification/pages/VerificationPage';
 import GISPage from '@/features/gis/pages/GISPage';
+import BimViewerPage from '@/features/gis/pages/BimViewerPage';
 import ReportsPage from '@/features/approval/pages/ReportsPage';
 import UsersPage from '@/features/users/pages/UsersPage';
 import RolesPage from '@/features/users/pages/RolesPage';
 import ReferencesPage from '@/features/users/pages/ReferencesPage';
 
+/**
+ * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
+ * 
+ * Sesuai prinsip Low Coupling & High Cohesion, rute dipisahkan menjadi dua kelompok utama:
+ * 1. Kelompok Administratif (Dibalut oleh DashboardLayout):
+ *    Menyajikan halaman tabular, form administratif, laporan, dan pengelolaan data master.
+ * 2. Kelompok Spasial Imersif (GIS Page berdiri sendiri):
+ *    Diletakkan di tingkat teratas agar komponen peta dapat mengonsumsi 100% ruang
+ *    viewport peramban tanpa terhalang atau terpotong oleh layout pembungkus dashboard.
+ */
 export const router = createBrowserRouter([
+  // 1. KELOMPOK ADMINISTRATIF (Dashboard & Dokumen)
   {
     path: '/',
     element: <DashboardLayout />,
@@ -71,10 +83,6 @@ export const router = createBrowserRouter([
         element: <VerificationPage />,
       },
       {
-        path: 'gis',
-        element: <GISPage />,
-      },
-      {
         path: 'laporan',
         element: <ReportsPage />,
       },
@@ -97,6 +105,19 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // 2. KELOMPOK SPASIAL (Immersive Infinite Canvas)
+  // Dilepas dari anak DashboardLayout agar peta bebas mengonsumsi seluruh resolusi layar monitor.
+  {
+    path: '/gis',
+    element: <GISPage />,
+  },
+  {
+    path: '/gis/bim/:id',
+    element: <BimViewerPage />,
+  },
+
+  // 3. FALLBACK REDIRECT (Fail-Safe Routing)
   {
     path: '*',
     element: <Navigate to="/dashboard" replace />,

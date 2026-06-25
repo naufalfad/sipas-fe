@@ -1,3 +1,4 @@
+
 import type { Submission } from '@/features/submission/types';
 
 export const mockSubmissions: Submission[] = [
@@ -9,6 +10,12 @@ export const mockSubmissions: Submission[] = [
     landArea: 25000,
     submissionDate: '2026-06-20',
     status: 'Menunggu Verifikasi',
+    kdbPercent: 55.2,
+    klbValue: 2.1,
+    kdhPercent: 15.4,
+    rthArea: 3850,
+    psuArea: 1200,
+    roadArea: 1500,
     documents: [
       { id: 'doc-1-1', name: 'Surat Permohonan.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-20' },
       { id: 'doc-1-2', name: 'Sertifikat Tanah Hak Milik.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-20' },
@@ -27,6 +34,45 @@ export const mockSubmissions: Submission[] = [
         [-6.5945, 106.8175],
         [-6.5960, 106.8175],
         [-6.5960, 106.8160],
+      ],
+      // --- SUB-POLYGONS DETAIL SITE PLAN (CAD DRAWING LAYOUT) ---
+      roadPolygons: [
+        [
+          [-6.5952, 106.8160],
+          [-6.5952, 106.8175],
+          [-6.5953, 106.8175],
+          [-6.5953, 106.8160],
+        ]
+      ],
+      rthPolygons: [
+        [
+          [-6.5945, 106.8160],
+          [-6.5945, 106.8165],
+          [-6.5950, 106.8165],
+          [-6.5950, 106.8160],
+        ]
+      ],
+      psuPolygons: [
+        [
+          [-6.5945, 106.8170],
+          [-6.5945, 106.8175],
+          [-6.5950, 106.8175],
+          [-6.5950, 106.8170],
+        ]
+      ],
+      kavlingPolygons: [
+        [
+          [-6.5954, 106.8160],
+          [-6.5954, 106.8167],
+          [-6.5959, 106.8167],
+          [-6.5959, 106.8160],
+        ],
+        [
+          [-6.5954, 106.8168],
+          [-6.5954, 106.8175],
+          [-6.5959, 106.8175],
+          [-6.5959, 106.8168],
+        ]
       ]
     }
   },
@@ -35,9 +81,15 @@ export const mockSubmissions: Submission[] = [
     submissionNo: 'SIPAS-2026-002',
     housingName: 'Sentul Green Valley',
     developerName: 'PT Properti Indah Raya',
-    landArea: 48000,
+    landArea: 120000,
     submissionDate: '2026-06-18',
     status: 'Verifikasi Administrasi',
+    kdbPercent: 52.4,
+    klbValue: 2.8,
+    kdhPercent: 18.2,
+    rthArea: 8736,
+    psuArea: 2500,
+    roadArea: 3200,
     documents: [
       { id: 'doc-2-1', name: 'Surat Pengantar Dinas.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-18' },
       { id: 'doc-2-2', name: 'Sertifikat Peta Bidang BPN.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-18' },
@@ -57,6 +109,44 @@ export const mockSubmissions: Submission[] = [
         [-6.5710, 106.8755],
         [-6.5735, 106.8755],
         [-6.5735, 106.8730],
+      ],
+      roadPolygons: [
+        [
+          [-6.5720, 106.8730],
+          [-6.5720, 106.8755],
+          [-6.5722, 106.8755],
+          [-6.5722, 106.8730],
+        ]
+      ],
+      rthPolygons: [
+        [
+          [-6.5710, 106.8730],
+          [-6.5710, 106.8738],
+          [-6.5718, 106.8738],
+          [-6.5718, 106.8730],
+        ]
+      ],
+      psuPolygons: [
+        [
+          [-6.5710, 106.8745],
+          [-6.5710, 106.8755],
+          [-6.5718, 106.8755],
+          [-6.5718, 106.8745],
+        ]
+      ],
+      kavlingPolygons: [
+        [
+          [-6.5723, 106.8730],
+          [-6.5723, 106.8742],
+          [-6.5733, 106.8742],
+          [-6.5733, 106.8730],
+        ],
+        [
+          [-6.5723, 106.8743],
+          [-6.5723, 106.8755],
+          [-6.5733, 106.8755],
+          [-6.5733, 106.8743],
+        ]
       ]
     }
   },
@@ -65,9 +155,15 @@ export const mockSubmissions: Submission[] = [
     submissionNo: 'SIPAS-2026-003',
     housingName: 'Pakuan Executive Heights',
     developerName: 'PT Graha Kencana',
-    landArea: 18500,
+    landArea: 8000,
     submissionDate: '2026-06-15',
     status: 'Verifikasi Teknis',
+    kdbPercent: 58.6,
+    klbValue: 3.1,
+    kdhPercent: 11.2,
+    rthArea: 2072,
+    psuArea: 850,
+    roadArea: 1200,
     documents: [
       { id: 'doc-3-1', name: 'Dokumen Kesesuaian Tata Ruang.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-15' },
       { id: 'doc-3-2', name: 'SitePlan CAD Spasial Final.dwg', type: 'cad', url: '#', uploadedAt: '2026-06-15' },
@@ -86,6 +182,38 @@ export const mockSubmissions: Submission[] = [
         [-6.6180, 106.8030],
         [-6.6200, 106.8030],
         [-6.6200, 106.8015],
+      ],
+      roadPolygons: [
+        [
+          [-6.6190, 106.8015],
+          [-6.6190, 106.8030],
+          [-6.6192, 106.8030],
+          [-6.6192, 106.8015],
+        ]
+      ],
+      rthPolygons: [
+        [
+          [-6.6180, 106.8015],
+          [-6.6180, 106.8022],
+          [-6.6188, 106.8022],
+          [-6.6188, 106.8015],
+        ]
+      ],
+      psuPolygons: [
+        [
+          [-6.6180, 106.8025],
+          [-6.6180, 106.8030],
+          [-6.6188, 106.8030],
+          [-6.6188, 106.8025],
+        ]
+      ],
+      kavlingPolygons: [
+        [
+          [-6.6193, 106.8015],
+          [-6.6193, 106.8030],
+          [-6.6199, 106.8030],
+          [-6.6199, 106.8015],
+        ]
       ]
     }
   },
@@ -97,6 +225,12 @@ export const mockSubmissions: Submission[] = [
     landArea: 32000,
     submissionDate: '2026-06-10',
     status: 'Disetujui',
+    kdbPercent: 54.8,
+    klbValue: 2.5,
+    kdhPercent: 14.2,
+    rthArea: 4544,
+    psuArea: 1800,
+    roadArea: 2100,
     documents: [
       { id: 'doc-4-1', name: 'SK Pengesahan Site Plan.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-14' },
       { id: 'doc-4-2', name: 'Site Plan Disahkan.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-14' },
@@ -117,6 +251,38 @@ export const mockSubmissions: Submission[] = [
         [-6.6005, 106.8095],
         [-6.6025, 106.8095],
         [-6.6025, 106.8080],
+      ],
+      roadPolygons: [
+        [
+          [-6.6012, 106.8080],
+          [-6.6012, 106.8095],
+          [-6.6014, 106.8095],
+          [-6.6014, 106.8080],
+        ]
+      ],
+      rthPolygons: [
+        [
+          [-6.6005, 106.8080],
+          [-6.6005, 106.8087],
+          [-6.6010, 106.8087],
+          [-6.6010, 106.8080],
+        ]
+      ],
+      psuPolygons: [
+        [
+          [-6.6005, 106.8089],
+          [-6.6005, 106.8095],
+          [-6.6010, 106.8095],
+          [-6.6010, 106.8089],
+        ]
+      ],
+      kavlingPolygons: [
+        [
+          [-6.6015, 106.8080],
+          [-6.6015, 106.8095],
+          [-6.6024, 106.8095],
+          [-6.6024, 106.8080],
+        ]
       ]
     }
   },
@@ -128,6 +294,12 @@ export const mockSubmissions: Submission[] = [
     landArea: 12000,
     submissionDate: '2026-06-08',
     status: 'Ditolak',
+    kdbPercent: 60.5,
+    klbValue: 3.2,
+    kdhPercent: 12.1,
+    rthArea: 1452,
+    psuArea: 500,
+    roadArea: 250,
     documents: [
       { id: 'doc-5-1', name: 'Layout Gambar Rencana.dwg', type: 'cad', url: '#', uploadedAt: '2026-06-08' },
     ],
@@ -146,6 +318,38 @@ export const mockSubmissions: Submission[] = [
         [-6.6205, 106.8120],
         [-6.6220, 106.8120],
         [-6.6220, 106.8105],
+      ],
+      roadPolygons: [
+        [
+          [-6.6210, 106.8105],
+          [-6.6210, 106.8120],
+          [-6.6212, 106.8120],
+          [-6.6212, 106.8105],
+        ]
+      ],
+      rthPolygons: [
+        [
+          [-6.6205, 106.8105],
+          [-6.6205, 106.8112],
+          [-6.6209, 106.8112],
+          [-6.6209, 106.8105],
+        ]
+      ],
+      psuPolygons: [
+        [
+          [-6.6205, 106.8113],
+          [-6.6205, 106.8120],
+          [-6.6209, 106.8120],
+          [-6.6209, 106.8113],
+        ]
+      ],
+      kavlingPolygons: [
+        [
+          [-6.6213, 106.8105],
+          [-6.6213, 106.8120],
+          [-6.6219, 106.8120],
+          [-6.6219, 106.8105],
+        ]
       ]
     }
   }

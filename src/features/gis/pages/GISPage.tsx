@@ -1,98 +1,88 @@
-import { useQuery } from '@tanstack/react-query';
-import { SubmissionService } from '@/features/submission/services/submission.service';
-import GISMapContainer from '@/components/maps/GISMapContainer';
-import GISLayerControl from '@/components/maps/GISLayerControl';
-import GISPolygonLayer from '@/components/maps/GISPolygonLayer';
-import type { GISPolygonData } from '@/components/maps/GISPolygonLayer';
-import GISMarkerLayer from '@/components/maps/GISMarkerLayer';
-import type { GISMarkerData } from '@/components/maps/GISMarkerLayer';
-import { Layers, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
+import { useUIStore } from '@/app/store/useUIStore';
+import { useGisUIStore } from '@/app/store/useGisUIStore';
+import { Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
+
+// Import Komponen Spasial Inti (Tema Terang Cohesive GFW Style)
+import GisNavbar from '../components/GisNavbar';
+import SipasMap from '../components/SipasMap';
+import GisSidebar from '../components/GisSidebar';
+import PanelOrchestrator from '../components/PanelOrchestrator';
+import MapHUD from '../components/MapHUD';
+import ZoningHorizontalLegend from '../components/ZoningHorizontalLegend';
+
+// --- (3D BIM ENGINE DIPINDAHKAN KE HALAMAN TERSENDIRI) ---
 
 export default function GISPage() {
-  const { data: submissions = [], isLoading } = useQuery({
-    queryKey: ['submissions'],
-    queryFn: SubmissionService.getAll,
-  });
+  const { activeRole } = useUIStore();
 
-  // Prepare polygons from submissions that have layout polygons
-  const polygons: GISPolygonData[] = submissions
-    .filter(s => s.location.polygon)
-    .map(s => ({
-      id: s.id,
-      positions: s.location.polygon as [number, number][],
-      housingName: s.housingName,
-      developerName: s.developerName,
-      landArea: s.landArea,
-      status: s.status,
-      // Emerald for approved, Rose for rejected, Teal for others
-      color: s.status === 'Disetujui' ? '#10b981' : s.status === 'Ditolak' ? '#f43f5e' : '#0d9488'
-    }));
+  // Tarik ID perumahan terpilih dari store spasial
+  useGisUIStore();
 
-  // Prepare markers
-  const markers: GISMarkerData[] = submissions.map(s => ({
-    id: s.id,
-    position: [s.location.lat, s.location.lng] as [number, number],
-    housingName: s.housingName,
-    developerName: s.developerName,
-    address: s.location.address
-  }));
+  const isExecutive = activeRole === 'Kepala Bidang' || activeRole === 'Super Admin' || activeRole === 'Tim Teknis';
+
+  // Resolusi nama perumahan secara dinamis untuk dikirim sebagai judul modal 3D
+
+  useEffect(() => {
+    toast.info(`Kanvas Geospasial GEOSIPAS aktif sebagai: ${activeRole}`);
+  }, [activeRole]);
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4">
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            GIS Viewer
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Visualisasi spasial plot kavling site plan dan korelasi perizinan tata ruang wilayah.
-          </p>
+    <main className="relative h-screen w-screen overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased select-none">
+
+      {/* =====================================================================
+          LAYER 0: THE INFINITE CANVAS (PETA UTAMA 2D/3D - LEAFLET)
+          Berada di dasar (z-0) dan mengonsumsi 100% ruang viewport monitor.
+      ====================================================================== */}
+      <SipasMap />
+
+      {/* =====================================================================
+          LAYER 1: THE GLOBAL CONTEXT (NAVBAR ATAS)
+          Tinggi fix 64px, nempel absolut di atas (top-0), z-50.
+      ====================================================================== */}
+      <GisNavbar />
+
+      {/* =====================================================================
+          LAYER 2: THE SLIM ANCHOR (SIDEBAR KIRI - BRIGHT COHESIVE THEME)
+          Lebar fix 64px, menempel di bawah navbar, z-40.
+      ====================================================================== */}
+      <GisSidebar />
+
+      {/* =====================================================================
+          LAYER 3: THE STACKING DRAWERS (PANEL ORCHESTRATOR - STACKING DRAWER)
+          Wadah untuk menumpuk laci-laci samping (drawers).
+          Mulai dari koordinat left-16 (samping sidebar) dan top-16, z-30.
+      ====================================================================== */}
+      <PanelOrchestrator />
+
+      {/* =====================================================================
+          LAYER 4: AI COPILOT FLOATING TRIGGER
+          Tombol melayang taktis asisten kecerdasan buatan untuk Pimpinan.
+      ====================================================================== */}
+      {isExecutive && (
+        <div className="absolute top-[88px] right-6 z-30">
+          <button
+            type="button"
+            onClick={() => toast.success("AI Site Plan Reviewer diaktifkan di panel.")}
+            className="relative flex items-center justify-center w-12 h-12 bg-slate-900 border border-teal-500 text-teal-400 hover:bg-teal-600 hover:text-white transition-all shadow-[0_0_15px_rgba(13,148,136,0.4)] rounded-none outline-none group active:scale-95 cursor-pointer"
+            title="AI Site Plan Reviewer"
+          >
+            <div className="absolute inset-0 bg-teal-400/20 animate-ping opacity-30" />
+            <Sparkles size={20} className="relative z-10" />
+          </button>
         </div>
-        <div className="flex items-center space-x-2 text-xs font-semibold text-slate-500 bg-white dark:bg-slate-800 border dark:border-slate-700 px-3.5 py-1.5 rounded-lg shadow-sm">
-          <Layers className="h-4 w-4 text-teal-600 animate-pulse" />
-          <span>Total Terpetakan: {submissions.length} Kavling</span>
-        </div>
-      </div>
+      )}
 
-      {/* Map Container Wrapper */}
-      <div className="flex-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm relative overflow-hidden">
-        {isLoading ? (
-          <div className="absolute inset-0 z-10 bg-slate-50/70 dark:bg-slate-900/70 backdrop-blur-xs flex flex-col justify-center items-center space-y-3">
-            <Loader2 className="h-8 w-8 text-teal-600 animate-spin" />
-            <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Loading spatial layers...</span>
-          </div>
-        ) : null}
+      {/* =====================================================================
+          LAYER 5: MAP HUD & LEGENDA (KANAN / TENGAH BAWAH)
+          HUD Zoom Scale dan legenda mendatar yang terperinci di bawah layar.
+      ====================================================================== */}
+      <MapHUD />
+      <ZoningHorizontalLegend />
 
-        {/* Leaflet Map integration */}
-        <GISMapContainer>
-          <GISLayerControl />
-          <GISPolygonLayer data={polygons} />
-          <GISMarkerLayer data={markers} />
-        </GISMapContainer>
 
-        {/* Legend Overlay Panel */}
-        <div className="absolute bottom-6 left-6 z-[1000] bg-white/90 dark:bg-slate-800/90 backdrop-blur-md p-4 rounded-xl border border-slate-100 dark:border-slate-750 shadow-lg max-w-xs text-xs space-y-3">
-          <h5 className="font-bold text-slate-800 dark:text-white text-xs border-b pb-1.5 uppercase tracking-wider">
-            Legenda Peta
-          </h5>
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2.5">
-              <span className="h-3 w-6 bg-teal-500 rounded border border-teal-600 opacity-60"></span>
-              <span className="font-medium text-slate-600 dark:text-slate-350">Sedang Diverifikasi</span>
-            </div>
-            <div className="flex items-center space-x-2.5">
-              <span className="h-3 w-6 bg-emerald-500 rounded border border-emerald-600 opacity-60"></span>
-              <span className="font-medium text-slate-600 dark:text-slate-350">Site Plan Disahkan (Aktif)</span>
-            </div>
-            <div className="flex items-center space-x-2.5">
-              <span className="h-3 w-6 bg-rose-500 rounded border border-rose-600 opacity-60"></span>
-              <span className="font-medium text-slate-600 dark:text-slate-350">Ditolak / Ditangguhkan</span>
-            </div>
-          </div>
-        </div>
 
-      </div>
-    </div>
+    </main>
   );
 }

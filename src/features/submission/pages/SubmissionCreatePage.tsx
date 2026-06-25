@@ -9,7 +9,7 @@ import { ArrowLeft, Loader2, Save } from 'lucide-react';
 const submissionSchema = z.object({
   housingName: z.string().min(3, 'Nama perumahan minimal 3 karakter'),
   developerName: z.string().min(3, 'Nama developer minimal 3 karakter'),
-  landArea: z.number({ invalid_type_error: 'Luas lahan harus berupa angka' }).positive('Luas lahan harus bernilai positif'),
+  landArea: z.number({ message: 'Luas lahan harus berupa angka' }).positive('Luas lahan harus bernilai positif'),
   address: z.string().min(5, 'Alamat minimal 5 karakter'),
 });
 

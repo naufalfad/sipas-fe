@@ -1,4 +1,4 @@
-import { SitePlan } from '@/features/siteplan/types';
+import type { SitePlan } from '@/features/siteplan/types';
 
 export const mockSitePlans: SitePlan[] = [
   {
