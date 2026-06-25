@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Minus, Maximize2, Map as MapIcon } from "lucide-react";
+import { Plus, Minus, Maximize2, Map as MapIcon, Box } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * yang otomatis menyesuaikan tampilannya jika layer-layer tersebut aktif.
  */
 export default function MapHUD() {
-    const { activeLayers, mapZoom } = useGisUIStore();
+    const { activeLayers, mapZoom, mapPitch, is3DMode, toggle3DMode } = useGisUIStore();
     const [isLegendExpanded, setIsLegendExpanded] = useState(true);
 
     useEffect(() => {
@@ -160,10 +160,12 @@ export default function MapHUD() {
 
                 {/* 3. ZOOM SCALE HUD */}
                 <div className="bg-white/95 backdrop-blur border border-slate-300 px-4 py-1.5 flex items-center justify-between shadow-xl rounded-none text-[9px] font-black text-slate-700 uppercase tracking-widest leading-none h-10 select-none w-60">
-                    <span>Zoom Level: {mapZoom}</span>
+                    <span>Zoom: {Math.round(mapZoom)}</span>
+                    <span className="text-slate-300">|</span>
+                    <span>Pitch: {Math.round(mapPitch)}°</span>
                     <span className="text-slate-300">|</span>
                     <span>
-                        Skala: {mapZoom < 10 ? 'KABUPATEN' : mapZoom < 14 ? 'KECAMATAN' : 'DETAIL'}
+                        {mapZoom < 10 ? 'KAB.' : mapZoom < 14 ? 'KEC.' : 'DETAIL'}
                     </span>
                 </div>
             </div>
@@ -190,6 +192,18 @@ export default function MapHUD() {
                     title="Perkecil (Zoom Out)"
                 >
                     <Minus size={18} strokeWidth={2.5} />
+                </button>
+                {/* Tombol Toggle 3D/Flat */}
+                <button
+                    onClick={toggle3DMode}
+                    className={`w-10 h-10 flex items-center justify-center transition-colors active:bg-slate-200 rounded-none outline-none ${
+                        is3DMode
+                            ? 'bg-teal-600 text-white hover:bg-teal-700'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-teal-700'
+                    }`}
+                    title={is3DMode ? 'Beralih ke Tampilan Flat 2D' : 'Beralih ke Tampilan 3D Imersif'}
+                >
+                    <Box size={16} strokeWidth={2} />
                 </button>
             </div>
 

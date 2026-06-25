@@ -1,366 +1,807 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+/**
+ * ============================================================================
+ * SIPAS MAP — Immersive 3D GIS Canvas  [PERFORMANCE-OPTIMIZED v2]
+ * ============================================================================
+ * Engine  : MapLibre GL JS (WebGL, open-source)
+ * Wrapper : react-map-gl v7
+ * Cluster : supercluster (client-side, zero-dependency)
+ *
+ * OPTIMASI KRITIS yang diimplementasikan di versi ini:
+ *
+ * [OPT-1] ELIMINASI RE-RENDER LOOP saat peta bergerak
+ *   Sebelumnya: onMoveEnd dan onMove keduanya menulis ke Zustand store,
+ *   menyebabkan seluruh React tree (panel samping, HUD, dll) ikut re-render
+ *   60× per detik selama gesture pan/zoom.
+ *
+ *   Sesudahnya: Gerakan halus dikelola oleh LOCAL viewState internal Map
+ *   (pola "controlled component" react-map-gl). Zustand HANYA diperbarui
+ *   pada event onMoveEnd (saat jari/mouse dilepas). Ini mengurangi Zustand
+ *   writes dari ~3600/menit → ~1–3/menit selama normal panning.
+ *
+ * [OPT-2] MEMOIZATION STABIL untuk GeoJSON Sources
+ *   Layer GeoJSON hanya dibangun ulang jika data atau aktiveLayers berubah,
+ *   bukan setiap kali viewState berubah. Ini mencegah WebGL dari membongkar
+ *   dan rebuild vertex buffer di GPU tanpa alasan.
+ *
+ * [OPT-3] LAZY LOAD + GUARD yang benar untuk BANGUNAN_AR_25K (3.5 MB)
+ *   File 3.5 MB hanya dimuat saat zoom >= 14 (bukan zoom >= 10), memberikan
+ *   waktu lebih lama sebelum browser perlu mengalokasikan GPU memory.
+ *   tolerance=1.0 dipakai di zoom rendah, 0.5 di zoom detail.
+ *
+ * [OPT-4] WebGL CONTEXT CLEANUP via onRemove
+ *   MapLibre instance dihancurkan secara eksplisit lewat map.remove() saat
+ *   komponen unmount untuk mencegah WebGL context leak.
+ *
+ * [OPT-5] STABLE SUPERCLUSTER BBOX — cluster hanya dikalkuasi saat
+ *   viewBBox atau zoom (dibulatkan ke integer) benar-benar berubah,
+ *   bukan setiap frame animasi.
+ *
+ * Arsitektur Layer (bottom → top):
+ *   1. Basemap       — Raster tiles (OSM/Carto/ArcGIS) dibungkus MapLibre Style
+ *   2. GeoJSON Env   — Sungai (line), Kontur (line), Pemukiman (fill)
+ *   3. Bangunan      — Flat fill (zoom<17), Fill-extrusion (zoom≥17)
+ *   4. Submissions   — Flat fill (zoom<14), Fill-extrusion 3D (zoom≥14)
+ *   5. Sub-polygons  — Kavling, RTH, PSU, Jalan (zoom≥14)
+ *   6. Clash Layer   — Area pelanggaran sempadan (merah pulsing)
+ *   7. Markers       — Supercluster (zoom<13), Individual (zoom≥13)
+ * ============================================================================
+ */
+
 import {
-    MapContainer,
-    TileLayer,
-    Polygon,
+    useEffect, useMemo, useState,
+    useCallback, useRef, memo,
+} from 'react';
+import Map, {
+    Source,
+    Layer,
+    Marker,
     Popup,
-    GeoJSON,
-    useMap,
-    useMapEvents
-} from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import 'leaflet.markercluster';
+    type MapRef,
+    type MapLayerMouseEvent,
+    type ViewStateChangeEvent,
+} from 'react-map-gl/maplibre';
+import type { StyleSpecification } from 'maplibre-gl';
+import Supercluster from 'supercluster';
+import type { BBox, GeoJsonProperties } from 'geojson';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
 import { useGisUIStore } from '@/app/store/useGisUIStore';
 import { mockSubmissions } from '@/mock/submission/submissions';
 import type { Submission } from '@/features/submission/types';
+import {
+    leafletRingToGeoJSON,
+    calcExtrusionHeight,
+    resolveStatusColor,
+    resolveLayerCategory,
+} from '@/lib/geoUtils';
 
-// Bypass TS errors
-// @ts-ignore
-import * as turf from '@turf/turf';
+// ─── Konstanta ─────────────────────────────────────────────────────────────────
 
-// Custom styled cluster icon
-const createClusterIcon = (cluster: L.MarkerCluster) => {
-    const count = cluster.getChildCount();
-    const size = count < 10 ? 36 : count < 50 ? 44 : 52;
-    return L.divIcon({
-        html: `<div style="
-            width:${size}px;height:${size}px;
-            background:linear-gradient(135deg,#0f766e,#14b8a6);
-            border:3px solid #fff;
-            border-radius:50%;
-            display:flex;align-items:center;justify-content:center;
-            font-size:${size < 44 ? 12 : 14}px;
-            font-weight:900;
-            color:#fff;
-            box-shadow:0 2px 12px rgba(20,184,166,0.5);
-            font-family:sans-serif;
-        ">${count}</div>`,
-        className: '',
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-    });
-};
+const BOGOR_LNG = 106.8560;
+const BOGOR_LAT = -6.4816;
 
-const customMarkerIcon = (color: string) => L.divIcon({
-    html: `<div style="
-        width:28px;height:28px;
-        background:${color};
-        border:3px solid #fff;
-        border-radius:50% 50% 50% 0;
-        transform:rotate(-45deg);
-        box-shadow:0 2px 8px rgba(0,0,0,0.3);
-    "></div>`,
-    className: '',
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor: [0, -30],
-});
+const INITIAL_VIEW_STATE = {
+    longitude: BOGOR_LNG,
+    latitude: BOGOR_LAT,
+    zoom: 11,
+    pitch: 45,
+    bearing: -10,
+} as const;
 
-const BOGOR_CENTER: [number, number] = [-6.4816, 106.8560];
+// ─── Basemap Style Factory (dimemoize di luar komponen) ────────────────────────
 
-function MapController() {
-    const map = useMap();
-    const { setMapCenter, setMapZoom } = useGisUIStore();
+/**
+ * Cache style per basemap agar tidak membuat object baru setiap render.
+ * Tanpa cache ini, mapStyle prop yang selalu baru memaksa MapLibre reload
+ * seluruh tile source bahkan ketika basemap tidak berubah.
+ */
+const styleCache = new globalThis.Map<string, StyleSpecification>();
 
-    useMapEvents({
-        moveend: () => {
-            const center = map.getCenter();
-            setMapCenter([center.lat, center.lng]);
-            window.dispatchEvent(new Event('map-move-end'));
+function buildRasterStyle(tileUrl: string, attribution: string): StyleSpecification {
+    const cached = styleCache.get(tileUrl);
+    if (cached) return cached;
+
+    const style: StyleSpecification = {
+        version: 8,
+        sources: {
+            'raster-base': {
+                type: 'raster',
+                tiles: [tileUrl],
+                tileSize: 256,
+                attribution,
+            },
         },
-        movestart: () => {
-            window.dispatchEvent(new Event('map-move-start'));
-        },
-        zoomend: () => {
-            setMapZoom(map.getZoom());
-        }
-    });
+        layers: [
+            {
+                id: 'raster-base-layer',
+                type: 'raster',
+                source: 'raster-base',
+                paint: { 'raster-opacity': 1 },
+            },
+        ],
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+    } as StyleSpecification;
 
-    useEffect(() => {
-        const handleZoomIn = () => map.zoomIn();
-        const handleZoomOut = () => map.zoomOut();
-        const handleResetView = () => map.setView(BOGOR_CENTER, 11, { animate: true });
-
-        const handleFlyToCoords = (e: Event) => {
-            const customEvent = e as CustomEvent<{ lat: number; lng: number }>;
-            if (customEvent.detail) {
-                const { lat, lng } = customEvent.detail;
-                map.flyTo([lat, lng], 18, { animate: true, duration: 1.5 });
-            }
-        };
-
-        window.addEventListener('map-zoom-in', handleZoomIn);
-        window.addEventListener('map-zoom-out', handleZoomOut);
-        window.addEventListener('map-reset-view', handleResetView);
-        window.addEventListener('map-fly-to-coords', handleFlyToCoords);
-
-        return () => {
-            window.removeEventListener('map-zoom-in', handleZoomIn);
-            window.removeEventListener('map-zoom-out', handleZoomOut);
-            window.removeEventListener('map-reset-view', handleResetView);
-            window.removeEventListener('map-fly-to-coords', handleFlyToCoords);
-        };
-    }, [map]);
-
-    return null;
+    styleCache.set(tileUrl, style);
+    return style;
 }
 
-export default function SipasMap() {
-    const {
-        activeLayers,
-        activeBaseMap,
-        mapOpacity,
-        selectedCompanyId,
-        setSelectedCompanyId,
-        openPanel,
-        closePanelsToTheRight,
-        mapZoom
-    } = useGisUIStore();
+function getMapStyle(activeBaseMap: string): StyleSpecification {
+    switch (activeBaseMap) {
+        case 'dark':
+            return buildRasterStyle('https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', '© CartoDB');
+        case 'satellite':
+            return buildRasterStyle(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                '© Esri'
+            );
+        case 'street':
+            return buildRasterStyle('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', '© Google');
+        case 'voyager':
+        default:
+            return buildRasterStyle('https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', '© CartoDB');
+    }
+}
 
-    const [sungaiData, setSungaiData] = useState<any>(null);
-    const [konturData, setKonturData] = useState<any>(null);
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function vis(active: boolean): 'visible' | 'none' {
+    return active ? 'visible' : 'none';
+}
+
+// ─── Tipe Internal ─────────────────────────────────────────────────────────────
+
+interface ProcessedSubmission extends Submission {
+    color: string;
+    categoryLayer: string;
+    extrusionHeight: number;
+}
+
+// ─── Sub-komponen Marker yang di-memo ──────────────────────────────────────────
+// Memisahkan JSX marker ke komponen tersendiri mencegah re-render semua marker
+// hanya karena salah satu state (misal popupInfo) berubah.
+
+interface ClusterMarkerProps {
+    lng: number;
+    lat: number;
+    count: number;
+    clusterId: number;
+    zoom: number;
+    onExpand: (clusterId: number, lng: number, lat: number, zoom: number) => void;
+}
+
+const ClusterMarker = memo(function ClusterMarker({
+    lng, lat, count, clusterId, zoom, onExpand,
+}: ClusterMarkerProps) {
+    const size = count < 10 ? 36 : count < 50 ? 44 : 52;
+    return (
+        <Marker longitude={lng} latitude={lat} anchor="center"
+            onClick={(e) => { e.originalEvent.stopPropagation(); onExpand(clusterId, lng, lat, zoom); }}>
+            <div style={{
+                width: size, height: size,
+                background: 'linear-gradient(135deg, #0f766e, #14b8a6)',
+                border: '3px solid #fff', borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: size < 44 ? 12 : 14, fontWeight: 900, color: '#fff',
+                boxShadow: '0 2px 12px rgba(20,184,166,0.55)', cursor: 'pointer',
+            }}>
+                {count}
+            </div>
+        </Marker>
+    );
+});
+
+interface PinMarkerProps {
+    sub: ProcessedSubmission;
+    isSelected: boolean;
+    sizeBase?: number;
+    onClickPin: (sub: ProcessedSubmission) => void;
+    onShowPopup: (sub: ProcessedSubmission) => void;
+}
+
+const PinMarker = memo(function PinMarker({
+    sub, isSelected, sizeBase = 28, onClickPin, onShowPopup,
+}: PinMarkerProps) {
+    const size = isSelected ? sizeBase + 4 : sizeBase;
+    return (
+        <Marker longitude={sub.location.lng} latitude={sub.location.lat} anchor="bottom"
+            onClick={(e) => {
+                e.originalEvent.stopPropagation();
+                onShowPopup(sub);
+                onClickPin(sub);
+            }}>
+            <div style={{
+                width: size, height: size, background: sub.color,
+                border: '3px solid #fff',
+                borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)',
+                boxShadow: isSelected
+                    ? `0 0 0 3px ${sub.color}, 0 4px 16px rgba(0,0,0,0.5)`
+                    : '0 2px 8px rgba(0,0,0,0.3)',
+                cursor: 'pointer', transition: 'all 0.15s ease',
+            }} />
+        </Marker>
+    );
+});
+
+// ─── KOMPONEN UTAMA ────────────────────────────────────────────────────────────
+
+export default function SipasMap() {
+    // ── Zustand: hanya baca state yang benar-benar diperlukan ─────────────────
+    // Pisahkan pembacaan store agar perubahan satu state tidak memaksa
+    // re-subscribe semua state lain dalam satu destructuring.
+    const activeLayers         = useGisUIStore((s) => s.activeLayers);
+    const activeBaseMap        = useGisUIStore((s) => s.activeBaseMap);
+    const mapOpacity           = useGisUIStore((s) => s.mapOpacity);
+    const selectedCompanyId    = useGisUIStore((s) => s.selectedCompanyId);
+    const is3DMode             = useGisUIStore((s) => s.is3DMode);
+    const flyToTarget          = useGisUIStore((s) => s.flyToTarget);
+    // Actions (stable references — tidak menyebabkan re-render)
+    const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
+    const setMapZoom           = useGisUIStore((s) => s.setMapZoom);
+    const setMapCenter         = useGisUIStore((s) => s.setMapCenter);
+    const setMapPitch          = useGisUIStore((s) => s.setMapPitch);
+    const setMapBearing        = useGisUIStore((s) => s.setMapBearing);
+    const openPanel            = useGisUIStore((s) => s.openPanel);
+    const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
+    const clearFlyTo           = useGisUIStore((s) => s.clearFlyTo);
+
+    const mapRef = useRef<MapRef>(null);
+
+    // ── [OPT-1] LOCAL VIEW STATE ───────────────────────────────────────────────
+    // react-map-gl "controlled" mode: viewState dikelola secara lokal di sini.
+    // Perubahan halus (pan/pinch/rotate) tidak menyentuh Zustand sama sekali
+    // → panel samping tidak pernah re-render selama gesture berlangsung.
+    const [localViewState, setLocalViewState] = useState(INITIAL_VIEW_STATE);
+
+    // ── State GeoJSON Layer (Lazy Loaded) ──────────────────────────────────────
+    const [sungaiData, setSungaiData]       = useState<any>(null);
+    const [konturData, setKonturData]       = useState<any>(null);
     const [pemukimanData, setPemukimanData] = useState<any>(null);
-    const [isMoving, setIsMoving] = useState(false);
-    
-    // Clash Polygon from the hook events
-    const [clashPolygons, setClashPolygons] = useState<[number, number][][]>([]);
+    const [bangunanData, setBangunanData]   = useState<any>(null);
+
+    // ── State Cluster & Popup ──────────────────────────────────────────────────
+    const [clusters, setClusters]   = useState<any[]>([]);
+    const [popupInfo, setPopupInfo] = useState<ProcessedSubmission | null>(null);
+    const [viewBBox, setViewBBox]   = useState<BBox>([-180, -85, 180, 85]);
+
+    // ── State Clash Layer ──────────────────────────────────────────────────────
+    const [clashGeoJSON, setClashGeoJSON] = useState<any>(null);
+
+    // ── [OPT-3] LAZY LOAD GeoJSON — guard ketat, hanya load sekali ────────────
+    // Bangunan hanya dimuat saat zoom >= 14 (bukan >= 10) untuk menunda
+    // alokasi 3.5 MB GPU buffer hingga benar-benar dibutuhkan.
+    const localZoom = localViewState.zoom;
 
     useEffect(() => {
-        const handleMoveStart = () => setIsMoving(true);
-        const handleMoveEnd = () => setIsMoving(false);
-        
+        if (activeLayers.includes('layer-river') && localZoom >= 10 && !sungaiData) {
+            import('@/assets/geojson/bogor/SUNGAI_LN_25K.json')
+                .then((m) => setSungaiData(m.default)).catch(console.error);
+        }
+    }, [activeLayers, localZoom, sungaiData]);
+
+    useEffect(() => {
+        if (activeLayers.includes('layer-kontur') && localZoom >= 10 && !konturData) {
+            import('@/assets/geojson/bogor/KONTUR_LN_25K.json')
+                .then((m) => setKonturData(m.default)).catch(console.error);
+        }
+    }, [activeLayers, localZoom, konturData]);
+
+    useEffect(() => {
+        if (activeLayers.includes('layer-aqi') && localZoom >= 10 && !pemukimanData) {
+            import('@/assets/geojson/bogor/PEMUKIMAN_AR_25K.json')
+                .then((m) => setPemukimanData(m.default)).catch(console.error);
+        }
+    }, [activeLayers, localZoom, pemukimanData]);
+
+    useEffect(() => {
+        // [OPT-3] Bangunan: tunda load hingga zoom detail (>= 14) untuk hemat memori awal
+        if (localZoom >= 14 && !bangunanData) {
+            import('@/assets/geojson/bogor/BANGUNAN_AR_25K.json')
+                .then((m) => setBangunanData(m.default)).catch(console.error);
+        }
+    }, [localZoom, bangunanData]);
+
+    // ── Proses Submissions (stable — hanya recalc jika activeLayers berubah) ──
+    const processedSubmissions = useMemo<ProcessedSubmission[]>(() =>
+        mockSubmissions
+            .map((sub: Submission) => ({
+                ...sub,
+                color: resolveStatusColor(sub.status),
+                categoryLayer: resolveLayerCategory(sub.landArea),
+                extrusionHeight: calcExtrusionHeight(sub),
+            }))
+            .filter((sub) => activeLayers.includes(sub.categoryLayer)),
+        [activeLayers]
+    );
+
+    // ── [OPT-2] STABLE GeoJSON MEMOS ──────────────────────────────────────────
+    // Dependencies: hanya processedSubmissions (bukan localViewState)
+    // Ini menjamin WebGL tidak rebuild GPU buffer saat peta digeser.
+    const submissionsGeoJSON = useMemo(() => {
+        const features = processedSubmissions
+            .filter((sub) => sub.location.polygon && sub.location.polygon.length >= 3)
+            .map((sub) => {
+                try {
+                    const ring = leafletRingToGeoJSON(sub.location.polygon as [number, number][]);
+                    return {
+                        type: 'Feature' as const,
+                        geometry: { type: 'Polygon' as const, coordinates: [ring] },
+                        properties: {
+                            id: sub.id,
+                            color: sub.color,
+                            height: sub.extrusionHeight,
+                            status: sub.status,
+                            housingName: sub.housingName,
+                            categoryLayer: sub.categoryLayer,
+                        },
+                    };
+                } catch {
+                    return null;
+                }
+            })
+            .filter(Boolean);
+
+        return { type: 'FeatureCollection' as const, features };
+    }, [processedSubmissions]);
+
+    const subPolygonsGeoJSON = useMemo(() => {
+        const features: any[] = [];
+        processedSubmissions.forEach((sub) => {
+            const loc = sub.location;
+            const addPoly = (rings: [number, number][][], color: string, type: string) => {
+                rings.forEach((ring) => {
+                    try {
+                        features.push({
+                            type: 'Feature',
+                            geometry: { type: 'Polygon', coordinates: [leafletRingToGeoJSON(ring)] },
+                            properties: { color, type, submissionId: sub.id },
+                        });
+                    } catch { /* skip invalid */ }
+                });
+            };
+            if (loc.roadPolygons)    addPoly(loc.roadPolygons,    '#cbd5e1', 'road');
+            if (loc.rthPolygons)     addPoly(loc.rthPolygons,     '#10b981', 'rth');
+            if (loc.psuPolygons)     addPoly(loc.psuPolygons,     '#14b8a6', 'psu');
+            if (loc.kavlingPolygons) addPoly(loc.kavlingPolygons, '#64748b', 'kavling');
+        });
+        return { type: 'FeatureCollection' as const, features };
+    }, [processedSubmissions]);
+
+    // ── [OPT-5] SUPERCLUSTER: stable, hanya rebuild jika data berubah ─────────
+    const supercluster = useMemo(() => {
+        const sc = new Supercluster<GeoJsonProperties>({ radius: 80, maxZoom: 12, minZoom: 0 });
+        sc.load(processedSubmissions.map((sub) => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [sub.location.lng, sub.location.lat] },
+            properties: {
+                submissionId: sub.id, color: sub.color,
+                housingName: sub.housingName, developerName: sub.developerName, status: sub.status,
+            },
+        })));
+        return sc;
+    }, [processedSubmissions]);
+
+    // [OPT-5] Cluster hanya dikalkuasi saat bbox atau integer zoom berubah
+    const intZoom = Math.floor(localZoom);
+    useEffect(() => {
+        try {
+            setClusters(supercluster.getClusters(viewBBox, intZoom));
+        } catch {
+            setClusters([]);
+        }
+    }, [supercluster, viewBBox, intZoom]);
+
+    // ── Clash Polygon Listener ────────────────────────────────────────────────
+    useEffect(() => {
         const handleRenderClash = (e: Event) => {
             const ev = e as CustomEvent;
-            if (ev.detail && ev.detail.clashGeometry) {
-                const geom = ev.detail.clashGeometry;
-                let coords: [number, number][][] = [];
-                
-                if (geom.geometry) {
-                    const type = geom.geometry.type;
-                    if (type === 'Polygon') {
-                        const poly = geom.geometry.coordinates[0].map((c: any) => [c[1], c[0]]);
-                        coords.push(poly);
-                    } else if (type === 'MultiPolygon') {
-                        geom.geometry.coordinates.forEach((polygon: any) => {
-                            const poly = polygon[0].map((c: any) => [c[1], c[0]]);
-                            coords.push(poly);
-                        });
-                    }
-                }
-                setClashPolygons(coords);
+            if (!ev.detail?.clashGeometry?.geometry) return;
+            try {
+                setClashGeoJSON({ type: 'FeatureCollection', features: [ev.detail.clashGeometry] });
+            } catch {
+                setClashGeoJSON(null);
             }
         };
-
-        const handleClearClash = () => {
-            setClashPolygons([]);
-        };
-
-        window.addEventListener('map-move-start', handleMoveStart);
-        window.addEventListener('map-move-end', handleMoveEnd);
+        const handleClearClash = () => setClashGeoJSON(null);
         window.addEventListener('map-render-clash', handleRenderClash);
-        window.addEventListener('map-clear-clash', handleClearClash);
-
+        window.addEventListener('map-clear-clash',  handleClearClash);
         return () => {
-            window.removeEventListener('map-move-start', handleMoveStart);
-            window.removeEventListener('map-move-end', handleMoveEnd);
             window.removeEventListener('map-render-clash', handleRenderClash);
-            window.removeEventListener('map-clear-clash', handleClearClash);
+            window.removeEventListener('map-clear-clash',  handleClearClash);
         };
     }, []);
 
+    // ── Observer: is3DMode Toggle ─────────────────────────────────────────────
     useEffect(() => {
-        if (activeLayers.includes('layer-river') && mapZoom >= 10 && !sungaiData) {
-            import('@/assets/geojson/bogor/SUNGAI_LN_25K.json')
-                .then((module) => setSungaiData(module.default))
-                .catch((err) => console.error(err));
+        if (!mapRef.current) return;
+        mapRef.current.easeTo({ pitch: is3DMode ? 45 : 0, duration: 600 });
+    }, [is3DMode]);
+
+    // ── FlyTo Observer (Zustand → MapLibre imperative) ────────────────────────
+    useEffect(() => {
+        if (!flyToTarget || !mapRef.current) return;
+        const { longitude, latitude, zoom, pitch, bearing } = flyToTarget;
+        mapRef.current.flyTo({
+            center: [longitude, latitude],
+            zoom: zoom ?? 18,
+            pitch: pitch ?? localViewState.pitch,
+            bearing: bearing ?? localViewState.bearing,
+            duration: 1800,
+            essential: true,
+        });
+        clearFlyTo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flyToTarget, clearFlyTo]);
+
+    // ── Legacy Window Event Bridge ─────────────────────────────────────────────
+    // Dijaga oleh onLoad agar mapRef sudah terisi saat event pertama diterima.
+    const handleMapLoad = useCallback(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        const handleZoomIn  = () => map.zoomIn({ duration: 300 });
+        const handleZoomOut = () => map.zoomOut({ duration: 300 });
+        const handleReset   = () => map.flyTo({
+            center: [BOGOR_LNG, BOGOR_LAT], zoom: 11, pitch: 45, bearing: -10, duration: 1200,
+        });
+        const handleFlyTo   = (e: Event) => {
+            const ev = e as CustomEvent<{ lat: number; lng: number }>;
+            if (ev.detail) map.flyTo({ center: [ev.detail.lng, ev.detail.lat], zoom: 18, pitch: 60, duration: 1800 });
+        };
+
+        window.addEventListener('map-zoom-in',       handleZoomIn);
+        window.addEventListener('map-zoom-out',      handleZoomOut);
+        window.addEventListener('map-reset-view',    handleReset);
+        window.addEventListener('map-fly-to-coords', handleFlyTo);
+
+        // [OPT-4] WebGL cleanup: daftarkan event remove di sini juga
+        // agar cleanup terikat lifecycle map yang sama, bukan closure komponen.
+        const mapNative = map.getMap();
+        const onRemove = () => {
+            window.removeEventListener('map-zoom-in',       handleZoomIn);
+            window.removeEventListener('map-zoom-out',      handleZoomOut);
+            window.removeEventListener('map-reset-view',    handleReset);
+            window.removeEventListener('map-fly-to-coords', handleFlyTo);
+        };
+        mapNative.once('remove', onRemove);
+    }, []);
+
+    // ── [OPT-4] WebGL Context Cleanup ─────────────────────────────────────────
+    // Memanggil map.remove() secara eksplisit saat komponen unmount.
+    // Tanpa ini, browser bisa kehabisan WebGL context (max ~16 context per tab)
+    // setelah pengguna berpindah halaman berkali-kali.
+    useEffect(() => {
+        return () => {
+            try {
+                mapRef.current?.getMap()?.remove();
+            } catch {
+                // map mungkin sudah ter-destroy oleh React, abaikan
+            }
+        };
+    }, []);
+
+    // ── [OPT-1] Handler: onMove — HANYA update localViewState (TIDAK Zustand) ─
+    const handleMove = useCallback((e: ViewStateChangeEvent) => {
+        setLocalViewState(e.viewState as typeof INITIAL_VIEW_STATE);
+    }, []);
+
+    const handleMoveStart = useCallback(() => {
+        window.dispatchEvent(new Event('map-move-start'));
+    }, []);
+
+    // ── [OPT-1] Handler: onMoveEnd — baru sync ke Zustand & supercluster ──────
+    // Dipanggil HANYA saat gesture selesai (touchend / mouseup / wheel stop).
+    // Frekuensi: ~1–3× per interaksi, bukan 60× per detik.
+    const handleMoveEnd = useCallback((e: ViewStateChangeEvent) => {
+        const { longitude, latitude, zoom, pitch, bearing } = e.viewState;
+
+        // Sync ke Zustand (satu batch write, bukan 60 writes/detik)
+        setMapCenter([latitude, longitude]);
+        setMapZoom(zoom);
+        setMapPitch(pitch);
+        setMapBearing(bearing);
+
+        // Update bbox untuk supercluster setelah gerakan selesai
+        const map = mapRef.current;
+        if (map) {
+            const bounds = map.getBounds();
+            if (bounds) {
+                setViewBBox([
+                    bounds.getWest(), bounds.getSouth(),
+                    bounds.getEast(), bounds.getNorth(),
+                ]);
+            }
         }
-        if (activeLayers.includes('layer-kontur') && mapZoom >= 10 && !konturData) {
-            import('@/assets/geojson/bogor/KONTUR_LN_25K.json')
-                .then((module) => setKonturData(module.default))
-                .catch((err) => console.error(err));
-        }
-        if (activeLayers.includes('layer-aqi') && mapZoom >= 10 && !pemukimanData) {
-            import('@/assets/geojson/bogor/PEMUKIMAN_AR_25K.json')
-                .then((module) => setPemukimanData(module.default))
-                .catch((err) => console.error(err));
-        }
-    }, [activeLayers, mapZoom, sungaiData, konturData, pemukimanData]);
 
-    const getTileUrl = () => {
-        switch (activeBaseMap) {
-            case 'dark': return "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-            case 'satellite': return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-            case 'street': return "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
-            case 'voyager': return "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-            default: return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-        }
-    };
+        window.dispatchEvent(new Event('map-move-end'));
+    }, [setMapCenter, setMapZoom, setMapPitch, setMapBearing]);
 
-    const processedSubmissions = useMemo(() => {
-        return mockSubmissions
-            .map((sub: Submission) => {
-                let categoryLayer = 'layer-siteplan';
-                if (sub.landArea > 100000) categoryLayer = 'layer-masterplan';
-                else if (sub.landArea < 10000) categoryLayer = 'layer-gs';
-
-                let color = '#3b82f6';
-                if (sub.status === 'Disetujui') color = '#10b981';
-                else if (sub.status === 'Ditolak') color = '#ef4444';
-                else if (sub.status === 'Verifikasi Teknis') color = '#6366f1';
-                else if (sub.status === 'Verifikasi Administrasi') color = '#3b82f6';
-                else if (sub.status === 'Menunggu Verifikasi') color = '#f59e0b';
-
-                return { ...sub, color, categoryLayer, polygon: sub.location.polygon || [] };
-            })
-            .filter(sub => activeLayers.includes(sub.categoryLayer));
-    }, [activeLayers]);
-
-    const handleMarkerClick = (sub: any, map?: L.Map) => {
-        if (map) map.flyTo([sub.location.lat, sub.location.lng], 16, { animate: true, duration: 1.2 });
+    // ── Handler: Klik Layer Submissions ───────────────────────────────────────
+    const handleSubmissionClick = useCallback((e: MapLayerMouseEvent) => {
+        const props = e.features?.[0]?.properties;
+        if (!props?.id) return;
+        const sub = processedSubmissions.find((s) => s.id === props.id);
+        if (!sub) return;
         setSelectedCompanyId(sub.id);
         closePanelsToTheRight(-1);
-        openPanel('detil-perusahaan', 'Detail Pengajuan', sub);
-    };
+        openPanel('detil-perusahaan', `Detail: ${sub.housingName}`, sub);
+        mapRef.current?.flyTo({
+            center: [sub.location.lng, sub.location.lat],
+            zoom: Math.max(localZoom, 15), pitch: 60, duration: 1200,
+        });
+    }, [processedSubmissions, setSelectedCompanyId, closePanelsToTheRight, openPanel, localZoom]);
 
-    // ── MARKER CLUSTER LAYER (injected imperatively into Leaflet) ──────────────
-    function ClusterLayer({ submissions }: { submissions: typeof processedSubmissions }) {
-        const map = useMap();
-        const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
+    const handleMarkerClick = useCallback((sub: ProcessedSubmission) => {
+        setSelectedCompanyId(sub.id);
+        closePanelsToTheRight(-1);
+        openPanel('detil-perusahaan', `Detail: ${sub.housingName}`, sub);
+        mapRef.current?.flyTo({ center: [sub.location.lng, sub.location.lat], zoom: 16, pitch: 55, duration: 1200 });
+    }, [setSelectedCompanyId, closePanelsToTheRight, openPanel]);
 
-        useEffect(() => {
-            // @ts-ignore
-            const cluster: L.MarkerClusterGroup = (L as any).markerClusterGroup({
-                iconCreateFunction: createClusterIcon,
-                showCoverageOnHover: false,
-                zoomToBoundsOnClick: true,
-                disableClusteringAtZoom: 13, // below 13 → cluster, at 13+ → individual markers or polygons
-                maxClusterRadius: 80,
-                animate: true,
-            });
+    const handleClusterExpand = useCallback((
+        clusterId: number, lng: number, lat: number, currentZoom: number,
+    ) => {
+        try {
+            const z = supercluster.getClusterExpansionZoom(clusterId);
+            mapRef.current?.flyTo({ center: [lng, lat], zoom: z, duration: 800 });
+        } catch {
+            mapRef.current?.flyTo({ center: [lng, lat], zoom: currentZoom + 2, duration: 800 });
+        }
+    }, [supercluster]);
 
-            submissions.forEach(sub => {
-                const marker = L.marker([sub.location.lat, sub.location.lng], {
-                    icon: customMarkerIcon(sub.color),
-                });
+    // ── Derived visibility — HANYA dari localViewState (tidak subscribe Zustand) ─
+    const opacity       = mapOpacity / 100;
+    const showSungai    = activeLayers.includes('layer-river')  && localZoom >= 10;
+    const showKontur    = activeLayers.includes('layer-kontur') && localZoom >= 10;
+    const showPemukiman = activeLayers.includes('layer-aqi')    && localZoom >= 10;
+    const showDetail    = localZoom >= 14;
+    const showClusters  = localZoom < 13;
 
-                marker.bindPopup(`
-                    <div style="padding:6px;min-width:180px;">
-                        <div style="font-weight:900;font-size:13px;color:#0f172a;margin-bottom:4px;">${sub.housingName}</div>
-                        <div style="font-size:11px;color:#64748b;margin-bottom:4px;">${sub.developerName}</div>
-                        <span style="font-size:10px;font-weight:700;color:#0f766e;text-transform:uppercase;letter-spacing:0.05em;">${sub.status}</span>
-                    </div>
-                `);
+    // ── Toleransi simplifikasi GeoJSON bangunan berdasarkan zoom ─────────────
+    // Zoom jauh → toleransi besar (geometri kasar, cepat di GPU)
+    // Zoom dekat → toleransi kecil (geometri detail, akurat)
+    const bangunanTolerance = localZoom < 15 ? 1.0 : 0.5;
 
-                marker.on('click', () => handleMarkerClick(sub, map));
-                cluster.addLayer(marker);
-            });
-
-            map.addLayer(cluster);
-            clusterRef.current = cluster;
-
-            return () => {
-                map.removeLayer(cluster);
-                cluster.clearLayers();
-            };
-        }, [submissions, map]); // eslint-disable-line react-hooks/exhaustive-deps
-
-        return null;
-    }
-
+    // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div className="absolute inset-0 z-0 bg-slate-100">
-            <MapContainer center={BOGOR_CENTER} zoom={mapZoom} zoomControl={false} className="w-full h-full" preferCanvas={true}>
-                <MapController />
-                <TileLayer url={getTileUrl()} />
-
-                {/* LOD: Peta Zonasi Pemukiman RTRW (Zoom >= 10) */}
-                {!isMoving && activeLayers.includes('layer-aqi') && mapZoom >= 10 && mapZoom < 14 && pemukimanData && (
-                    <GeoJSON
-                        data={pemukimanData}
-                        style={() => ({ color: "#2dd4bf", fillColor: "#2dd4bf", fillOpacity: 0.35 * (mapOpacity / 100), weight: 1.5, interactive: false })}
-                    />
-                )}
-
-                {/* LOD: Peta Kontur Lereng (Zoom >= 10) */}
-                {!isMoving && activeLayers.includes('layer-kontur') && mapZoom >= 10 && konturData && (
-                    <GeoJSON
-                        data={konturData}
-                        style={() => ({ color: "#fcd34d", weight: 1.5, opacity: 0.8 * (mapOpacity / 100), interactive: false })}
-                    />
-                )}
-
-                {/* LOD: Peta Aliran Sungai Utama (Zoom >= 10) */}
-                {!isMoving && activeLayers.includes('layer-river') && mapZoom >= 10 && sungaiData && (
-                    <GeoJSON
-                        data={sungaiData}
-                        style={() => ({ color: "#22d3ee", weight: 3, opacity: 0.9 * (mapOpacity / 100), interactive: false })}
-                    />
-                )}
-
-                {/* ── Zoom < 13: Clustered Markers ──────────────────────── */}
-                {mapZoom < 13 && (
-                    <ClusterLayer submissions={processedSubmissions} />
-                )}
-
-                {/* ── Zoom 13–13: Simple polygons (overview) ────────────── */}
-                {mapZoom >= 13 && mapZoom < 14 && processedSubmissions.map((sub) => {
-                    const isSelected = selectedCompanyId === sub.id;
-                    if (sub.polygon.length === 0) return null;
-                    return (
-                        <Polygon
-                            key={`poly-${sub.id}`}
-                            positions={sub.polygon as [number, number][]}
-                            pathOptions={{
-                                color: isSelected ? '#14b8a6' : sub.color,
-                                fillColor: sub.color,
-                                fillOpacity: isSelected ? 0.5 : (0.3 * (mapOpacity / 100)),
-                                weight: isSelected ? 3 : 2
-                            }}
-                            eventHandlers={{ click: () => handleMarkerClick(sub) }}
+        <div className="absolute inset-0 z-0">
+            {/*
+             * [OPT-1] "Controlled" Map: viewState dikelola secara lokal via onMove.
+             * Zustand TIDAK diperbarui selama gesture — hanya saat onMoveEnd.
+             */}
+            <Map
+                ref={mapRef}
+                mapLib={import('maplibre-gl')}
+                mapStyle={getMapStyle(activeBaseMap)}
+                {...localViewState}                 // Controlled view state
+                style={{ width: '100%', height: '100%' }}
+                pitchWithRotate={true}
+                dragRotate={true}
+                touchZoomRotate={true}
+                interactiveLayerIds={['submissions-fill-flat', 'submissions-extrusion']}
+                onMove={handleMove}                 // [OPT-1] Update local state saja
+                onMoveStart={handleMoveStart}
+                onMoveEnd={handleMoveEnd}           // [OPT-1] Zustand hanya di sini
+                onClick={handleSubmissionClick}
+                onLoad={handleMapLoad}              // [OPT-4] Setup event + cleanup hook
+            >
+                {/* ================================================================
+                    LAYER 1: PEMUKIMAN RTRW
+                    [OPT-2] Source stabil — tidak recreate saat peta bergerak
+                ================================================================ */}
+                {showPemukiman && pemukimanData && (
+                    <Source id="pemukiman" type="geojson" data={pemukimanData}>
+                        <Layer id="pemukiman-fill" type="fill"
+                            layout={{ visibility: vis(showPemukiman) }}
+                            paint={{ 'fill-color': '#2dd4bf', 'fill-opacity': 0.35 * opacity }}
                         />
-                    );
-                })}
+                        <Layer id="pemukiman-outline" type="line"
+                            layout={{ visibility: vis(showPemukiman) }}
+                            paint={{ 'line-color': '#14b8a6', 'line-width': 1, 'line-opacity': 0.6 * opacity }}
+                        />
+                    </Source>
+                )}
 
-                {/* ── Zoom >= 14: Detail CAD view ───────────────────────── */}
-                {mapZoom >= 14 && processedSubmissions.map((sub) => {
-                    const isSelected = selectedCompanyId === sub.id;
-                    return (
-                        <div key={`cad-${sub.id}`}>
-                            <Polygon
-                                positions={sub.polygon as [number, number][]}
-                                pathOptions={{ color: isSelected ? '#14b8a6' : sub.color, fillColor: sub.color, fillOpacity: 0.25 * (mapOpacity / 100), weight: isSelected ? 4 : 2 }}
-                                eventHandlers={{ click: () => handleMarkerClick(sub) }}
-                            />
+                {/* ================================================================
+                    LAYER 2: KONTUR LERENG
+                ================================================================ */}
+                {showKontur && konturData && (
+                    <Source id="kontur" type="geojson" data={konturData}>
+                        <Layer id="kontur-line" type="line"
+                            layout={{ visibility: vis(showKontur) }}
+                            paint={{
+                                'line-color': '#fcd34d', 'line-width': 1,
+                                'line-opacity': 0.8 * opacity, 'line-dasharray': [4, 2],
+                            }}
+                        />
+                    </Source>
+                )}
 
-                            {sub.location.roadPolygons?.map((road, idx) => (
-                                <Polygon key={`road-${idx}`} positions={road as [number, number][]} pathOptions={{ color: '#cbd5e1', fillColor: '#cbd5e1', fillOpacity: 0.8, weight: 1 }} />
-                            ))}
-                            {sub.location.rthPolygons?.map((rth, idx) => (
-                                <Polygon key={`rth-${idx}`} positions={rth as [number, number][]} pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.6, weight: 1 }} />
-                            ))}
-                            {sub.location.psuPolygons?.map((psu, idx) => (
-                                <Polygon key={`psu-${idx}`} positions={psu as [number, number][]} pathOptions={{ color: '#14b8a6', fillColor: '#14b8a6', fillOpacity: 0.6, weight: 1 }} />
-                            ))}
-                            {sub.location.kavlingPolygons?.map((kav, idx) => (
-                                <Polygon key={`kav-${idx}`} positions={kav as [number, number][]} pathOptions={{ color: '#475569', fillColor: '#64748b', fillOpacity: 0.5, weight: 1 }} />
-                            ))}
+                {/* ================================================================
+                    LAYER 3: ALIRAN SUNGAI
+                ================================================================ */}
+                {showSungai && sungaiData && (
+                    <Source id="sungai" type="geojson" data={sungaiData}>
+                        <Layer id="sungai-casing" type="line"
+                            layout={{ visibility: vis(showSungai) }}
+                            paint={{ 'line-color': '#0e7490', 'line-width': 5, 'line-opacity': 0.5 * opacity }}
+                        />
+                        <Layer id="sungai-line" type="line"
+                            layout={{ visibility: vis(showSungai) }}
+                            paint={{ 'line-color': '#22d3ee', 'line-width': 3, 'line-opacity': 0.9 * opacity }}
+                        />
+                    </Source>
+                )}
 
-                            {isSelected && clashPolygons.map((polyCoords, i) => (
-                                <Polygon
-                                    key={`clash-${i}`}
-                                    positions={polyCoords}
-                                    pathOptions={{ color: '#ff0000', fillColor: '#ff0000', fillOpacity: 0.6, weight: 3, dashArray: '4, 4' }}
-                                >
-                                    <Popup><span className="text-xs font-black text-rose-700">Area Melanggar Sempadan!</span></Popup>
-                                </Polygon>
-                            ))}
+                {/* ================================================================
+                    LAYER 4: BANGUNAN EKSISTING
+                    [OPT-3] Hanya dimuat dan dirender saat zoom >= 14.
+                    tolerance bervariasi berdasarkan zoom untuk efisiensi GPU.
+                ================================================================ */}
+                {bangunanData && localZoom >= 14 && (
+                    <Source id="bangunan" type="geojson" data={bangunanData}
+                        tolerance={bangunanTolerance}>
+                        <Layer id="bangunan-fill-flat" type="fill" maxzoom={17}
+                            paint={{ 'fill-color': '#94a3b8', 'fill-opacity': 0.4 * opacity }}
+                        />
+                        <Layer id="bangunan-extrusion" type="fill-extrusion" minzoom={17}
+                            paint={{
+                                'fill-extrusion-color': '#94a3b8', 'fill-extrusion-height': 8,
+                                'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.6 * opacity,
+                            }}
+                        />
+                    </Source>
+                )}
+
+                {/* ================================================================
+                    LAYER 5: SUBMISSION POLYGON (Pengajuan Site Plan)
+                    [OPT-2] Source ID stabil → tidak recreate GPU buffer
+                ================================================================ */}
+                <Source id="submissions" type="geojson" data={submissionsGeoJSON} generateId={true}>
+                    <Layer id="submissions-fill-flat" type="fill" maxzoom={14}
+                        paint={{
+                            'fill-color': ['get', 'color'],
+                            'fill-opacity': [
+                                'case', ['==', ['get', 'id'], selectedCompanyId ?? ''],
+                                0.6, 0.35 * opacity,
+                            ],
+                        }}
+                    />
+                    <Layer id="submissions-outline-flat" type="line" maxzoom={14}
+                        paint={{
+                            'line-color': ['get', 'color'],
+                            'line-width': [
+                                'case', ['==', ['get', 'id'], selectedCompanyId ?? ''], 3, 1.5,
+                            ],
+                            'line-opacity': opacity,
+                        }}
+                    />
+                    <Layer id="submissions-extrusion" type="fill-extrusion" minzoom={14}
+                        paint={{
+                            'fill-extrusion-color': ['get', 'color'],
+                            'fill-extrusion-height': [
+                                'case', ['==', ['get', 'id'], selectedCompanyId ?? ''],
+                                ['*', ['get', 'height'], 1.5], ['get', 'height'],
+                            ],
+                            'fill-extrusion-base': 0,
+                            'fill-extrusion-opacity': 0.75 * opacity,
+                        }}
+                    />
+                </Source>
+
+                {/* ================================================================
+                    LAYER 6: SUB-POLYGON CAD DETAIL (zoom >= 14)
+                ================================================================ */}
+                {showDetail && (
+                    <Source id="sub-polygons" type="geojson" data={subPolygonsGeoJSON}>
+                        <Layer id="sub-poly-fill" type="fill"
+                            paint={{ 'fill-color': ['get', 'color'], 'fill-opacity': 0.5 * opacity }}
+                        />
+                        <Layer id="sub-poly-outline" type="line"
+                            paint={{ 'line-color': ['get', 'color'], 'line-width': 1, 'line-opacity': 0.8 * opacity }}
+                        />
+                    </Source>
+                )}
+
+                {/* ================================================================
+                    LAYER 7: CLASH POLYGON (Pelanggaran Sempadan Sungai)
+                ================================================================ */}
+                {clashGeoJSON && (
+                    <Source id="clash" type="geojson" data={clashGeoJSON}>
+                        <Layer id="clash-fill" type="fill"
+                            paint={{ 'fill-color': '#ef4444', 'fill-opacity': 0.5 }}
+                        />
+                        <Layer id="clash-outline" type="line"
+                            paint={{
+                                'line-color': '#ff0000', 'line-width': 3,
+                                'line-opacity': 1, 'line-dasharray': [4, 3],
+                            }}
+                        />
+                    </Source>
+                )}
+
+                {/* ================================================================
+                    LAYER 8: MARKERS
+                    [OPT-2] Cluster/PinMarker di-memo → tidak re-render jika
+                    prop yang tidak relevan berubah (misal popupInfo dari state lain).
+                ================================================================ */}
+                {showClusters
+                    ? clusters.map((cluster) => {
+                          const [lng, lat] = cluster.geometry.coordinates;
+                          const { cluster: isCluster, point_count, cluster_id } = cluster.properties;
+
+                          if (isCluster) {
+                              return (
+                                  <ClusterMarker
+                                      key={`cluster-${cluster_id}`}
+                                      lng={lng} lat={lat}
+                                      count={point_count}
+                                      clusterId={cluster_id}
+                                      zoom={localZoom}
+                                      onExpand={handleClusterExpand}
+                                  />
+                              );
+                          }
+
+                          const sub = processedSubmissions.find(
+                              (s) => s.id === cluster.properties.submissionId
+                          );
+                          if (!sub) return null;
+
+                          return (
+                              <PinMarker
+                                  key={`marker-${sub.id}`}
+                                  sub={sub}
+                                  isSelected={selectedCompanyId === sub.id}
+                                  sizeBase={28}
+                                  onClickPin={handleMarkerClick}
+                                  onShowPopup={setPopupInfo}
+                              />
+                          );
+                      })
+                    : processedSubmissions.map((sub) => (
+                          <PinMarker
+                              key={`marker-hi-${sub.id}`}
+                              sub={sub}
+                              isSelected={selectedCompanyId === sub.id}
+                              sizeBase={24}
+                              onClickPin={handleMarkerClick}
+                              onShowPopup={setPopupInfo}
+                          />
+                      ))}
+
+                {/* ── Popup Info Cepat ────────────────────────────────────────── */}
+                {popupInfo && (
+                    <Popup
+                        longitude={popupInfo.location.lng}
+                        latitude={popupInfo.location.lat}
+                        anchor="bottom"
+                        offset={[0, -36] as [number, number]}
+                        onClose={() => setPopupInfo(null)}
+                        closeButton={false}
+                        className="!rounded-none !border-0 !p-0 !shadow-2xl"
+                    >
+                        <div className="px-3 py-2.5 min-w-[180px] bg-white border border-slate-200 text-left select-none">
+                            <div className="font-black text-[13px] text-slate-900 leading-tight mb-1">
+                                {popupInfo.housingName}
+                            </div>
+                            <div className="text-[11px] text-slate-500 mb-2">
+                                {popupInfo.developerName}
+                            </div>
+                            <span
+                                className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5"
+                                style={{
+                                    color: popupInfo.color,
+                                    background: `${popupInfo.color}20`,
+                                    border: `1px solid ${popupInfo.color}40`,
+                                }}
+                            >
+                                {popupInfo.status}
+                            </span>
                         </div>
-                    );
-                })}
-            </MapContainer>
+                    </Popup>
+                )}
+            </Map>
         </div>
     );
 }

@@ -1,7 +1,6 @@
 import { useFormContext } from 'react-hook-form';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 import { UploadCloud, MapPin } from 'lucide-react';
-import { TileLayer } from 'react-leaflet';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
 
@@ -181,11 +180,7 @@ export const CoordinateSection = () => {
       {/* Wadah Peta */}
       <div className="h-[400px] w-full border-2 border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-inner">
         <GISMapContainer>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          {/* Komponen Drawing yang kita buat di Step 2 */}
+          {/* GISDrawingMap dirender sebagai children dari Map internal GISMapContainer */}
           <GISDrawingMap onShapeChange={handleMapChange} />
         </GISMapContainer>
       </div>
