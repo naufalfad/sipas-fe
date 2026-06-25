@@ -771,6 +771,19 @@ export default function SipasMap() {
     // ── Observer: is3DMode Toggle ─────────────────────────────────────────────
     useEffect(() => {
         if (!mapRef.current) return;
+        
+        // Manual override for MapLibre dynamic property bug
+        const nativeMap = mapRef.current.getMap();
+        if (nativeMap) {
+            if (is3DMode) {
+                nativeMap.dragRotate.enable();
+                nativeMap.touchZoomRotate.enable();
+            } else {
+                nativeMap.dragRotate.disable();
+                nativeMap.touchZoomRotate.disable();
+            }
+        }
+
         const targetPitch = is3DMode ? 45 : 0;
         const targetBearing = is3DMode ? -10 : 0;
         setLocalViewState((prev) => ({
