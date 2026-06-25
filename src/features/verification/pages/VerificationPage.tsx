@@ -1,5 +1,4 @@
-import React from 'react';
-import { ShieldCheck, ClipboardCheck, MessageSquare } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export default function VerificationPage() {
   return (
