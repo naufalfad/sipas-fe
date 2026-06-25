@@ -61,6 +61,8 @@ import Map, {
     type ViewStateChangeEvent,
 } from 'react-map-gl/maplibre';
 import type { StyleSpecification } from 'maplibre-gl';
+import { MercatorCoordinate } from 'maplibre-gl';
+import * as THREE from 'three';
 import Supercluster from 'supercluster';
 import type { BBox, GeoJsonProperties } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -86,7 +88,9 @@ const INITIAL_VIEW_STATE = {
     zoom: 11,
     pitch: 45,
     bearing: -10,
-} as const;
+};
+
+type MapViewState = typeof INITIAL_VIEW_STATE;
 
 // ─── Basemap Style Factory (dimemoize di luar komponen) ────────────────────────
 
@@ -109,6 +113,7 @@ function buildRasterStyle(tileUrl: string, attribution: string): StyleSpecificat
                 tiles: [tileUrl],
                 tileSize: 256,
                 attribution,
+                maxzoom: 18,
             },
         },
         layers: [
@@ -147,6 +152,109 @@ function getMapStyle(activeBaseMap: string): StyleSpecification {
 
 function vis(active: boolean): 'visible' | 'none' {
     return active ? 'visible' : 'none';
+}
+
+function calculateCentroid(polygon: [number, number][]): [number, number] {
+    let totalLat = 0;
+    let totalLng = 0;
+    polygon.forEach(([lat, lng]) => {
+        totalLat += lat;
+        totalLng += lng;
+    });
+    return [totalLng / polygon.length, totalLat / polygon.length];
+}
+
+function disposeHierarchy(obj: any) {
+    obj.traverse((child: any) => {
+        if (child.geometry) {
+            child.geometry.dispose();
+        }
+        if (child.material) {
+            if (Array.isArray(child.material)) {
+                child.material.forEach((m) => m.dispose());
+            } else {
+                child.material.dispose();
+            }
+        }
+    });
+}
+
+function createMockSitePlanModel() {
+    const mainGroup = new THREE.Group();
+
+    // Materials using MeshLambertMaterial for lightweight GPU rendering
+    const lawnMat = new THREE.MeshLambertMaterial({ color: 0x1b5e20 }); // dark green
+    const roadMat = new THREE.MeshLambertMaterial({ color: 0x2d3748 }); // dark gray
+    const houseMat = new THREE.MeshLambertMaterial({ color: 0x0f766e }); // teal
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0x134e4a }); // dark teal
+    const facilityMat = new THREE.MeshLambertMaterial({ color: 0xd97706 }); // orange
+    const facilityRoofMat = new THREE.MeshLambertMaterial({ color: 0x92400e }); // dark orange
+
+    // Ground Lawn Base
+    const lawnGeo = new THREE.BoxGeometry(80, 0.2, 80);
+    const lawn = new THREE.Mesh(lawnGeo, lawnMat);
+    lawn.position.y = 0.1;
+    mainGroup.add(lawn);
+
+    // Roads (mimicking BimViewerPage.tsx)
+    const road1 = new THREE.Mesh(new THREE.BoxGeometry(6, 0.3, 80), roadMat);
+    road1.position.set(0, 0.2, 0);
+    mainGroup.add(road1);
+
+    const road2 = new THREE.Mesh(new THREE.BoxGeometry(80, 0.3, 6), roadMat);
+    road2.position.set(0, 0.2, 0);
+    mainGroup.add(road2);
+
+    // Function to place a building with BoxGeometry (body) and ConeGeometry (roof)
+    const placeBuilding = (
+        x: number, z: number, w: number, d: number, h: number,
+        bodyMat: THREE.Material, roofMaterial: THREE.Material
+    ) => {
+        const bodyGeom = new THREE.BoxGeometry(w, h, d);
+        const body = new THREE.Mesh(bodyGeom, bodyMat);
+        body.position.set(x, h / 2 + 0.2, z);
+        mainGroup.add(body);
+
+        // Roof (pyramid-like via scaled ConeGeometry with 4 radial segments)
+        const roofGeom = new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.3, 4);
+        const roof = new THREE.Mesh(roofGeom, roofMaterial);
+        roof.position.set(x, h + (h * 0.15) + 0.2, z);
+        roof.rotation.y = Math.PI / 4;
+        mainGroup.add(roof);
+    };
+
+    // Grid-based layout mimicking BimViewerPage.tsx
+    const rows = 5;
+    const cols = 5;
+    const spacingX = 14;
+    const spacingZ = 16;
+    const offsetX = -((cols - 1) * spacingX) / 2;
+    const offsetZ = -((rows - 1) * spacingZ) / 2;
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const x = offsetX + col * spacingX;
+            const z = offsetZ + row * spacingZ;
+            
+            // Skip center area for road intersection
+            if (Math.abs(x) < 6 || Math.abs(z) < 8) continue;
+
+            const isFacility = (row === 0 && col === 0) || (row === 4 && col === 4);
+            const bw = 4 + (row % 2) * 1.5 + (col % 2) * 0.5;
+            const bd = 5 + (col % 2) * 1.5 + (row % 2) * 0.5;
+            const bh = isFacility ? 10 : 4 + (row % 3) * 1;
+
+            placeBuilding(
+                x,
+                z,
+                bw, bd, bh,
+                isFacility ? facilityMat : houseMat,
+                isFacility ? facilityRoofMat : roofMat
+            );
+        }
+    }
+
+    return mainGroup;
 }
 
 // ─── Tipe Internal ─────────────────────────────────────────────────────────────
@@ -251,7 +359,7 @@ export default function SipasMap() {
     // react-map-gl "controlled" mode: viewState dikelola secara lokal di sini.
     // Perubahan halus (pan/pinch/rotate) tidak menyentuh Zustand sama sekali
     // → panel samping tidak pernah re-render selama gesture berlangsung.
-    const [localViewState, setLocalViewState] = useState(INITIAL_VIEW_STATE);
+    const [localViewState, setLocalViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
 
     // ── State GeoJSON Layer (Lazy Loaded) ──────────────────────────────────────
     const [sungaiData, setSungaiData]       = useState<any>(null);
@@ -266,6 +374,8 @@ export default function SipasMap() {
 
     // ── State Clash Layer ──────────────────────────────────────────────────────
     const [clashGeoJSON, setClashGeoJSON] = useState<any>(null);
+
+
 
     // ── [OPT-3] LAZY LOAD GeoJSON — guard ketat, hanya load sekali ────────────
     // Bangunan hanya dimuat saat zoom >= 14 (bukan >= 10) untuk menunda
@@ -313,6 +423,234 @@ export default function SipasMap() {
             .filter((sub) => activeLayers.includes(sub.categoryLayer)),
         [activeLayers]
     );
+
+    // ── Three.js Custom WebGL Layer for 3D GLB/CAD Models ────────────────────
+    const customUser3DLayerRef = useRef<any>(null);
+    const customUser3DLayer = useMemo(() => {
+        const layer: any = {
+            id: 'user-3d-model-layer',
+            type: 'custom',
+            renderingMode: '3d',
+            map: null,
+            renderer: null,
+            scene: null,
+            camera: null,
+            modelMesh: null,
+            currentModelId: null,
+            modelTransform: null,
+            pendingCentroid: null,
+            pendingModelUrl: null,
+
+            onAdd(map: any, gl: any) {
+                this.map = map;
+                
+                // Initialize Three.js renderer wrapping the existing WebGL context
+                this.renderer = new THREE.WebGLRenderer({
+                    canvas: map.getCanvas(),
+                    context: gl,
+                    antialias: true,
+                });
+                this.renderer.autoClear = false;
+
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera();
+
+                // Setup lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+                this.scene.add(ambientLight);
+                
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                dirLight.position.set(0, -70, 100).normalize();
+                this.scene.add(dirLight);
+
+                const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+                dirLight2.position.set(0, 70, 100).normalize();
+                this.scene.add(dirLight2);
+
+                // Load any queued/pending model once the scene is ready
+                if (this.currentModelId && this.pendingCentroid) {
+                    const id = this.currentModelId;
+                    const centroid = this.pendingCentroid;
+                    const url = this.pendingModelUrl;
+                    this.currentModelId = null; // Reset to bypass deduplication check
+                    this.loadModel(id, centroid, url);
+                }
+            },
+
+            loadModel(id: string, centroid: [number, number], modelUrl: string) {
+                if (this.currentModelId === id && this.scene) return; // already loading/loaded
+                
+                this.clearModel();
+                this.currentModelId = id;
+                this.pendingCentroid = centroid;
+                this.pendingModelUrl = modelUrl;
+
+                // Guard: If scene is not yet initialized by onAdd, wait and let onAdd trigger it.
+                if (!this.scene) {
+                    return;
+                }
+
+                // 2. Konversikan koordinat centroid poligon pengajuan yang dipilih ke unit Mercator
+                const center = MercatorCoordinate.fromLngLat(centroid, 0);
+                const scale = center.meterInMercatorCoordinateUnits();
+
+                this.modelTransform = {
+                    translateX: center.x,
+                    translateY: center.y,
+                    translateZ: center.z,
+                    scale: scale,
+                    rx: Math.PI / 2, // Rotate upright
+                    ry: 0,
+                    rz: 0,
+                };
+
+                const useFallback = () => {
+                    if (this.currentModelId !== id || !this.scene) return;
+                    if (this.modelMesh) {
+                        this.scene.remove(this.modelMesh);
+                        disposeHierarchy(this.modelMesh);
+                    }
+                    const mockModel = createMockSitePlanModel();
+                    this.modelMesh = mockModel;
+                    this.scene.add(mockModel);
+                    if (this.map) this.map.triggerRepaint();
+                };
+
+                if (modelUrl) {
+                    import('three/addons/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
+                        if (this.currentModelId !== id) return;
+
+                        const loader = new GLTFLoader();
+                        loader.load(
+                            modelUrl,
+                            (gltf) => {
+                                if (this.currentModelId !== id) {
+                                    disposeHierarchy(gltf.scene);
+                                    return;
+                                }
+
+                                if (this.modelMesh && this.scene) {
+                                    this.scene.remove(this.modelMesh);
+                                    disposeHierarchy(this.modelMesh);
+                                }
+
+                                const model = gltf.scene;
+                                // Scale standard GLTF Box if needed to be visible and nicely sized on the map
+                                model.scale.set(10, 10, 10);
+
+                                this.modelMesh = model;
+                                this.scene.add(model);
+                                if (this.map) this.map.triggerRepaint();
+                            },
+                            undefined,
+                            (err) => {
+                                console.warn('[THREE-BIM] Failed to load external GLTF model, using procedural fallback.', err);
+                                useFallback();
+                            }
+                        );
+                    }).catch((err) => {
+                        console.warn('[THREE-BIM] Failed to import GLTFLoader, using procedural fallback.', err);
+                        useFallback();
+                    });
+                } else {
+                    useFallback();
+                }
+            },
+
+            clearModel() {
+                this.currentModelId = null;
+                this.modelTransform = null;
+                this.pendingCentroid = null;
+                this.pendingModelUrl = null;
+                if (this.modelMesh && this.scene) {
+                    this.scene.remove(this.modelMesh);
+                    disposeHierarchy(this.modelMesh);
+                    this.modelMesh = null;
+                    if (this.map) this.map.triggerRepaint();
+                }
+            },
+
+            render(_gl: any, matrix: number[]) {
+                if (!this.renderer || !this.scene || !this.camera || !this.modelMesh || !this.modelTransform) return;
+
+                const { translateX, translateY, translateZ, scale, rx, ry, rz } = this.modelTransform;
+
+                const rotationX = new THREE.Matrix4().makeRotationX(rx);
+                const rotationY = new THREE.Matrix4().makeRotationY(ry);
+                const rotationZ = new THREE.Matrix4().makeRotationZ(rz);
+
+                const m = new THREE.Matrix4().fromArray(matrix);
+                const l = new THREE.Matrix4()
+                    .makeTranslation(translateX, translateY, translateZ)
+                    .scale(new THREE.Vector3(scale, -scale, scale))
+                    .multiply(rotationX)
+                    .multiply(rotationY)
+                    .multiply(rotationZ);
+
+                this.camera.projectionMatrix = m.multiply(l);
+                this.renderer.resetState();
+                this.renderer.render(this.scene, this.camera);
+            },
+
+            onRemove() {
+                this.clearModel();
+                if (this.renderer) {
+                    this.renderer.dispose();
+                    this.renderer = null;
+                }
+            }
+        };
+
+        customUser3DLayerRef.current = layer;
+        return layer;
+    }, []);
+
+    // Effect: Re-add custom WebGL layer when style changes
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        const mapNative = map.getMap();
+
+        const handleStyleData = () => {
+            if (mapNative && !mapNative.getLayer('user-3d-model-layer')) {
+                try {
+                    mapNative.addLayer(customUser3DLayer);
+                } catch (e) {
+                    console.warn('[THREE-BIM] Failed to add custom WebGL layer:', e);
+                }
+            }
+        };
+
+        mapNative.on('styledata', handleStyleData);
+        handleStyleData(); // try to add it immediately if style is loaded
+        
+        return () => {
+            if (mapNative) {
+                mapNative.off('styledata', handleStyleData);
+            }
+        };
+    }, [activeBaseMap, customUser3DLayer]);
+
+    // Effect: Dynamically load/unload BIM model based on selection and zoom
+    useEffect(() => {
+        if (selectedCompanyId && localZoom >= 16) {
+            const sub = processedSubmissions.find((s) => s.id === selectedCompanyId);
+            if (sub && sub.location.polygon && sub.location.polygon.length >= 3) {
+                const centroid = calculateCentroid(sub.location.polygon);
+                const modelUrl = 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb';
+                customUser3DLayer.loadModel(selectedCompanyId, centroid, modelUrl);
+            }
+        } else {
+            customUser3DLayer.clearModel();
+        }
+    }, [selectedCompanyId, localZoom, processedSubmissions, customUser3DLayer]);
+
+    // Effect: Cleanup Three.js Layer on component unmount
+    useEffect(() => {
+        return () => {
+            customUser3DLayerRef.current?.onRemove();
+        };
+    }, []);
 
     // ── [OPT-2] STABLE GeoJSON MEMOS ──────────────────────────────────────────
     // Dependencies: hanya processedSubmissions (bukan localViewState)
@@ -414,18 +752,40 @@ export default function SipasMap() {
     // ── Observer: is3DMode Toggle ─────────────────────────────────────────────
     useEffect(() => {
         if (!mapRef.current) return;
-        mapRef.current.easeTo({ pitch: is3DMode ? 45 : 0, duration: 600 });
+        const targetPitch = is3DMode ? 45 : 0;
+        const targetBearing = is3DMode ? -10 : 0;
+        setLocalViewState((prev) => ({
+            ...prev,
+            pitch: targetPitch,
+            bearing: targetBearing,
+        }));
+        mapRef.current.easeTo({
+            pitch: targetPitch,
+            bearing: targetBearing,
+            duration: 600,
+        });
     }, [is3DMode]);
 
     // ── FlyTo Observer (Zustand → MapLibre imperative) ────────────────────────
     useEffect(() => {
         if (!flyToTarget || !mapRef.current) return;
         const { longitude, latitude, zoom, pitch, bearing } = flyToTarget;
+        const currentIs3D = useGisUIStore.getState().is3DMode;
+        const targetPitch = currentIs3D ? (pitch ?? localViewState.pitch) : 0;
+        const targetBearing = currentIs3D ? (bearing ?? localViewState.bearing) : 0;
+        setLocalViewState((prev) => ({
+            ...prev,
+            longitude,
+            latitude,
+            zoom: zoom ?? 18,
+            pitch: targetPitch,
+            bearing: targetBearing,
+        }));
         mapRef.current.flyTo({
             center: [longitude, latitude],
             zoom: zoom ?? 18,
-            pitch: pitch ?? localViewState.pitch,
-            bearing: bearing ?? localViewState.bearing,
+            pitch: targetPitch,
+            bearing: targetBearing,
             duration: 1800,
             essential: true,
         });
@@ -441,9 +801,27 @@ export default function SipasMap() {
 
         const handleZoomIn  = () => map.zoomIn({ duration: 300 });
         const handleZoomOut = () => map.zoomOut({ duration: 300 });
-        const handleReset   = () => map.flyTo({
-            center: [BOGOR_LNG, BOGOR_LAT], zoom: 11, pitch: 45, bearing: -10, duration: 1200,
-        });
+        const handleReset   = () => {
+            const currentIs3D = useGisUIStore.getState().is3DMode;
+            const targetPitch = currentIs3D ? 45 : 0;
+            const targetBearing = currentIs3D ? -10 : 0;
+            console.log(`[GEOSIPAS] Resetting map view. Mode: ${currentIs3D ? "3D" : "2D"}, Target Pitch: ${targetPitch}, Target Bearing: ${targetBearing}`);
+            setLocalViewState((prev) => ({
+                ...prev,
+                longitude: BOGOR_LNG,
+                latitude: BOGOR_LAT,
+                zoom: 11,
+                pitch: targetPitch,
+                bearing: targetBearing,
+            }));
+            map.flyTo({
+                center: [BOGOR_LNG, BOGOR_LAT],
+                zoom: 11,
+                pitch: targetPitch,
+                bearing: targetBearing,
+                duration: 1200,
+            });
+        };
         const handleFlyTo   = (e: Event) => {
             const ev = e as CustomEvent<{ lat: number; lng: number }>;
             if (ev.detail) map.flyTo({ center: [ev.detail.lng, ev.detail.lat], zoom: 18, pitch: 60, duration: 1800 });
@@ -482,7 +860,7 @@ export default function SipasMap() {
 
     // ── [OPT-1] Handler: onMove — HANYA update localViewState (TIDAK Zustand) ─
     const handleMove = useCallback((e: ViewStateChangeEvent) => {
-        setLocalViewState(e.viewState as typeof INITIAL_VIEW_STATE);
+        setLocalViewState(e.viewState as MapViewState);
     }, []);
 
     const handleMoveStart = useCallback(() => {
@@ -525,9 +903,23 @@ export default function SipasMap() {
         setSelectedCompanyId(sub.id);
         closePanelsToTheRight(-1);
         openPanel('detil-perusahaan', `Detail: ${sub.housingName}`, sub);
+        const currentIs3D = useGisUIStore.getState().is3DMode;
+        const targetPitch = currentIs3D ? 60 : 0;
+        const targetBearing = currentIs3D ? -10 : 0;
+        setLocalViewState((prev) => ({
+            ...prev,
+            longitude: sub.location.lng,
+            latitude: sub.location.lat,
+            zoom: Math.max(localZoom, 15),
+            pitch: targetPitch,
+            bearing: targetBearing,
+        }));
         mapRef.current?.flyTo({
             center: [sub.location.lng, sub.location.lat],
-            zoom: Math.max(localZoom, 15), pitch: 60, duration: 1200,
+            zoom: Math.max(localZoom, 15),
+            pitch: targetPitch,
+            bearing: targetBearing,
+            duration: 1200,
         });
     }, [processedSubmissions, setSelectedCompanyId, closePanelsToTheRight, openPanel, localZoom]);
 
@@ -535,7 +927,24 @@ export default function SipasMap() {
         setSelectedCompanyId(sub.id);
         closePanelsToTheRight(-1);
         openPanel('detil-perusahaan', `Detail: ${sub.housingName}`, sub);
-        mapRef.current?.flyTo({ center: [sub.location.lng, sub.location.lat], zoom: 16, pitch: 55, duration: 1200 });
+        const currentIs3D = useGisUIStore.getState().is3DMode;
+        const targetPitch = currentIs3D ? 55 : 0;
+        const targetBearing = currentIs3D ? -10 : 0;
+        setLocalViewState((prev) => ({
+            ...prev,
+            longitude: sub.location.lng,
+            latitude: sub.location.lat,
+            zoom: 16,
+            pitch: targetPitch,
+            bearing: targetBearing,
+        }));
+        mapRef.current?.flyTo({
+            center: [sub.location.lng, sub.location.lat],
+            zoom: 16,
+            pitch: targetPitch,
+            bearing: targetBearing,
+            duration: 1200,
+        });
     }, [setSelectedCompanyId, closePanelsToTheRight, openPanel]);
 
     const handleClusterExpand = useCallback((
@@ -575,9 +984,10 @@ export default function SipasMap() {
                 mapStyle={getMapStyle(activeBaseMap)}
                 {...localViewState}                 // Controlled view state
                 style={{ width: '100%', height: '100%' }}
-                pitchWithRotate={true}
-                dragRotate={true}
-                touchZoomRotate={true}
+                maxZoom={22}
+                pitchWithRotate={is3DMode}
+                dragRotate={is3DMode}
+                touchZoomRotate={is3DMode}
                 interactiveLayerIds={['submissions-fill-flat', 'submissions-extrusion']}
                 onMove={handleMove}                 // [OPT-1] Update local state saja
                 onMoveStart={handleMoveStart}

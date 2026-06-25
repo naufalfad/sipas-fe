@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Minus, Maximize2, Map as MapIcon, Box } from "lucide-react";
+import { Plus, Minus, Maximize2, Map as MapIcon } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 
@@ -203,7 +203,7 @@ export default function MapHUD() {
                     }`}
                     title={is3DMode ? 'Beralih ke Tampilan Flat 2D' : 'Beralih ke Tampilan 3D Imersif'}
                 >
-                    <Box size={16} strokeWidth={2} />
+                    <span className="text-[11px] font-black tracking-wider leading-none">3D</span>
                 </button>
             </div>
 

@@ -23,6 +23,7 @@ const DEFAULT_STYLE: StyleSpecification = {
             tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
             attribution: '© OpenStreetMap contributors',
+            maxzoom: 18,
         },
     },
     layers: [{ id: 'osm-layer', type: 'raster', source: 'osm' }],
@@ -70,6 +71,7 @@ export default function GISMapContainer({
                     zoom,
                 }}
                 style={{ width: '100%', height: '100%' }}
+                maxZoom={22}
                 pitchWithRotate={false}
             >
                 {children}
