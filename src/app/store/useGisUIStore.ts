@@ -36,6 +36,7 @@ interface GisUIState {
     mapOpacity: number;
     maskOpacity: number;
     activeBaseMap: string;
+    isTerrainActive: boolean;
 
     // ── Selection ────────────────────────────────────────────────────────────
     selectedCompanyId: string | null;
@@ -63,6 +64,7 @@ interface GisUIState {
     setMapOpacity: (opacity: number) => void;
     setMaskOpacity: (opacity: number) => void;
     setActiveBaseMap: (baseMap: string) => void;
+    toggleTerrain: () => void;
 
     // ── Actions: Selection ───────────────────────────────────────────────────
     setSelectedCompanyId: (id: string | null) => void;
@@ -96,6 +98,7 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     mapPitch: 45,                      // Default 3D immersive view
     mapBearing: -10,                   // Sedikit rotasi kompas untuk estetika
     is3DMode: true,
+    isTerrainActive: true,
     activeBaseMap: 'voyager',
     activePanels: [],
     flyToTarget: null,
@@ -124,6 +127,10 @@ export const useGisUIStore = create<GisUIState>((set) => ({
             mapPitch: newIs3D ? 45 : 0,
         };
     }),
+
+    toggleTerrain: () => set((state) => ({
+        isTerrainActive: !state.isTerrainActive
+    })),
 
     flyTo: (flyToTarget) => set({ flyToTarget }),
 

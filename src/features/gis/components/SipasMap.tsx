@@ -342,6 +342,7 @@ export default function SipasMap() {
     const mapOpacity           = useGisUIStore((s) => s.mapOpacity);
     const selectedCompanyId    = useGisUIStore((s) => s.selectedCompanyId);
     const is3DMode             = useGisUIStore((s) => s.is3DMode);
+    const isTerrainActive      = useGisUIStore((s) => s.isTerrainActive);
     const flyToTarget          = useGisUIStore((s) => s.flyToTarget);
     // Actions (stable references — tidak menyebabkan re-render)
     const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
@@ -360,6 +361,11 @@ export default function SipasMap() {
     // Perubahan halus (pan/pinch/rotate) tidak menyentuh Zustand sama sekali
     // → panel samping tidak pernah re-render selama gesture berlangsung.
     const [localViewState, setLocalViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
+
+    const terrainConfig = useMemo(() => {
+        if (!isTerrainActive || !is3DMode) return null;
+        return { source: 'aws-terrain-source', exaggeration: 1.5 };
+    }, [isTerrainActive, is3DMode]);
 
     // ── State GeoJSON Layer (Lazy Loaded) ──────────────────────────────────────
     const [sungaiData, setSungaiData]       = useState<any>(null);
@@ -571,9 +577,22 @@ export default function SipasMap() {
             },
 
             render(_gl: any, matrix: number[]) {
-                if (!this.renderer || !this.scene || !this.camera || !this.modelMesh || !this.modelTransform) return;
+                if (!this.renderer || !this.scene || !this.camera || !this.modelMesh || !this.modelTransform || !this.pendingCentroid) return;
 
-                const { translateX, translateY, translateZ, scale, rx, ry, rz } = this.modelTransform;
+                const { rx, ry, rz } = this.modelTransform;
+
+                // Dynamically query terrain elevation to snap the custom 3D model to the terrain surface
+                let elevation = 0;
+                if (this.map) {
+                    try {
+                        elevation = this.map.queryTerrainElevation(this.pendingCentroid) || 0;
+                    } catch (e) {
+                        // ignore if tiles aren't loaded yet
+                    }
+                }
+
+                const center = MercatorCoordinate.fromLngLat(this.pendingCentroid, elevation);
+                const scale = center.meterInMercatorCoordinateUnits();
 
                 const rotationX = new THREE.Matrix4().makeRotationX(rx);
                 const rotationY = new THREE.Matrix4().makeRotationY(ry);
@@ -581,7 +600,7 @@ export default function SipasMap() {
 
                 const m = new THREE.Matrix4().fromArray(matrix);
                 const l = new THREE.Matrix4()
-                    .makeTranslation(translateX, translateY, translateZ)
+                    .makeTranslation(center.x, center.y, center.z)
                     .scale(new THREE.Vector3(scale, -scale, scale))
                     .multiply(rotationX)
                     .multiply(rotationY)
@@ -766,7 +785,6 @@ export default function SipasMap() {
         });
     }, [is3DMode]);
 
-    // ── FlyTo Observer (Zustand → MapLibre imperative) ────────────────────────
     useEffect(() => {
         if (!flyToTarget || !mapRef.current) return;
         const { longitude, latitude, zoom, pitch, bearing } = flyToTarget;
@@ -858,13 +876,13 @@ export default function SipasMap() {
         };
     }, []);
 
+    const handleMoveStart = useCallback(() => {
+        window.dispatchEvent(new Event('map-move-start'));
+    }, []);
+
     // ── [OPT-1] Handler: onMove — HANYA update localViewState (TIDAK Zustand) ─
     const handleMove = useCallback((e: ViewStateChangeEvent) => {
         setLocalViewState(e.viewState as MapViewState);
-    }, []);
-
-    const handleMoveStart = useCallback(() => {
-        window.dispatchEvent(new Event('map-move-start'));
     }, []);
 
     // ── [OPT-1] Handler: onMoveEnd — baru sync ke Zustand & supercluster ──────
@@ -978,29 +996,43 @@ export default function SipasMap() {
              * [OPT-1] "Controlled" Map: viewState dikelola secara lokal via onMove.
              * Zustand TIDAK diperbarui selama gesture — hanya saat onMoveEnd.
              */}
-            <Map
+             <Map
                 ref={mapRef}
                 mapLib={import('maplibre-gl')}
                 mapStyle={getMapStyle(activeBaseMap)}
-                {...localViewState}                 // Controlled view state
+                {...localViewState}
+                onMove={handleMove}
                 style={{ width: '100%', height: '100%' }}
                 maxZoom={22}
                 pitchWithRotate={is3DMode}
                 dragRotate={is3DMode}
                 touchZoomRotate={is3DMode}
+                terrain={terrainConfig || undefined}
+                maxPitch={85}
                 interactiveLayerIds={['submissions-fill-flat', 'submissions-extrusion']}
-                onMove={handleMove}                 // [OPT-1] Update local state saja
                 onMoveStart={handleMoveStart}
-                onMoveEnd={handleMoveEnd}           // [OPT-1] Zustand hanya di sini
+                onMoveEnd={handleMoveEnd}
                 onClick={handleSubmissionClick}
-                onLoad={handleMapLoad}              // [OPT-4] Setup event + cleanup hook
+                onLoad={handleMapLoad}
             >
+                {/* 3D Terrain Elevation Source */}
+                {isTerrainActive && (
+                    <Source
+                        key="aws-terrain-source"
+                        id="aws-terrain-source"
+                        type="raster-dem"
+                        tiles={['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png']}
+                        encoding="terrarium"
+                        tileSize={256}
+                        maxzoom={18}
+                    />
+                )}
                 {/* ================================================================
                     LAYER 1: PEMUKIMAN RTRW
                     [OPT-2] Source stabil — tidak recreate saat peta bergerak
                 ================================================================ */}
                 {showPemukiman && pemukimanData && (
-                    <Source id="pemukiman" type="geojson" data={pemukimanData}>
+                    <Source key="pemukiman-source" id="pemukiman" type="geojson" data={pemukimanData}>
                         <Layer id="pemukiman-fill" type="fill"
                             layout={{ visibility: vis(showPemukiman) }}
                             paint={{ 'fill-color': '#2dd4bf', 'fill-opacity': 0.35 * opacity }}
@@ -1016,7 +1048,7 @@ export default function SipasMap() {
                     LAYER 2: KONTUR LERENG
                 ================================================================ */}
                 {showKontur && konturData && (
-                    <Source id="kontur" type="geojson" data={konturData}>
+                    <Source key="kontur-source" id="kontur" type="geojson" data={konturData}>
                         <Layer id="kontur-line" type="line"
                             layout={{ visibility: vis(showKontur) }}
                             paint={{
@@ -1031,7 +1063,7 @@ export default function SipasMap() {
                     LAYER 3: ALIRAN SUNGAI
                 ================================================================ */}
                 {showSungai && sungaiData && (
-                    <Source id="sungai" type="geojson" data={sungaiData}>
+                    <Source key="sungai-source" id="sungai" type="geojson" data={sungaiData}>
                         <Layer id="sungai-casing" type="line"
                             layout={{ visibility: vis(showSungai) }}
                             paint={{ 'line-color': '#0e7490', 'line-width': 5, 'line-opacity': 0.5 * opacity }}
@@ -1049,7 +1081,7 @@ export default function SipasMap() {
                     tolerance bervariasi berdasarkan zoom untuk efisiensi GPU.
                 ================================================================ */}
                 {bangunanData && localZoom >= 14 && (
-                    <Source id="bangunan" type="geojson" data={bangunanData}
+                    <Source key="bangunan-source" id="bangunan" type="geojson" data={bangunanData}
                         tolerance={bangunanTolerance}>
                         <Layer id="bangunan-fill-flat" type="fill" maxzoom={17}
                             paint={{ 'fill-color': '#94a3b8', 'fill-opacity': 0.4 * opacity }}
@@ -1067,7 +1099,7 @@ export default function SipasMap() {
                     LAYER 5: SUBMISSION POLYGON (Pengajuan Site Plan)
                     [OPT-2] Source ID stabil → tidak recreate GPU buffer
                 ================================================================ */}
-                <Source id="submissions" type="geojson" data={submissionsGeoJSON} generateId={true}>
+                <Source key="submissions-source" id="submissions" type="geojson" data={submissionsGeoJSON} generateId={true}>
                     <Layer id="submissions-fill-flat" type="fill" maxzoom={14}
                         paint={{
                             'fill-color': ['get', 'color'],
@@ -1103,7 +1135,7 @@ export default function SipasMap() {
                     LAYER 6: SUB-POLYGON CAD DETAIL (zoom >= 14)
                 ================================================================ */}
                 {showDetail && (
-                    <Source id="sub-polygons" type="geojson" data={subPolygonsGeoJSON}>
+                    <Source key="sub-polygons-source" id="sub-polygons" type="geojson" data={subPolygonsGeoJSON}>
                         <Layer id="sub-poly-fill" type="fill"
                             paint={{ 'fill-color': ['get', 'color'], 'fill-opacity': 0.5 * opacity }}
                         />
@@ -1117,7 +1149,7 @@ export default function SipasMap() {
                     LAYER 7: CLASH POLYGON (Pelanggaran Sempadan Sungai)
                 ================================================================ */}
                 {clashGeoJSON && (
-                    <Source id="clash" type="geojson" data={clashGeoJSON}>
+                    <Source key="clash-source" id="clash" type="geojson" data={clashGeoJSON}>
                         <Layer id="clash-fill" type="fill"
                             paint={{ 'fill-color': '#ef4444', 'fill-opacity': 0.5 }}
                         />

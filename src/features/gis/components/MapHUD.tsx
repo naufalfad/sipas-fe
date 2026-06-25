@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Minus, Maximize2, Map as MapIcon } from "lucide-react";
+import { Plus, Minus, Maximize2, Map as MapIcon, Mountain } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * yang otomatis menyesuaikan tampilannya jika layer-layer tersebut aktif.
  */
 export default function MapHUD() {
-    const { activeLayers, mapZoom, mapPitch, is3DMode, toggle3DMode } = useGisUIStore();
+    const { activeLayers, mapZoom, mapPitch, is3DMode, toggle3DMode, isTerrainActive, toggleTerrain } = useGisUIStore();
     const [isLegendExpanded, setIsLegendExpanded] = useState(true);
 
     useEffect(() => {
@@ -204,6 +204,18 @@ export default function MapHUD() {
                     title={is3DMode ? 'Beralih ke Tampilan Flat 2D' : 'Beralih ke Tampilan 3D Imersif'}
                 >
                     <span className="text-[11px] font-black tracking-wider leading-none">3D</span>
+                </button>
+                {/* Tombol Toggle Terrain */}
+                <button
+                    onClick={toggleTerrain}
+                    className={`w-10 h-10 flex items-center justify-center transition-colors active:bg-slate-200 rounded-none outline-none ${
+                        isTerrainActive
+                            ? 'bg-teal-600 text-white hover:bg-teal-700'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-teal-700'
+                    }`}
+                    title={isTerrainActive ? 'Nonaktifkan 3D Terrain' : 'Aktifkan 3D Terrain'}
+                >
+                    <Mountain size={18} strokeWidth={2.5} />
                 </button>
             </div>
 
