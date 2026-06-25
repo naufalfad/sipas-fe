@@ -1,49 +1,98 @@
-import { useForm } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Loader2, Save, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 import { SubmissionService } from '@/features/submission/services/submission.service';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { fullSubmissionSchema, type FullSubmissionFormValues } from '../schemas/submissionFormSchema';
+import {
+  ApplicantSection, SubmissionSection, LocationSection, CoordinateSection,
+  SpatialSection, TechnicalSection, ConsultantSection, DocumentSection,
+  PhotoSection, StatementSection
+} from '../components/FormSections';
 
-const submissionSchema = z.object({
-  housingName: z.string().min(3, 'Nama perumahan minimal 3 karakter'),
-  developerName: z.string().min(3, 'Nama developer minimal 3 karakter'),
-  landArea: z.number({ message: 'Luas lahan harus berupa angka' }).positive('Luas lahan harus bernilai positif'),
-  address: z.string().min(5, 'Alamat minimal 5 karakter'),
-});
-
-type SubmissionFormValues = z.infer<typeof submissionSchema>;
+const steps = [
+  { id: 1, title: 'Data Pemohon' },
+  { id: 2, title: 'Data Pengajuan' },
+  { id: 3, title: 'Data Lokasi' },
+  { id: 4, title: 'Data Koordinat' },
+  { id: 5, title: 'Info Tata Ruang' },
+  { id: 6, title: 'Data Teknis' },
+  { id: 7, title: 'Konsultan' },
+  { id: 8, title: 'Dokumen' },
+  { id: 9, title: 'Foto Lokasi' },
+  { id: 10, title: 'Pernyataan' },
+];
 
 export default function SubmissionCreatePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [currentStep, setCurrentStep] = useState(1);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<SubmissionFormValues>({
-    resolver: zodResolver(submissionSchema),
+  const methods = useForm<FullSubmissionFormValues>({
+    resolver: zodResolver(fullSubmissionSchema),
     defaultValues: {
-      housingName: '',
-      developerName: '',
-      landArea: 0,
-      address: '',
-    }
+      applicant: { type: 'PERORANGAN' },
+      submission: { submissionType: 'BARU' },
+      location: { ownershipStatus: 'SHM' },
+    },
+    mode: 'onTouched',
   });
 
+  const { handleSubmit, trigger } = methods;
+
   const mutation = useMutation({
-    mutationFn: SubmissionService.create,
+    mutationFn: async (data: FullSubmissionFormValues) => {
+      // Mock formatting for submission service
+      return SubmissionService.create({
+        housingName: data.submission.activityName,
+        developerName: data.applicant.name,
+        landArea: data.location.landArea,
+        address: data.location.fullAddress,
+      });
+    },
     onSuccess: () => {
-      // Invalidate submissions cache to fetch fresh data
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
       navigate('/pengajuan/daftar');
     }
   });
 
-  const onSubmit = (data: SubmissionFormValues) => {
+  const onSubmit = (data: FullSubmissionFormValues) => {
     mutation.mutate(data);
   };
 
+  const nextStep = async () => {
+    let fieldsToValidate: any = [];
+    switch (currentStep) {
+      case 1: fieldsToValidate = 'applicant'; break;
+      case 2: fieldsToValidate = 'submission'; break;
+      case 3: fieldsToValidate = 'location'; break;
+      case 4: fieldsToValidate = 'coordinate'; break;
+      case 5: fieldsToValidate = 'spatial'; break;
+      case 6: fieldsToValidate = 'technical'; break;
+      case 7: fieldsToValidate = 'consultant'; break;
+      case 8: fieldsToValidate = 'document'; break;
+      case 9: fieldsToValidate = 'photo'; break;
+      case 10: fieldsToValidate = 'statement'; break;
+    }
+
+    const isStepValid = await trigger(fieldsToValidate);
+    if (isStepValid && currentStep < steps.length) {
+      setCurrentStep(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link to="/pengajuan/daftar" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors">
@@ -54,114 +103,111 @@ export default function SubmissionCreatePage() {
             Buat Pengajuan Baru
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Silakan lengkapi formulir di bawah untuk mendaftarkan site plan perumahan baru.
+            Lengkapi 10 tahapan formulir di bawah ini.
           </p>
         </div>
       </div>
 
-      {/* Form Card */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="housingName" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nama Perumahan / Kawasan
-              </label>
-              <input
-                id="housingName"
-                type="text"
-                {...register('housingName')}
-                placeholder="Contoh: Grand Pajajaran Residence"
-                className={`w-full px-4 py-2 border rounded-lg dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all ${
-                  errors.housingName ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-200 dark:border-slate-750'
-                }`}
-              />
-              {errors.housingName && (
-                <p className="text-xs text-rose-500 mt-1.5">{errors.housingName.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="developerName" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nama Perumahan Developer
-              </label>
-              <input
-                id="developerName"
-                type="text"
-                {...register('developerName')}
-                placeholder="Contoh: PT Bangun Persada Mandiri"
-                className={`w-full px-4 py-2 border rounded-lg dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all ${
-                  errors.developerName ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-200 dark:border-slate-750'
-                }`}
-              />
-              {errors.developerName && (
-                <p className="text-xs text-rose-500 mt-1.5">{errors.developerName.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="landArea" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Luas Lahan (m²)
-              </label>
-              <input
-                id="landArea"
-                type="number"
-                {...register('landArea', { valueAsNumber: true })}
-                placeholder="Contoh: 15000"
-                className={`w-full px-4 py-2 border rounded-lg dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all ${
-                  errors.landArea ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-200 dark:border-slate-750'
-                }`}
-              />
-              {errors.landArea && (
-                <p className="text-xs text-rose-500 mt-1.5">{errors.landArea.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="address" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Lokasi / Alamat Lengkap Kawasan
-              </label>
-              <input
-                id="address"
-                type="text"
-                {...register('address')}
-                placeholder="Contoh: Jl. Raya Tajur No. 12, Kec. Bogor Selatan"
-                className={`w-full px-4 py-2 border rounded-lg dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all ${
-                  errors.address ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-200 dark:border-slate-750'
-                }`}
-              />
-              {errors.address && (
-                <p className="text-xs text-rose-500 mt-1.5">{errors.address.message}</p>
-              )}
-            </div>
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar Stepper */}
+        <div className="lg:w-1/4 shrink-0">
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 sticky top-6 shadow-sm">
+            <nav className="space-y-1">
+              {steps.map((step) => {
+                const isActive = step.id === currentStep;
+                const isCompleted = step.id < currentStep;
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => {
+                      if (step.id < currentStep) setCurrentStep(step.id);
+                    }}
+                    disabled={step.id > currentStep}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400' :
+                        isCompleted ? 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50' :
+                          'text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                      }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs ${isActive ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-400' :
+                          isCompleted ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300' :
+                            'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                        }`}>
+                        {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : step.id}
+                      </span>
+                      {step.title}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
           </div>
+        </div>
 
-          <div className="pt-4 border-t dark:border-slate-700 flex justify-end space-x-3">
-            <Link
-              to="/pengajuan/daftar"
-              className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-300 text-sm font-semibold transition-all"
-            >
-              Batal
-            </Link>
-            <button
-              type="submit"
-              disabled={mutation.isPending}
-              className="inline-flex items-center justify-center px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white font-semibold rounded-lg shadow-sm text-sm transition-all gap-2"
-            >
-              {mutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Mengirimkan...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  <span>Simpan Pengajuan</span>
-                </>
-              )}
-            </button>
+        {/* Main Form Content */}
+        <div className="lg:w-3/4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 md:p-8 min-h-[500px] flex flex-col">
+            <FormProvider {...methods}>
+              <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col">
+                <div className="flex-1 mb-8">
+                  {currentStep === 1 && <ApplicantSection />}
+                  {currentStep === 2 && <SubmissionSection />}
+                  {currentStep === 3 && <LocationSection />}
+                  {currentStep === 4 && <CoordinateSection />}
+                  {currentStep === 5 && <SpatialSection />}
+                  {currentStep === 6 && <TechnicalSection />}
+                  {currentStep === 7 && <ConsultantSection />}
+                  {currentStep === 8 && <DocumentSection />}
+                  {currentStep === 9 && <PhotoSection />}
+                  {currentStep === 10 && <StatementSection />}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="pt-6 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    disabled={currentStep === 1}
+                    className="inline-flex items-center px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white disabled:opacity-50 transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Sebelumnya
+                  </button>
+
+                  {currentStep < steps.length ? (
+                    <button
+                      type="button"
+                      onClick={nextStep}
+                      className="inline-flex items-center justify-center px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-semibold rounded-lg shadow-sm text-sm transition-all"
+                    >
+                      Selanjutnya
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={mutation.isPending}
+                      className="inline-flex items-center justify-center px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white font-semibold rounded-lg shadow-sm text-sm transition-all gap-2"
+                    >
+                      {mutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Mengirimkan...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          <span>Simpan Pengajuan Final</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </form>
+            </FormProvider>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
