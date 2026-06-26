@@ -44,7 +44,7 @@ export default function SubmissionCreatePage() {
 
   const mutation = useMutation({
     mutationFn: async (data: FullSubmissionFormValues) => {
-      // Mock formatting for submission service
+      // Formats data to send to the submission service
       return SubmissionService.create({
         housingName: data.submission.activityName,
         developerName: data.applicant.name,
@@ -62,6 +62,7 @@ export default function SubmissionCreatePage() {
     mutation.mutate(data);
   };
 
+  // Validasi dinamis per tahapan sebelum diperbolehkan melangkah ke tab berikutnya
   const nextStep = async () => {
     let fieldsToValidate: any = [];
     switch (currentStep) {
@@ -92,30 +93,38 @@ export default function SubmissionCreatePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link to="/pengajuan/daftar" className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors">
+    <div className="space-y-6 max-w-6xl mx-auto font-sans">
+
+      {/* ─── SEKSI 1: HEADER HALAMAN ─── */}
+      <div className="flex items-center gap-4 select-none">
+        <Link
+          to="/pengajuan/daftar"
+          className="p-2 hover:bg-slate-100 rounded-none text-slate-500 transition-colors cursor-pointer"
+          title="Kembali ke Daftar Pengajuan"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+        <div className="text-left">
+          <h1 className="text-2xl font-bold text-[#111D13] leading-none">
             Buat Pengajuan Baru
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Lengkapi 10 tahapan formulir di bawah ini.
+          <p className="text-xs text-slate-500 mt-2">
+            Lengkapi 10 tahapan formulir di bawah ini dengan mengunggah berkas yang valid.
           </p>
         </div>
       </div>
 
+      {/* ─── SEKSI 2: GRID WORKSPACE (STEPPER VS FORM CONTENT) ─── */}
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Stepper */}
-        <div className="lg:w-1/4 shrink-0">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 sticky top-6 shadow-sm">
+
+        {/* Kolom Kiri: Sidebar Stepper (Penyelarasan Desain dengan Sidebar Utama) */}
+        <div className="lg:w-1/4 shrink-0 select-none">
+          <div className="sticky top-6 border border-border bg-white p-3 shadow-[1px_1px_3px_rgba(0,0,0,0.015)]">
             <nav className="space-y-1">
               {steps.map((step) => {
                 const isActive = step.id === currentStep;
                 const isCompleted = step.id < currentStep;
+
                 return (
                   <button
                     key={step.id}
@@ -124,19 +133,24 @@ export default function SubmissionCreatePage() {
                       if (step.id < currentStep) setCurrentStep(step.id);
                     }}
                     disabled={step.id > currentStep}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400' :
-                        isCompleted ? 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50' :
-                          'text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-none text-xs font-semibold transition-all outline-none border-none cursor-pointer ${isActive
+                      ? 'bg-secondary text-primary border-l-2 border-primary font-bold'
+                      : isCompleted
+                        ? 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-950'
+                        : 'text-slate-400 cursor-not-allowed'
                       }`}
                   >
                     <span className="flex items-center gap-3">
-                      <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs ${isActive ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-400' :
-                          isCompleted ? 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300' :
-                            'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                      {/* Avatar indikator nomor langkah (Pengecualian rounded-full di index.css) */}
+                      <span className={`flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold shrink-0 ${isActive
+                        ? 'bg-primary text-white'
+                        : isCompleted
+                          ? 'bg-accent text-primary'
+                          : 'bg-slate-100 text-slate-400'
                         }`}>
-                        {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : step.id}
+                        {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.id}
                       </span>
-                      {step.title}
+                      <span>{step.title}</span>
                     </span>
                   </button>
                 );
@@ -145,11 +159,13 @@ export default function SubmissionCreatePage() {
           </div>
         </div>
 
-        {/* Main Form Content */}
+        {/* Kolom Kanan: Main Form Area */}
         <div className="lg:w-3/4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 md:p-8 min-h-[500px] flex flex-col">
+          <div className="bg-white border border-border p-6 md:p-8 min-h-[500px] flex flex-col shadow-[1px_1px_3px_rgba(0,0,0,0.015)]">
             <FormProvider {...methods}>
               <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col">
+
+                {/* Form Sections Viewport */}
                 <div className="flex-1 mb-8">
                   {currentStep === 1 && <ApplicantSection />}
                   {currentStep === 2 && <SubmissionSection />}
@@ -163,13 +179,13 @@ export default function SubmissionCreatePage() {
                   {currentStep === 10 && <StatementSection />}
                 </div>
 
-                {/* Footer Actions */}
-                <div className="pt-6 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                {/* Tombol Navigasi Kaki Formulir (Ramping, Siku Kaku, Hunter Green) */}
+                <div className="pt-6 border-t border-border flex justify-between items-center select-none">
                   <button
                     type="button"
                     onClick={prevStep}
                     disabled={currentStep === 1}
-                    className="inline-flex items-center px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all rounded-none outline-none border-none cursor-pointer"
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" />
                     Sebelumnya
@@ -179,7 +195,7 @@ export default function SubmissionCreatePage() {
                     <button
                       type="button"
                       onClick={nextStep}
-                      className="inline-flex items-center justify-center px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-semibold rounded-lg shadow-sm text-sm transition-all"
+                      className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 text-white font-bold rounded-none transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer outline-none"
                     >
                       Selanjutnya
                       <ChevronRight className="h-4 w-4 ml-1" />
@@ -188,11 +204,11 @@ export default function SubmissionCreatePage() {
                     <button
                       type="submit"
                       disabled={mutation.isPending}
-                      className="inline-flex items-center justify-center px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white font-semibold rounded-lg shadow-sm text-sm transition-all gap-2"
+                      className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-none transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer outline-none"
                     >
                       {mutation.isPending ? (
                         <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin text-white" />
                           <span>Mengirimkan...</span>
                         </>
                       ) : (
@@ -204,10 +220,12 @@ export default function SubmissionCreatePage() {
                     </button>
                   )}
                 </div>
+
               </form>
             </FormProvider>
           </div>
         </div>
+
       </div>
     </div>
   );

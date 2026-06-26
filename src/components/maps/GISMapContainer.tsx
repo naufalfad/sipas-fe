@@ -1,38 +1,81 @@
-import React from 'react';
-import { MapContainer } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+/**
+ * ============================================================================
+ * GIS MAP CONTAINER — MapLibre GL JS Wrapper
+ * ============================================================================
+ * Migrasi dari: react-leaflet MapContainer
+ * Migrasi ke  : react-map-gl/maplibre Map
+ *
+ * Komponen pembungkus peta generik. Digunakan oleh form pengajuan dan
+ * komponen lain yang membutuhkan peta embedding ringan (bukan GISPage utama).
+ * ============================================================================
+ */
 
-// Fix for default Leaflet icon paths in React bundle build
-export const customMarkerIcon = new L.Icon({
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+import React, { useRef, useEffect } from 'react';
+import Map, { type MapRef } from 'react-map-gl/maplibre';
+import type { StyleSpecification } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+const DEFAULT_STYLE: StyleSpecification = {
+    version: 8,
+    sources: {
+        'osm': {
+            type: 'raster',
+            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors',
+            maxzoom: 18,
+        },
+    },
+    layers: [{ id: 'osm-layer', type: 'raster', source: 'osm' }],
+    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+} as StyleSpecification;
 
 interface GISMapContainerProps {
-  center?: [number, number];
-  zoom?: number;
-  children: React.ReactNode;
+    /** Pusat awal peta dalam format [latitude, longitude] */
+    center?: [number, number];
+    zoom?: number;
+    children?: React.ReactNode;
+    className?: string;
 }
 
-export default function GISMapContainer({ 
-  center = [-6.595189, 106.816629], // Bogor default
-  zoom = 13, 
-  children 
+export default function GISMapContainer({
+    center = [-6.595189, 106.816629],
+    zoom = 13,
+    children,
+    className = 'w-full h-full rounded-xl shadow-inner border border-slate-200',
 }: GISMapContainerProps) {
-  return (
-    <MapContainer 
-      center={center} 
-      zoom={zoom} 
-      scrollWheelZoom={true}
-      className="w-full h-full rounded-xl shadow-inner border border-slate-200 dark:border-slate-700"
-    >
-      {children}
-    </MapContainer>
-  );
+    const mapRef = useRef<MapRef>(null);
+
+    // ── WebGL Context Cleanup ──
+    // Memanggil map.remove() secara eksplisit saat unmount untuk membebaskan WebGL context secara instan.
+    useEffect(() => {
+        return () => {
+            try {
+                mapRef.current?.getMap()?.remove();
+            } catch {
+                // Abaikan jika map sudah dihancurkan oleh React
+            }
+        };
+    }, []);
+
+    return (
+        <div className={className} style={{ width: '100%', height: '100%' }}>
+            <Map
+                ref={mapRef}
+                id="gis-map-container"
+                mapLib={import('maplibre-gl')}
+                mapStyle={DEFAULT_STYLE}
+                initialViewState={{
+                    longitude: center[1], // GeoJSON format: [lng, lat]
+                    latitude: center[0],
+                    zoom,
+                }}
+                style={{ width: '100%', height: '100%' }}
+                maxZoom={22}
+                pitchWithRotate={false}
+            >
+                {children}
+            </Map>
+        </div>
+    );
 }
