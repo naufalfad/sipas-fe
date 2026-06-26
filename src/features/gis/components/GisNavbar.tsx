@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
 import type { UserRole } from '@/app/store/useUIStore';
 import {
-    ChevronLeft, Layers, LogOut, ChevronDown,
+    ChevronLeft, Globe, LogOut, ChevronDown,
     RefreshCw, Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -47,10 +47,8 @@ export default function GisNavbar() {
 
                 <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
 
-                <Link to="/" className="flex items-center gap-3 active:scale-95 transition-transform group rounded-none outline-none text-left">
-                    <div className="w-8 h-8 bg-teal-600 flex items-center justify-center text-white rounded-none shadow-sm group-hover:bg-teal-700 transition-colors">
-                        <Layers size={18} />
-                    </div>
+                <Link to="/" className="flex items-center gap-2.5 active:scale-95 transition-transform group rounded-none outline-none text-left">
+                    <Globe size={22} className="text-teal-600 group-hover:text-teal-700 transition-colors shrink-0" strokeWidth={1.75} />
                     <div className="flex flex-col leading-none">
                         <span className="font-sans font-semibold text-lg md:text-xl tracking-tight text-slate-800">
                             Geo <span className="text-teal-600">SIPAS</span>

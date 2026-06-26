@@ -1,49 +1,14 @@
 /**
  * ============================================================================
- * SIPAS MAP — Immersive 3D GIS Canvas  [PERFORMANCE-OPTIMIZED v2]
+ * SIPAS MAP — Immersive 3D GIS Canvas  [PERFORMANCE-OPTIMIZED v2.1]
  * ============================================================================
  * Engine  : MapLibre GL JS (WebGL, open-source)
  * Wrapper : react-map-gl v7
  * Cluster : supercluster (client-side, zero-dependency)
  *
- * OPTIMASI KRITIS yang diimplementasikan di versi ini:
- *
- * [OPT-1] ELIMINASI RE-RENDER LOOP saat peta bergerak
- *   Sebelumnya: onMoveEnd dan onMove keduanya menulis ke Zustand store,
- *   menyebabkan seluruh React tree (panel samping, HUD, dll) ikut re-render
- *   60× per detik selama gesture pan/zoom.
- *
- *   Sesudahnya: Gerakan halus dikelola oleh LOCAL viewState internal Map
- *   (pola "controlled component" react-map-gl). Zustand HANYA diperbarui
- *   pada event onMoveEnd (saat jari/mouse dilepas). Ini mengurangi Zustand
- *   writes dari ~3600/menit → ~1–3/menit selama normal panning.
- *
- * [OPT-2] MEMOIZATION STABIL untuk GeoJSON Sources
- *   Layer GeoJSON hanya dibangun ulang jika data atau aktiveLayers berubah,
- *   bukan setiap kali viewState berubah. Ini mencegah WebGL dari membongkar
- *   dan rebuild vertex buffer di GPU tanpa alasan.
- *
- * [OPT-3] LAZY LOAD + GUARD yang benar untuk BANGUNAN_AR_25K (3.5 MB)
- *   File 3.5 MB hanya dimuat saat zoom >= 14 (bukan zoom >= 10), memberikan
- *   waktu lebih lama sebelum browser perlu mengalokasikan GPU memory.
- *   tolerance=1.0 dipakai di zoom rendah, 0.5 di zoom detail.
- *
- * [OPT-4] WebGL CONTEXT CLEANUP via onRemove
- *   MapLibre instance dihancurkan secara eksplisit lewat map.remove() saat
- *   komponen unmount untuk mencegah WebGL context leak.
- *
- * [OPT-5] STABLE SUPERCLUSTER BBOX — cluster hanya dikalkuasi saat
- *   viewBBox atau zoom (dibulatkan ke integer) benar-benar berubah,
- *   bukan setiap frame animasi.
- *
- * Arsitektur Layer (bottom → top):
- *   1. Basemap       — Raster tiles (OSM/Carto/ArcGIS) dibungkus MapLibre Style
- *   2. GeoJSON Env   — Sungai (line), Kontur (line), Pemukiman (fill)
- *   3. Bangunan      — Flat fill (zoom<17), Fill-extrusion (zoom≥17)
- *   4. Submissions   — Flat fill (zoom<14), Fill-extrusion 3D (zoom≥14)
- *   5. Sub-polygons  — Kavling, RTH, PSU, Jalan (zoom≥14)
- *   6. Clash Layer   — Area pelanggaran sempadan (merah pulsing)
- *   7. Markers       — Supercluster (zoom<13), Individual (zoom≥13)
+ * OPTIMASI TERRAIN 3D (Anti-Crash & Anti-Jittering):
+ * [OPT-TERRAIN-STABLE] Source raster-dem dipasang permanen untuk mencegah 
+ * crash siklus unmount WebGL. Toggle dikendalikan murni lewat properti `terrain`.
  * ============================================================================
  */
 
@@ -92,13 +57,8 @@ const INITIAL_VIEW_STATE = {
 
 type MapViewState = typeof INITIAL_VIEW_STATE;
 
-// ─── Basemap Style Factory (dimemoize di luar komponen) ────────────────────────
+// ─── Basemap Style Factory ─────────────────────────────────────────────────────
 
-/**
- * Cache style per basemap agar tidak membuat object baru setiap render.
- * Tanpa cache ini, mapStyle prop yang selalu baru memaksa MapLibre reload
- * seluruh tile source bahkan ketika basemap tidak berubah.
- */
 const styleCache = new globalThis.Map<string, StyleSpecification>();
 
 function buildRasterStyle(tileUrl: string, attribution: string): StyleSpecification {
@@ -171,7 +131,8 @@ function disposeHierarchy(obj: any) {
         }
         if (child.material) {
             if (Array.isArray(child.material)) {
-                child.material.forEach((m) => m.dispose());
+                // Tambahkan ": any" secara eksplisit pada parameter m
+                child.material.forEach((m: any) => m.dispose());
             } else {
                 child.material.dispose();
             }
@@ -182,21 +143,18 @@ function disposeHierarchy(obj: any) {
 function createMockSitePlanModel() {
     const mainGroup = new THREE.Group();
 
-    // Materials using MeshLambertMaterial for lightweight GPU rendering
-    const lawnMat = new THREE.MeshLambertMaterial({ color: 0x1b5e20 }); // dark green
-    const roadMat = new THREE.MeshLambertMaterial({ color: 0x2d3748 }); // dark gray
-    const houseMat = new THREE.MeshLambertMaterial({ color: 0x0f766e }); // teal
-    const roofMat = new THREE.MeshLambertMaterial({ color: 0x134e4a }); // dark teal
-    const facilityMat = new THREE.MeshLambertMaterial({ color: 0xd97706 }); // orange
-    const facilityRoofMat = new THREE.MeshLambertMaterial({ color: 0x92400e }); // dark orange
+    const lawnMat = new THREE.MeshLambertMaterial({ color: 0x1b5e20 });
+    const roadMat = new THREE.MeshLambertMaterial({ color: 0x2d3748 });
+    const houseMat = new THREE.MeshLambertMaterial({ color: 0x0f766e });
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0x134e4a });
+    const facilityMat = new THREE.MeshLambertMaterial({ color: 0xd97706 });
+    const facilityRoofMat = new THREE.MeshLambertMaterial({ color: 0x92400e });
 
-    // Ground Lawn Base
     const lawnGeo = new THREE.BoxGeometry(80, 0.2, 80);
     const lawn = new THREE.Mesh(lawnGeo, lawnMat);
     lawn.position.y = 0.1;
     mainGroup.add(lawn);
 
-    // Roads (mimicking BimViewerPage.tsx)
     const road1 = new THREE.Mesh(new THREE.BoxGeometry(6, 0.3, 80), roadMat);
     road1.position.set(0, 0.2, 0);
     mainGroup.add(road1);
@@ -205,7 +163,6 @@ function createMockSitePlanModel() {
     road2.position.set(0, 0.2, 0);
     mainGroup.add(road2);
 
-    // Function to place a building with BoxGeometry (body) and ConeGeometry (roof)
     const placeBuilding = (
         x: number, z: number, w: number, d: number, h: number,
         bodyMat: THREE.Material, roofMaterial: THREE.Material
@@ -215,7 +172,6 @@ function createMockSitePlanModel() {
         body.position.set(x, h / 2 + 0.2, z);
         mainGroup.add(body);
 
-        // Roof (pyramid-like via scaled ConeGeometry with 4 radial segments)
         const roofGeom = new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.3, 4);
         const roof = new THREE.Mesh(roofGeom, roofMaterial);
         roof.position.set(x, h + (h * 0.15) + 0.2, z);
@@ -223,7 +179,6 @@ function createMockSitePlanModel() {
         mainGroup.add(roof);
     };
 
-    // Grid-based layout mimicking BimViewerPage.tsx
     const rows = 5;
     const cols = 5;
     const spacingX = 14;
@@ -235,8 +190,7 @@ function createMockSitePlanModel() {
         for (let col = 0; col < cols; col++) {
             const x = offsetX + col * spacingX;
             const z = offsetZ + row * spacingZ;
-            
-            // Skip center area for road intersection
+
             if (Math.abs(x) < 6 || Math.abs(z) < 8) continue;
 
             const isFacility = (row === 0 && col === 0) || (row === 4 && col === 4);
@@ -266,8 +220,6 @@ interface ProcessedSubmission extends Submission {
 }
 
 // ─── Sub-komponen Marker yang di-memo ──────────────────────────────────────────
-// Memisahkan JSX marker ke komponen tersendiri mencegah re-render semua marker
-// hanya karena salah satu state (misal popupInfo) berubah.
 
 interface ClusterMarkerProps {
     lng: number;
@@ -334,58 +286,43 @@ const PinMarker = memo(function PinMarker({
 // ─── KOMPONEN UTAMA ────────────────────────────────────────────────────────────
 
 export default function SipasMap() {
-    // ── Zustand: hanya baca state yang benar-benar diperlukan ─────────────────
-    // Pisahkan pembacaan store agar perubahan satu state tidak memaksa
-    // re-subscribe semua state lain dalam satu destructuring.
-    const activeLayers         = useGisUIStore((s) => s.activeLayers);
-    const activeBaseMap        = useGisUIStore((s) => s.activeBaseMap);
-    const mapOpacity           = useGisUIStore((s) => s.mapOpacity);
-    const selectedCompanyId    = useGisUIStore((s) => s.selectedCompanyId);
-    const is3DMode             = useGisUIStore((s) => s.is3DMode);
-    const isTerrainActive      = useGisUIStore((s) => s.isTerrainActive);
-    const flyToTarget          = useGisUIStore((s) => s.flyToTarget);
-    // Actions (stable references — tidak menyebabkan re-render)
+    const activeLayers = useGisUIStore((s) => s.activeLayers);
+    const activeBaseMap = useGisUIStore((s) => s.activeBaseMap);
+    const mapOpacity = useGisUIStore((s) => s.mapOpacity);
+    const selectedCompanyId = useGisUIStore((s) => s.selectedCompanyId);
+    const is3DMode = useGisUIStore((s) => s.is3DMode);
+    const isTerrainActive = useGisUIStore((s) => s.isTerrainActive);
+    const flyToTarget = useGisUIStore((s) => s.flyToTarget);
+
     const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
-    const setMapZoom           = useGisUIStore((s) => s.setMapZoom);
-    const setMapCenter         = useGisUIStore((s) => s.setMapCenter);
-    const setMapPitch          = useGisUIStore((s) => s.setMapPitch);
-    const setMapBearing        = useGisUIStore((s) => s.setMapBearing);
-    const openPanel            = useGisUIStore((s) => s.openPanel);
+    const setMapZoom = useGisUIStore((s) => s.setMapZoom);
+    const setMapCenter = useGisUIStore((s) => s.setMapCenter);
+    const setMapPitch = useGisUIStore((s) => s.setMapPitch);
+    const setMapBearing = useGisUIStore((s) => s.setMapBearing);
+    const openPanel = useGisUIStore((s) => s.openPanel);
     const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
-    const clearFlyTo           = useGisUIStore((s) => s.clearFlyTo);
+    const clearFlyTo = useGisUIStore((s) => s.clearFlyTo);
 
     const mapRef = useRef<MapRef>(null);
 
-    // ── [OPT-1] LOCAL VIEW STATE ───────────────────────────────────────────────
-    // react-map-gl "controlled" mode: viewState dikelola secara lokal di sini.
-    // Perubahan halus (pan/pinch/rotate) tidak menyentuh Zustand sama sekali
-    // → panel samping tidak pernah re-render selama gesture berlangsung.
     const [localViewState, setLocalViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
 
+    // [OPT-TERRAIN-STABLE] Konfigurasi terrain di-memoize dengan referensi konstan
     const terrainConfig = useMemo(() => {
-        if (!isTerrainActive || !is3DMode) return null;
         return { source: 'aws-terrain-source', exaggeration: 1.5 };
-    }, [isTerrainActive, is3DMode]);
+    }, []);
 
-    // ── State GeoJSON Layer (Lazy Loaded) ──────────────────────────────────────
-    const [sungaiData, setSungaiData]       = useState<any>(null);
-    const [konturData, setKonturData]       = useState<any>(null);
+    const [sungaiData, setSungaiData] = useState<any>(null);
+    const [konturData, setKonturData] = useState<any>(null);
     const [pemukimanData, setPemukimanData] = useState<any>(null);
-    const [bangunanData, setBangunanData]   = useState<any>(null);
+    const [bangunanData, setBangunanData] = useState<any>(null);
 
-    // ── State Cluster & Popup ──────────────────────────────────────────────────
-    const [clusters, setClusters]   = useState<any[]>([]);
+    const [clusters, setClusters] = useState<any[]>([]);
     const [popupInfo, setPopupInfo] = useState<ProcessedSubmission | null>(null);
-    const [viewBBox, setViewBBox]   = useState<BBox>([-180, -85, 180, 85]);
+    const [viewBBox, setViewBBox] = useState<BBox>([-180, -85, 180, 85]);
 
-    // ── State Clash Layer ──────────────────────────────────────────────────────
     const [clashGeoJSON, setClashGeoJSON] = useState<any>(null);
 
-
-
-    // ── [OPT-3] LAZY LOAD GeoJSON — guard ketat, hanya load sekali ────────────
-    // Bangunan hanya dimuat saat zoom >= 14 (bukan >= 10) untuk menunda
-    // alokasi 3.5 MB GPU buffer hingga benar-benar dibutuhkan.
     const localZoom = localViewState.zoom;
 
     useEffect(() => {
@@ -410,14 +347,12 @@ export default function SipasMap() {
     }, [activeLayers, localZoom, pemukimanData]);
 
     useEffect(() => {
-        // [OPT-3] Bangunan: tunda load hingga zoom detail (>= 14) untuk hemat memori awal
         if (localZoom >= 14 && !bangunanData) {
             import('@/assets/geojson/bogor/BANGUNAN_AR_25K.json')
                 .then((m) => setBangunanData(m.default)).catch(console.error);
         }
     }, [localZoom, bangunanData]);
 
-    // ── Proses Submissions (stable — hanya recalc jika activeLayers berubah) ──
     const processedSubmissions = useMemo<ProcessedSubmission[]>(() =>
         mockSubmissions
             .map((sub: Submission) => ({
@@ -430,7 +365,6 @@ export default function SipasMap() {
         [activeLayers]
     );
 
-    // ── Three.js Custom WebGL Layer for 3D GLB/CAD Models ────────────────────
     const customUser3DLayerRef = useRef<any>(null);
     const customUser3DLayer = useMemo(() => {
         const layer: any = {
@@ -449,8 +383,6 @@ export default function SipasMap() {
 
             onAdd(map: any, gl: any) {
                 this.map = map;
-                
-                // Initialize Three.js renderer wrapping the existing WebGL context
                 this.renderer = new THREE.WebGLRenderer({
                     canvas: map.getCanvas(),
                     context: gl,
@@ -461,10 +393,9 @@ export default function SipasMap() {
                 this.scene = new THREE.Scene();
                 this.camera = new THREE.PerspectiveCamera();
 
-                // Setup lights
                 const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
                 this.scene.add(ambientLight);
-                
+
                 const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
                 dirLight.position.set(0, -70, 100).normalize();
                 this.scene.add(dirLight);
@@ -473,30 +404,25 @@ export default function SipasMap() {
                 dirLight2.position.set(0, 70, 100).normalize();
                 this.scene.add(dirLight2);
 
-                // Load any queued/pending model once the scene is ready
                 if (this.currentModelId && this.pendingCentroid) {
                     const id = this.currentModelId;
                     const centroid = this.pendingCentroid;
                     const url = this.pendingModelUrl;
-                    this.currentModelId = null; // Reset to bypass deduplication check
+                    this.currentModelId = null;
                     this.loadModel(id, centroid, url);
                 }
             },
 
             loadModel(id: string, centroid: [number, number], modelUrl: string) {
-                if (this.currentModelId === id && this.scene) return; // already loading/loaded
-                
+                if (this.currentModelId === id && this.scene) return;
+
                 this.clearModel();
                 this.currentModelId = id;
                 this.pendingCentroid = centroid;
                 this.pendingModelUrl = modelUrl;
 
-                // Guard: If scene is not yet initialized by onAdd, wait and let onAdd trigger it.
-                if (!this.scene) {
-                    return;
-                }
+                if (!this.scene) return;
 
-                // 2. Konversikan koordinat centroid poligon pengajuan yang dipilih ke unit Mercator
                 const center = MercatorCoordinate.fromLngLat(centroid, 0);
                 const scale = center.meterInMercatorCoordinateUnits();
 
@@ -505,7 +431,7 @@ export default function SipasMap() {
                     translateY: center.y,
                     translateZ: center.z,
                     scale: scale,
-                    rx: Math.PI / 2, // Rotate upright
+                    rx: Math.PI / 2,
                     ry: 0,
                     rz: 0,
                 };
@@ -541,7 +467,6 @@ export default function SipasMap() {
                                 }
 
                                 const model = gltf.scene;
-                                // Scale standard GLTF Box if needed to be visible and nicely sized on the map
                                 model.scale.set(10, 10, 10);
 
                                 this.modelMesh = model;
@@ -550,12 +475,12 @@ export default function SipasMap() {
                             },
                             undefined,
                             (err) => {
-                                console.warn('[THREE-BIM] Failed to load external GLTF model, using procedural fallback.', err);
+                                console.warn('[THREE-BIM] Fallback triggered:', err);
                                 useFallback();
                             }
                         );
                     }).catch((err) => {
-                        console.warn('[THREE-BIM] Failed to import GLTFLoader, using procedural fallback.', err);
+                        console.warn('[THREE-BIM] Fallback triggered:', err);
                         useFallback();
                     });
                 } else {
@@ -581,13 +506,12 @@ export default function SipasMap() {
 
                 const { rx, ry, rz } = this.modelTransform;
 
-                // Dynamically query terrain elevation to snap the custom 3D model to the terrain surface
                 let elevation = 0;
                 if (this.map) {
                     try {
                         elevation = this.map.queryTerrainElevation(this.pendingCentroid) || 0;
                     } catch (e) {
-                        // ignore if tiles aren't loaded yet
+                        // mengabaikan kegagalan baca elevasi saat transisi tile
                     }
                 }
 
@@ -624,7 +548,6 @@ export default function SipasMap() {
         return layer;
     }, []);
 
-    // Effect: Re-add custom WebGL layer when style changes
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
@@ -635,14 +558,14 @@ export default function SipasMap() {
                 try {
                     mapNative.addLayer(customUser3DLayer);
                 } catch (e) {
-                    console.warn('[THREE-BIM] Failed to add custom WebGL layer:', e);
+                    console.warn('[THREE-BIM] Failed to add layer:', e);
                 }
             }
         };
 
         mapNative.on('styledata', handleStyleData);
-        handleStyleData(); // try to add it immediately if style is loaded
-        
+        handleStyleData();
+
         return () => {
             if (mapNative) {
                 mapNative.off('styledata', handleStyleData);
@@ -650,7 +573,6 @@ export default function SipasMap() {
         };
     }, [activeBaseMap, customUser3DLayer]);
 
-    // Effect: Dynamically load/unload BIM model based on selection and zoom
     useEffect(() => {
         if (selectedCompanyId && localZoom >= 16) {
             const sub = processedSubmissions.find((s) => s.id === selectedCompanyId);
@@ -664,16 +586,12 @@ export default function SipasMap() {
         }
     }, [selectedCompanyId, localZoom, processedSubmissions, customUser3DLayer]);
 
-    // Effect: Cleanup Three.js Layer on component unmount
     useEffect(() => {
         return () => {
             customUser3DLayerRef.current?.onRemove();
         };
     }, []);
 
-    // ── [OPT-2] STABLE GeoJSON MEMOS ──────────────────────────────────────────
-    // Dependencies: hanya processedSubmissions (bukan localViewState)
-    // Ini menjamin WebGL tidak rebuild GPU buffer saat peta digeser.
     const submissionsGeoJSON = useMemo(() => {
         const features = processedSubmissions
             .filter((sub) => sub.location.polygon && sub.location.polygon.length >= 3)
@@ -696,7 +614,8 @@ export default function SipasMap() {
                     return null;
                 }
             })
-            .filter(Boolean);
+            // Ganti ".filter(Boolean)" dengan Type Guard di bawah ini
+            .filter((f): f is Exclude<typeof f, null> => f !== null);
 
         return { type: 'FeatureCollection' as const, features };
     }, [processedSubmissions]);
@@ -713,18 +632,17 @@ export default function SipasMap() {
                             geometry: { type: 'Polygon', coordinates: [leafletRingToGeoJSON(ring)] },
                             properties: { color, type, submissionId: sub.id },
                         });
-                    } catch { /* skip invalid */ }
+                    } catch { /* skip */ }
                 });
             };
-            if (loc.roadPolygons)    addPoly(loc.roadPolygons,    '#cbd5e1', 'road');
-            if (loc.rthPolygons)     addPoly(loc.rthPolygons,     '#10b981', 'rth');
-            if (loc.psuPolygons)     addPoly(loc.psuPolygons,     '#14b8a6', 'psu');
+            if (loc.roadPolygons) addPoly(loc.roadPolygons, '#cbd5e1', 'road');
+            if (loc.rthPolygons) addPoly(loc.rthPolygons, '#10b981', 'rth');
+            if (loc.psuPolygons) addPoly(loc.psuPolygons, '#14b8a6', 'psu');
             if (loc.kavlingPolygons) addPoly(loc.kavlingPolygons, '#64748b', 'kavling');
         });
         return { type: 'FeatureCollection' as const, features };
     }, [processedSubmissions]);
 
-    // ── [OPT-5] SUPERCLUSTER: stable, hanya rebuild jika data berubah ─────────
     const supercluster = useMemo(() => {
         const sc = new Supercluster<GeoJsonProperties>({ radius: 80, maxZoom: 12, minZoom: 0 });
         sc.load(processedSubmissions.map((sub) => ({
@@ -738,7 +656,6 @@ export default function SipasMap() {
         return sc;
     }, [processedSubmissions]);
 
-    // [OPT-5] Cluster hanya dikalkuasi saat bbox atau integer zoom berubah
     const intZoom = Math.floor(localZoom);
     useEffect(() => {
         try {
@@ -748,7 +665,6 @@ export default function SipasMap() {
         }
     }, [supercluster, viewBBox, intZoom]);
 
-    // ── Clash Polygon Listener ────────────────────────────────────────────────
     useEffect(() => {
         const handleRenderClash = (e: Event) => {
             const ev = e as CustomEvent;
@@ -761,18 +677,16 @@ export default function SipasMap() {
         };
         const handleClearClash = () => setClashGeoJSON(null);
         window.addEventListener('map-render-clash', handleRenderClash);
-        window.addEventListener('map-clear-clash',  handleClearClash);
+        window.addEventListener('map-clear-clash', handleClearClash);
         return () => {
             window.removeEventListener('map-render-clash', handleRenderClash);
-            window.removeEventListener('map-clear-clash',  handleClearClash);
+            window.removeEventListener('map-clear-clash', handleClearClash);
         };
     }, []);
 
-    // ── Observer: is3DMode Toggle ─────────────────────────────────────────────
     useEffect(() => {
         if (!mapRef.current) return;
-        
-        // Manual override for MapLibre dynamic property bug
+
         const nativeMap = mapRef.current.getMap();
         if (nativeMap) {
             if (is3DMode) {
@@ -821,22 +735,19 @@ export default function SipasMap() {
             essential: true,
         });
         clearFlyTo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [flyToTarget, clearFlyTo]);
 
-    // ── Legacy Window Event Bridge ─────────────────────────────────────────────
-    // Dijaga oleh onLoad agar mapRef sudah terisi saat event pertama diterima.
     const handleMapLoad = useCallback(() => {
         const map = mapRef.current;
         if (!map) return;
 
-        const handleZoomIn  = () => map.zoomIn({ duration: 300 });
+        const handleZoomIn = () => map.zoomIn({ duration: 300 });
         const handleZoomOut = () => map.zoomOut({ duration: 300 });
-        const handleReset   = () => {
+        const handleReset = () => {
             const currentIs3D = useGisUIStore.getState().is3DMode;
             const targetPitch = currentIs3D ? 45 : 0;
             const targetBearing = currentIs3D ? -10 : 0;
-            console.log(`[GEOSIPAS] Resetting map view. Mode: ${currentIs3D ? "3D" : "2D"}, Target Pitch: ${targetPitch}, Target Bearing: ${targetBearing}`);
             setLocalViewState((prev) => ({
                 ...prev,
                 longitude: BOGOR_LNG,
@@ -853,38 +764,32 @@ export default function SipasMap() {
                 duration: 1200,
             });
         };
-        const handleFlyTo   = (e: Event) => {
+        const handleFlyTo = (e: Event) => {
             const ev = e as CustomEvent<{ lat: number; lng: number }>;
             if (ev.detail) map.flyTo({ center: [ev.detail.lng, ev.detail.lat], zoom: 18, pitch: 60, duration: 1800 });
         };
 
-        window.addEventListener('map-zoom-in',       handleZoomIn);
-        window.addEventListener('map-zoom-out',      handleZoomOut);
-        window.addEventListener('map-reset-view',    handleReset);
+        window.addEventListener('map-zoom-in', handleZoomIn);
+        window.addEventListener('map-zoom-out', handleZoomOut);
+        window.addEventListener('map-reset-view', handleReset);
         window.addEventListener('map-fly-to-coords', handleFlyTo);
 
-        // [OPT-4] WebGL cleanup: daftarkan event remove di sini juga
-        // agar cleanup terikat lifecycle map yang sama, bukan closure komponen.
         const mapNative = map.getMap();
         const onRemove = () => {
-            window.removeEventListener('map-zoom-in',       handleZoomIn);
-            window.removeEventListener('map-zoom-out',      handleZoomOut);
-            window.removeEventListener('map-reset-view',    handleReset);
+            window.removeEventListener('map-zoom-in', handleZoomIn);
+            window.removeEventListener('map-zoom-out', handleZoomOut);
+            window.removeEventListener('map-reset-view', handleReset);
             window.removeEventListener('map-fly-to-coords', handleFlyTo);
         };
         mapNative.once('remove', onRemove);
     }, []);
 
-    // ── [OPT-4] WebGL Context Cleanup ─────────────────────────────────────────
-    // Memanggil map.remove() secara eksplisit saat komponen unmount.
-    // Tanpa ini, browser bisa kehabisan WebGL context (max ~16 context per tab)
-    // setelah pengguna berpindah halaman berkali-kali.
     useEffect(() => {
         return () => {
             try {
                 mapRef.current?.getMap()?.remove();
             } catch {
-                // map mungkin sudah ter-destroy oleh React, abaikan
+                // map mungkin sudah hancur
             }
         };
     }, []);
@@ -893,24 +798,18 @@ export default function SipasMap() {
         window.dispatchEvent(new Event('map-move-start'));
     }, []);
 
-    // ── [OPT-1] Handler: onMove — HANYA update localViewState (TIDAK Zustand) ─
     const handleMove = useCallback((e: ViewStateChangeEvent) => {
         setLocalViewState(e.viewState as MapViewState);
     }, []);
 
-    // ── [OPT-1] Handler: onMoveEnd — baru sync ke Zustand & supercluster ──────
-    // Dipanggil HANYA saat gesture selesai (touchend / mouseup / wheel stop).
-    // Frekuensi: ~1–3× per interaksi, bukan 60× per detik.
     const handleMoveEnd = useCallback((e: ViewStateChangeEvent) => {
         const { longitude, latitude, zoom, pitch, bearing } = e.viewState;
 
-        // Sync ke Zustand (satu batch write, bukan 60 writes/detik)
         setMapCenter([latitude, longitude]);
         setMapZoom(zoom);
         setMapPitch(pitch);
         setMapBearing(bearing);
 
-        // Update bbox untuk supercluster setelah gerakan selesai
         const map = mapRef.current;
         if (map) {
             const bounds = map.getBounds();
@@ -925,7 +824,6 @@ export default function SipasMap() {
         window.dispatchEvent(new Event('map-move-end'));
     }, [setMapCenter, setMapZoom, setMapPitch, setMapBearing]);
 
-    // ── Handler: Klik Layer Submissions ───────────────────────────────────────
     const handleSubmissionClick = useCallback((e: MapLayerMouseEvent) => {
         const props = e.features?.[0]?.properties;
         if (!props?.id) return;
@@ -989,27 +887,18 @@ export default function SipasMap() {
         }
     }, [supercluster]);
 
-    // ── Derived visibility — HANYA dari localViewState (tidak subscribe Zustand) ─
-    const opacity       = mapOpacity / 100;
-    const showSungai    = activeLayers.includes('layer-river')  && localZoom >= 10;
-    const showKontur    = activeLayers.includes('layer-kontur') && localZoom >= 10;
-    const showPemukiman = activeLayers.includes('layer-aqi')    && localZoom >= 10;
-    const showDetail    = localZoom >= 14;
-    const showClusters  = localZoom < 13;
+    const opacity = mapOpacity / 100;
+    const showSungai = activeLayers.includes('layer-river') && localZoom >= 10;
+    const showKontur = activeLayers.includes('layer-kontur') && localZoom >= 10;
+    const showPemukiman = activeLayers.includes('layer-aqi') && localZoom >= 10;
+    const showDetail = localZoom >= 14;
+    const showClusters = localZoom < 13;
 
-    // ── Toleransi simplifikasi GeoJSON bangunan berdasarkan zoom ─────────────
-    // Zoom jauh → toleransi besar (geometri kasar, cepat di GPU)
-    // Zoom dekat → toleransi kecil (geometri detail, akurat)
     const bangunanTolerance = localZoom < 15 ? 1.0 : 0.5;
 
-    // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className="absolute inset-0 z-0">
-            {/*
-             * [OPT-1] "Controlled" Map: viewState dikelola secara lokal via onMove.
-             * Zustand TIDAK diperbarui selama gesture — hanya saat onMoveEnd.
-             */}
-             <Map
+            <Map
                 ref={mapRef}
                 mapLib={import('maplibre-gl')}
                 mapStyle={getMapStyle(activeBaseMap)}
@@ -1020,7 +909,8 @@ export default function SipasMap() {
                 pitchWithRotate={is3DMode}
                 dragRotate={is3DMode}
                 touchZoomRotate={is3DMode}
-                terrain={terrainConfig || undefined}
+                // [OPT-TERRAIN-STABLE] Toggling 3D Terrain dilakukan di sini tanpa unmount <Source>
+                terrain={(isTerrainActive && is3DMode) ? terrainConfig : undefined}
                 maxPitch={85}
                 interactiveLayerIds={['submissions-fill-flat', 'submissions-extrusion']}
                 onMoveStart={handleMoveStart}
@@ -1028,22 +918,20 @@ export default function SipasMap() {
                 onClick={handleSubmissionClick}
                 onLoad={handleMapLoad}
             >
-                {/* 3D Terrain Elevation Source */}
-                {isTerrainActive && (
-                    <Source
-                        key="aws-terrain-source"
-                        id="aws-terrain-source"
-                        type="raster-dem"
-                        tiles={['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png']}
-                        encoding="terrarium"
-                        tileSize={256}
-                        maxzoom={18}
-                    />
-                )}
-                {/* ================================================================
-                    LAYER 1: PEMUKIMAN RTRW
-                    [OPT-2] Source stabil — tidak recreate saat peta bergerak
-                ================================================================ */}
+                {/* 
+                  * [OPT-TERRAIN-STABLE] Source elevasi dipasang permanen.
+                  * MapLibre tidak akan meminta/mengunduh tile dem jika terrain di atas bernilai `undefined`.
+                  * Ini mencegah WebGL crash dan lag thread saat unmount source.
+                  */}
+                <Source
+                    id="aws-terrain-source"
+                    type="raster-dem"
+                    tiles={['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png']}
+                    encoding="terrarium"
+                    tileSize={256}
+                    maxzoom={18}
+                />
+
                 {showPemukiman && pemukimanData && (
                     <Source key="pemukiman-source" id="pemukiman" type="geojson" data={pemukimanData}>
                         <Layer id="pemukiman-fill" type="fill"
@@ -1057,9 +945,6 @@ export default function SipasMap() {
                     </Source>
                 )}
 
-                {/* ================================================================
-                    LAYER 2: KONTUR LERENG
-                ================================================================ */}
                 {showKontur && konturData && (
                     <Source key="kontur-source" id="kontur" type="geojson" data={konturData}>
                         <Layer id="kontur-line" type="line"
@@ -1072,9 +957,6 @@ export default function SipasMap() {
                     </Source>
                 )}
 
-                {/* ================================================================
-                    LAYER 3: ALIRAN SUNGAI
-                ================================================================ */}
                 {showSungai && sungaiData && (
                     <Source key="sungai-source" id="sungai" type="geojson" data={sungaiData}>
                         <Layer id="sungai-casing" type="line"
@@ -1088,11 +970,6 @@ export default function SipasMap() {
                     </Source>
                 )}
 
-                {/* ================================================================
-                    LAYER 4: BANGUNAN EKSISTING
-                    [OPT-3] Hanya dimuat dan dirender saat zoom >= 14.
-                    tolerance bervariasi berdasarkan zoom untuk efisiensi GPU.
-                ================================================================ */}
                 {bangunanData && localZoom >= 14 && (
                     <Source key="bangunan-source" id="bangunan" type="geojson" data={bangunanData}
                         tolerance={bangunanTolerance}>
@@ -1108,10 +985,6 @@ export default function SipasMap() {
                     </Source>
                 )}
 
-                {/* ================================================================
-                    LAYER 5: SUBMISSION POLYGON (Pengajuan Site Plan)
-                    [OPT-2] Source ID stabil → tidak recreate GPU buffer
-                ================================================================ */}
                 <Source key="submissions-source" id="submissions" type="geojson" data={submissionsGeoJSON} generateId={true}>
                     <Layer id="submissions-fill-flat" type="fill" maxzoom={14}
                         paint={{
@@ -1144,9 +1017,6 @@ export default function SipasMap() {
                     />
                 </Source>
 
-                {/* ================================================================
-                    LAYER 6: SUB-POLYGON CAD DETAIL (zoom >= 14)
-                ================================================================ */}
                 {showDetail && (
                     <Source key="sub-polygons-source" id="sub-polygons" type="geojson" data={subPolygonsGeoJSON}>
                         <Layer id="sub-poly-fill" type="fill"
@@ -1158,9 +1028,6 @@ export default function SipasMap() {
                     </Source>
                 )}
 
-                {/* ================================================================
-                    LAYER 7: CLASH POLYGON (Pelanggaran Sempadan Sungai)
-                ================================================================ */}
                 {clashGeoJSON && (
                     <Source key="clash-source" id="clash" type="geojson" data={clashGeoJSON}>
                         <Layer id="clash-fill" type="fill"
@@ -1175,57 +1042,51 @@ export default function SipasMap() {
                     </Source>
                 )}
 
-                {/* ================================================================
-                    LAYER 8: MARKERS
-                    [OPT-2] Cluster/PinMarker di-memo → tidak re-render jika
-                    prop yang tidak relevan berubah (misal popupInfo dari state lain).
-                ================================================================ */}
                 {showClusters
                     ? clusters.map((cluster) => {
-                          const [lng, lat] = cluster.geometry.coordinates;
-                          const { cluster: isCluster, point_count, cluster_id } = cluster.properties;
+                        const [lng, lat] = cluster.geometry.coordinates;
+                        const { cluster: isCluster, point_count, cluster_id } = cluster.properties;
 
-                          if (isCluster) {
-                              return (
-                                  <ClusterMarker
-                                      key={`cluster-${cluster_id}`}
-                                      lng={lng} lat={lat}
-                                      count={point_count}
-                                      clusterId={cluster_id}
-                                      zoom={localZoom}
-                                      onExpand={handleClusterExpand}
-                                  />
-                              );
-                          }
+                        if (isCluster) {
+                            return (
+                                <ClusterMarker
+                                    key={`cluster-${cluster_id}`}
+                                    lng={lng} lat={lat}
+                                    count={point_count}
+                                    clusterId={cluster_id}
+                                    zoom={localZoom}
+                                    onExpand={handleClusterExpand}
+                                />
+                            );
+                        }
 
-                          const sub = processedSubmissions.find(
-                              (s) => s.id === cluster.properties.submissionId
-                          );
-                          if (!sub) return null;
+                        const sub = processedSubmissions.find(
+                            (s) => s.id === cluster.properties.submissionId
+                        );
+                        if (!sub) return null;
 
-                          return (
-                              <PinMarker
-                                  key={`marker-${sub.id}`}
-                                  sub={sub}
-                                  isSelected={selectedCompanyId === sub.id}
-                                  sizeBase={28}
-                                  onClickPin={handleMarkerClick}
-                                  onShowPopup={setPopupInfo}
-                              />
-                          );
-                      })
+                        return (
+                            <PinMarker
+                                key={`marker-${sub.id}`}
+                                sub={sub}
+                                isSelected={selectedCompanyId === sub.id}
+                                sizeBase={28}
+                                onClickPin={handleMarkerClick}
+                                onShowPopup={setPopupInfo}
+                            />
+                        );
+                    })
                     : processedSubmissions.map((sub) => (
-                          <PinMarker
-                              key={`marker-hi-${sub.id}`}
-                              sub={sub}
-                              isSelected={selectedCompanyId === sub.id}
-                              sizeBase={24}
-                              onClickPin={handleMarkerClick}
-                              onShowPopup={setPopupInfo}
-                          />
-                      ))}
+                        <PinMarker
+                            key={`marker-hi-${sub.id}`}
+                            sub={sub}
+                            isSelected={selectedCompanyId === sub.id}
+                            sizeBase={24}
+                            onClickPin={handleMarkerClick}
+                            onShowPopup={setPopupInfo}
+                        />
+                    ))}
 
-                {/* ── Popup Info Cepat ────────────────────────────────────────── */}
                 {popupInfo && (
                     <Popup
                         longitude={popupInfo.location.lng}
@@ -1236,19 +1097,18 @@ export default function SipasMap() {
                         closeButton={false}
                         className="!rounded-none !border-0 !p-0 !shadow-2xl"
                     >
-                        <div className="px-3 py-2.5 min-w-[180px] bg-white border border-slate-200 text-left select-none">
+                        <div className="px-3.5 py-3 min-w-[180px] bg-white text-left select-none">
                             <div className="font-black text-[13px] text-slate-900 leading-tight mb-1">
                                 {popupInfo.housingName}
                             </div>
-                            <div className="text-[11px] text-slate-500 mb-2">
+                            <div className="text-[11px] text-slate-500 mb-2.5">
                                 {popupInfo.developerName}
                             </div>
                             <span
-                                className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5"
+                                className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5"
                                 style={{
                                     color: popupInfo.color,
-                                    background: `${popupInfo.color}20`,
-                                    border: `1px solid ${popupInfo.color}40`,
+                                    background: `${popupInfo.color}18`,
                                 }}
                             >
                                 {popupInfo.status}

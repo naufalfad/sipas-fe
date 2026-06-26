@@ -149,18 +149,18 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col h-full w-full bg-white relative font-sans text-slate-800 rounded-none border-slate-200">
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5 text-left">
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0 text-left">
 
                 {/* ── Status Banner ──────────────────────────────────────────── */}
                 {isProcessing ? (
-                    <div className="p-4 border border-slate-200 bg-slate-50 text-slate-500 flex items-center justify-center gap-2.5 rounded-none shadow-none select-none">
+                    <div className="px-4 py-4 border-b border-slate-200 bg-slate-50 text-slate-500 flex items-center justify-center gap-2.5 select-none">
                         <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
                         <span className="text-[11px] font-black uppercase tracking-widest animate-pulse">
                             Menghitung Geometri Sungai...
                         </span>
                     </div>
                 ) : auditResult?.isClashing ? (
-                    <div className="p-4 border text-[11px] font-semibold leading-relaxed text-justify rounded-none flex items-start gap-2.5 shadow-none select-none animate-in fade-in duration-300 text-rose-700 bg-rose-50 border-rose-200">
+                    <div className="px-4 py-3.5 border-b text-[11px] font-semibold leading-relaxed text-left flex items-start gap-2.5 select-none animate-in fade-in duration-300 text-rose-700 bg-rose-50 border-rose-200">
                         <XCircle className="shrink-0 text-rose-600 mt-0.5" size={14} />
                         <p className="leading-snug">
                             Pelanggaran Spasial Terdeteksi! Ditemukan benturan kritis pada sempadan sungai seluas{' '}
@@ -168,7 +168,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                         </p>
                     </div>
                 ) : (
-                    <div className="p-4 border text-[11px] font-semibold leading-relaxed text-justify rounded-none flex items-start gap-2.5 shadow-none select-none animate-in fade-in duration-300 text-teal-700 bg-teal-50 border-teal-200">
+                    <div className="px-4 py-3.5 border-b text-[11px] font-semibold leading-relaxed text-left flex items-start gap-2.5 select-none animate-in fade-in duration-300 text-teal-700 bg-teal-50 border-teal-200">
                         <CheckCircle2 className="shrink-0 text-teal-600 mt-0.5" size={14} />
                         <p className="leading-snug">
                             Hasil Verifikasi Spasial: Lahan bersih dari benturan spasial. Rencana mematuhi batas wilayah.
@@ -177,13 +177,15 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                 )}
 
                 {/* ── Laporan Indikator ──────────────────────────────────────── */}
-                <div className="space-y-3">
-                    <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 leading-none select-none">
-                        Laporan Indikator Spasial
-                    </h4>
-                    <div className="flex flex-col border border-slate-200 rounded-none bg-white divide-y divide-slate-100 shadow-sm">
+                <div className="">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 select-none">
+                        <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">
+                            Laporan Indikator Spasial
+                        </h4>
+                    </div>
+                    <div className="flex flex-col bg-white divide-y divide-slate-100">
                         <div className={cn(
-                            'p-3.5 transition-colors flex items-start justify-between gap-4',
+                            'px-4 py-3.5 transition-colors flex items-start justify-between gap-4',
                             !isProcessing && auditResult?.isClashing
                                 ? 'bg-rose-50/30 border-rose-200 border-2 animate-pulse'
                                 : 'hover:bg-slate-50/40'
@@ -196,7 +198,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                                     Cek Sempadan Sungai 25m
                                 </h5>
                                 <p className={cn(
-                                    'text-[10px] leading-snug font-medium text-justify',
+                                    'text-[10px] leading-snug font-medium text-left',
                                     !isProcessing && auditResult?.isClashing ? 'text-rose-700' : 'text-slate-500'
                                 )}>
                                     {isProcessing
@@ -231,13 +233,13 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                 </div>
 
                 {/* ── Keterangan Metode ──────────────────────────────────────── */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-none flex items-start gap-2.5 text-left select-none">
+                <div className="px-4 py-3.5 bg-slate-50 border-t border-slate-200 flex items-start gap-2.5 text-left select-none">
                     <HelpCircle className="text-slate-400 shrink-0 mt-0.5" size={14} />
                     <div className="space-y-1">
                         <h5 className="text-[9px] font-black uppercase tracking-widest leading-none text-slate-500">
                             Keterangan Metode Spasial
                         </h5>
-                        <p className="text-[9px] font-semibold leading-normal text-slate-400 text-justify">
+                        <p className="text-[9px] font-semibold leading-normal text-slate-400 text-left">
                             Pemeriksaan spasial dijalankan otomatis via point-in-polygon overlay menggunakan
                             data acuan RTRW dan RDTR resmi Kabupaten Bogor tahun 2025 dengan Turf.js murni.
                             Hasil kalkulasi di-debounce 600ms untuk efisiensi CPU.

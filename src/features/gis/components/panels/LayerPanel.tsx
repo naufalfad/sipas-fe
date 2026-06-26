@@ -22,8 +22,8 @@ export default function LayerPanel() {
 
     // Peta regulasi tata ruang & batas pengaman sempadan (Slide 5)
     const zoningLayers = [
-        { id: "layer-aqi", label: "Rencana Tata Ruang (RTRW)", desc: "Rencana tata ruang wilayah Kabupaten Bogor", color: "bg-teal-600", minZoom: 10 },
-        { id: "layer-river", label: "Garis Sempadan Sungai", desc: "Area lindung sungai, danau, SUTET, & KA", color: "bg-blue-600", minZoom: 10 },
+        { id: "layer-aqi", label: "Pemukiman", desc: "Pemukiman wilayah Kabupaten Bogor", color: "bg-teal-600", minZoom: 10 },
+        { id: "layer-river", label: "Garis Sempadan Sungai", desc: "Area lindung sungai", color: "bg-blue-600", minZoom: 10 },
         { id: "layer-kontur", label: "Peta Kontur Lereng", desc: "Informasi garis ketinggian topografi bukit", color: "bg-amber-300", minZoom: 10 }
     ];
 
@@ -46,8 +46,11 @@ export default function LayerPanel() {
                             className="group flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-white hover:bg-slate-50/50 transition-colors text-left w-full outline-none cursor-pointer rounded-none border-none"
                         >
                             <div className="flex items-center gap-3">
-                                {/* Toggle Switch Siku Kaku GFW Style */}
-                                <div className={cn("relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-none transition-colors duration-200 ease-in-out", isActive ? "bg-teal-600" : "bg-slate-350")}>
+                                {/* Toggle Switch Siku Kaku GFW Style dengan Perbaikan Kontras Nonaktif */}
+                                <div className={cn(
+                                    "relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-none transition-colors duration-200 ease-in-out border",
+                                    isActive ? "bg-teal-600 border-teal-600" : "bg-slate-100 border-slate-300"
+                                )}>
                                     <span className={cn("inline-block h-2.5 w-2.5 transform rounded-none bg-white shadow-sm transition duration-200 ease-in-out", isActive ? "translate-x-3.5" : "translate-x-0.5")} />
                                 </div>
                                 <div className="flex items-center gap-2.5">
@@ -81,7 +84,11 @@ export default function LayerPanel() {
                             className="group flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-white hover:bg-slate-50/50 transition-colors text-left w-full outline-none cursor-pointer rounded-none border-none"
                         >
                             <div className="flex items-center gap-3 w-full">
-                                <div className={cn("relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-none transition-colors duration-200 ease-in-out", isActive ? "bg-teal-600" : "bg-slate-350")}>
+                                {/* Toggle Switch Siku Kaku GFW Style dengan Perbaikan Kontras Nonaktif */}
+                                <div className={cn(
+                                    "relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-none transition-colors duration-200 ease-in-out border",
+                                    isActive ? "bg-teal-600 border-teal-600" : "bg-slate-100 border-slate-300"
+                                )}>
                                     <span className={cn("inline-block h-2.5 w-2.5 transform rounded-none bg-white shadow-sm transition duration-200 ease-in-out", isActive ? "translate-x-3.5" : "translate-x-0.5")} />
                                 </div>
                                 <div className="flex items-center justify-between gap-2.5 w-full">

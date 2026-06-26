@@ -3,33 +3,53 @@ import { Link } from 'react-router-dom';
 
 export default function SitePlanListPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-          Daftar Site Plan
+    <div className="space-y-6 font-sans">
+
+      {/* ─── SEKSI 1: HEADER HALAMAN ─── */}
+      <div className="text-left select-none">
+        <h1 className="text-2xl font-bold text-[#111D13] leading-none">
+          Daftar Site Plan Resmi
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">
-          Daftar seluruh Site Plan yang telah disetujui, direvisi, maupun sedang dalam proses verifikasi.
+        <p className="text-xs text-slate-500 mt-2">
+          Daftar seluruh dokumen Site Plan Kabupaten Bogor yang telah disetujui, direvisi, maupun sedang dalam proses verifikasi spasial.
         </p>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-8 shadow-sm flex flex-col items-center text-center">
-        <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-full text-teal-600 mb-4">
-          <Layers className="h-10 w-10" />
+      {/* ─── SEKSI 2: KARTU INTEGRASI GIS (CENTRAL ACTION CARD) ─── */}
+      {/* Dibungkus ke dalam kontainer putih tegas untuk kedalaman visual yang kuat */}
+      <div className="max-w-xl mx-auto bg-white border border-border p-8 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] flex flex-col items-center text-center rounded-none mt-12">
+
+        {/* Ikon Indikator dengan Soft Celadon Background */}
+        <div className="p-4 bg-accent/30 text-primary border border-primary/20 mb-5 rounded-none">
+          <Layers className="h-8 w-8 stroke-[2.2]" />
         </div>
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">Data Site Plan</h3>
-        <p className="text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-          Daftar Site Plan terintegrasi GIS yang memuat informasi koordinat, luas lahan, dan developer.
+
+        {/* Judul & Deskripsi dengan Kontras Terkalibrasi (Carbon Black) */}
+        <h3 className="text-sm font-bold text-[#111D13] mb-1.5 uppercase tracking-wide">
+          Data Spasial Site Plan
+        </h3>
+        <p className="text-xs text-slate-500 max-w-sm mb-6 leading-relaxed">
+          Sistem GEOSIPAS mengintegrasikan seluruh data site plan resmi Kabupaten Bogor secara spasial. Anda dapat melakukan filter pencarian berkas atau meninjau sebaran koordinat langsung di peta GIS.
         </p>
-        <div className="flex gap-4">
-          <button className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300 transition-all">
-            Filter Site Plan
+
+        {/* Baris Tombol Aksi Taktis (Ramping, Siku Kaku, Hunter Green) */}
+        <div className="flex gap-3 select-none">
+          <button
+            onClick={() => window.alert('Membuka laci penyaringan lanjut…')}
+            className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-[#111D13] text-xs font-bold border border-border transition-all rounded-none cursor-pointer outline-none"
+          >
+            Saring Site Plan
           </button>
-          <Link to="/gis" className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-2">
-            <Map className="h-4 w-4" />
+
+          <Link
+            to="/gis"
+            className="px-4 py-2 bg-primary hover:opacity-90 text-white text-xs font-bold transition-all rounded-none flex items-center gap-2 shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer outline-none"
+          >
+            <Map className="h-3.5 w-3.5" />
             Buka GIS Viewer
           </Link>
         </div>
+
       </div>
     </div>
   );

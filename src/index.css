@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,81 +6,92 @@
 
 @layer base {
   :root {
-    /* Harmoni Greenish-Teal and Slate Design System */
-    --background: 248, 250, 252;
-    /* Slate 50 */
-    --foreground: 15, 23, 42;
-    /* Slate 900 */
+    /* Premium Organic Warm SaaS Design System */
+    --background: 244, 247, 244;
+    /* Warm Sage Light Gray (Hex: #f4f7f4) - Membuat kartu putih pop-out */
+    --foreground: 17, 29, 19;
+    /* Carbon Black (Hex: #111D13) - Teks utama yang nyaman dibaca */
 
     --card: 255, 255, 255;
-    --card-foreground: 15, 23, 42;
+    /* Putih bersih untuk kontainer data */
+    --card-foreground: 17, 29, 19;
 
     --popover: 255, 255, 255;
-    --popover-foreground: 15, 23, 42;
+    --popover-foreground: 17, 29, 19;
 
-    --primary: 13, 148, 136;
-    /* Teal 600 */
+    --primary: 65, 93, 67;
+    /* Hunter Green (Hex: #415D43) - Warna primer berwibawa */
     --primary-foreground: 255, 255, 255;
 
-    --secondary: 241, 245, 249;
-    /* Slate 100 */
-    --secondary-foreground: 71, 85, 105;
-    /* Slate 600 */
+    --secondary: 232, 242, 234;
+    /* Celadon Soft Warm (Hex: #e8f2ea) */
+    --secondary-foreground: 112, 151, 117;
+    /* Muted Teal Medium (Hex: #709775) */
 
-    --muted: 241, 245, 249;
-    --muted-foreground: 100, 116, 139;
-    /* Slate 500 */
+    --muted: 232, 242, 234;
+    --muted-foreground: 112, 151, 117;
 
-    --accent: 204, 251, 241;
-    /* Teal 100 */
-    --accent-foreground: 13, 148, 136;
+    --accent: 161, 204, 165;
+    /* Celadon Highlight (Hex: #A1CCA5) - Indikator aktif lembut */
+    --accent-foreground: 65, 93, 67;
 
     --destructive: 239, 68, 68;
-    /* Red 500 */
     --destructive-foreground: 255, 255, 255;
 
-    --border: 226, 232, 240;
-    /* Slate 200 */
-    --input: 226, 232, 240;
-    --ring: 13, 148, 136;
+    --border: 218, 228, 219;
+    /* Subtle DAE4DB Border - Garis pembatas tipis organik */
+    --input: 218, 228, 219;
+    --ring: 65, 93, 67;
+    /* Hunter Green ring fokus */
 
     --radius: 0px;
-    /* SHARP STYLE: Diubah dari 0.75rem ke 0px demi estetika siku kaku GFW */
+    /* Siku siku kaku untuk elemen struktural */
   }
 
+  /* Samakan mode gelap ke tema organik yang sama untuk mencegah visual break */
   .dark {
-    --background: 15, 23, 42;
-    /* Slate 900 */
-    --foreground: 248, 250, 252;
-
-    --card: 30, 41, 59;
-    /* Slate 800 */
-    --card-foreground: 248, 250, 252;
-
-    --popover: 30, 41, 59;
-    --popover-foreground: 248, 250, 252;
-
-    --primary: 20, 184, 166;
-    /* Teal 500 */
-    --primary-foreground: 15, 23, 42;
-
-    --secondary: 51, 65, 85;
-    /* Slate 700 */
-    --secondary-foreground: 248, 250, 252;
-
-    --muted: 51, 65, 85;
-    --muted-foreground: 148, 163, 184;
-
-    --accent: 17, 94, 89;
-    /* Teal 800 */
-    --accent-foreground: 20, 184, 166;
-
-    --destructive: 248, 113, 113;
+    --background: 244, 247, 244;
+    --foreground: 17, 29, 19;
+    --card: 255, 255, 255;
+    --card-foreground: 17, 29, 19;
+    --popover: 255, 255, 255;
+    --popover-foreground: 17, 29, 19;
+    --primary: 65, 93, 67;
+    --primary-foreground: 255, 255, 255;
+    --secondary: 232, 242, 234;
+    --secondary-foreground: 112, 151, 117;
+    --muted: 232, 242, 234;
+    --muted-foreground: 112, 151, 117;
+    --accent: 161, 204, 165;
+    --accent-foreground: 65, 93, 67;
+    --destructive: 239, 68, 68;
     --destructive-foreground: 255, 255, 255;
+    --border: 218, 228, 219;
+    --input: 218, 228, 219;
+    --ring: 65, 93, 67;
+  }
 
-    --border: 51, 65, 85;
-    --input: 51, 65, 85;
-    --ring: 20, 184, 166;
+  .gis-theme {
+    /* Scoped theme khusus untuk halaman GIS/Peta agar visualisasi spasial aslinya tetap terjaga */
+    --background: 248, 250, 252;
+    --foreground: 15, 23, 42;
+    --card: 255, 255, 255;
+    --card-foreground: 15, 23, 42;
+    --popover: 255, 255, 255;
+    --popover-foreground: 15, 23, 42;
+    --primary: 13, 148, 136;
+    --primary-foreground: 255, 255, 255;
+    --secondary: 241, 245, 249;
+    --secondary-foreground: 71, 85, 105;
+    --muted: 241, 245, 249;
+    --muted-foreground: 100, 116, 139;
+    --accent: 204, 251, 241;
+    --accent-foreground: 13, 148, 136;
+    --destructive: 239, 68, 68;
+    --destructive-foreground: 255, 255, 255;
+    --border: 226, 232, 240;
+    --input: 226, 232, 240;
+    --ring: 13, 148, 136;
   }
 }
 
@@ -90,16 +101,32 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased font-sans;
+    @apply bg-background text-foreground antialiased font-sans transition-colors duration-200;
+  }
+
+  /* Reset elemen interaktif secara global ke siku kaku (0px) */
+  button,
+  input,
+  select,
+  textarea,
+  [class*="rounded-"]:not(.rounded-full):not([class*="sonar-ripple"]) {
+    border-radius: 0px !important;
+  }
+
+  /* Pengecualian protektif: Elemen sirkular tetap berbentuk bulat sempurna demi aspek humanis */
+  .rounded-full,
+  img[class*="avatar"],
+  div[class*="avatar"],
+  [class*="sonar-ripple"] {
+    border-radius: 9999px !important;
   }
 }
 
 /* ============================================================================
-   TACTICAL TIGHT SCROLLBARS (GFW HIGH DENSITY STYLE)
+   TACTICAL TIGHT SCROLLBARS (ORGANIC THEME SAGE SHARP SCROLLBAR)
    ============================================================================ */
 ::-webkit-scrollbar {
   width: 4px;
-  /* Sangat tipis untuk menghemat ruang laci samping */
   height: 4px;
 }
 
@@ -108,45 +135,44 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-slate-700 rounded-none;
-  /* Siku kaku */
+  background-color: rgb(218, 228, 219);
+  /* Warna DAE4DB pembatas lembut */
+  border-radius: 0px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 dark:bg-slate-600;
+  background-color: rgb(161, 204, 165);
+  /* Warna Celadon */
 }
 
 /* ============================================================================
-   LEAFLET MAP CONTAINER OVERRIDES & CUSTOM STYLING
+   LEAFLET & MAPLIBRE CONTAINER OVERRIDES
    ============================================================================ */
 .leaflet-container {
   width: 100%;
   height: 100%;
   z-index: 1;
   background: #0f172a !important;
-  /* Default gelap saat transisi basemap */
 }
 
-/* Menghapus default border-radius dan shadow bawaan Leaflet HUD Controls */
 .leaflet-bar,
 .leaflet-control-zoom,
 .leaflet-control-layers {
   border-radius: 0px !important;
-  border: 1px solid rgba(15, 23, 42, 0.15) !important;
+  border: 1px solid rgba(17, 29, 19, 0.15) !important;
   box-shadow: none !important;
 }
 
-/* Penyelarasan tampilan jendela Pop-up spasial kaku */
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
   border-radius: 0px !important;
-  box-shadow: 4px 4px 0px 0px rgba(15, 23, 42, 0.15) !important;
-  border: 2px solid #0f172a !important;
+  box-shadow: 4px 4px 0px 0px rgba(17, 29, 19, 0.08) !important;
+  border: 1px solid rgb(218, 228, 219) !important;
   background: #ffffff !important;
 }
 
 /* ============================================================================
-   KEYFRAMES ANIMASI SONAR RADAR APUNG OTONOM (EWS ALARM SYSTEM)
+   KEYFRAMES ANIMASI SONAR RADAR APUNG OTONOM
    ============================================================================ */
 @keyframes sonar-wave-expand {
   0% {
@@ -161,13 +187,13 @@
 }
 
 .sonar-ripple-teal {
-  border: 2px solid #14b8a6;
-  background-color: rgba(20, 184, 166, 0.15);
+  border: 2px solid #415d43;
+  background-color: rgba(65, 93, 67, 0.15);
   animation: sonar-wave-expand 1.8s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
 }
 
 .sonar-ripple-rose {
-  border: 2px solid #f43f5e;
-  background-color: rgba(244, 63, 94, 0.2);
+  border: 2px solid #ef4444;
+  background-color: rgba(239, 68, 68, 0.15);
   animation: sonar-wave-expand 1.2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
 }

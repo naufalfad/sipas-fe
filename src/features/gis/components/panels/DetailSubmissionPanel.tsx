@@ -54,20 +54,20 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
 
     return (
         <div className="flex flex-col h-full w-full bg-white relative font-sans text-slate-800">
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5 text-left">
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0 text-left">
 
                 {/* SECTION 1: HEADER SUMMARY BLOCK */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-none flex justify-between items-start gap-3 select-none shrink-0">
+                <div className="px-4 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-start gap-3 select-none shrink-0">
                     <div className="space-y-1.5">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Nomor Berkas</span>
                         <span className="font-mono font-bold text-xs text-slate-700 block leading-none">{submissionData.submissionNo}</span>
                         <h4 className="text-xs font-black text-slate-900 leading-tight uppercase mt-2">{submissionData.housingName}</h4>
                     </div>
                     <span className={cn(
-                        "rounded-none border text-[8px] font-black tracking-widest px-2.5 py-1 uppercase leading-none shrink-0",
-                        submissionData.status === 'Disetujui' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            submissionData.status === 'Ditolak' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                'bg-amber-50 text-amber-700 border-amber-200'
+                        "rounded-none text-[8px] font-black tracking-widest px-2.5 py-1 uppercase leading-none shrink-0",
+                        submissionData.status === 'Disetujui' ? 'bg-emerald-50 text-emerald-700' :
+                            submissionData.status === 'Ditolak' ? 'bg-rose-50 text-rose-700' :
+                                'bg-amber-50 text-amber-700'
                     )}>
                         {submissionData.status}
                     </span>
@@ -75,7 +75,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
 
                 {/* SECTION 2: ADAPTIVE PERDA COMPLIANCE BANNER */}
                 <div className={cn(
-                    "p-4 border text-[11px] font-semibold leading-relaxed text-justify rounded-none flex items-start gap-2.5",
+                    "px-4 py-3.5 border-b text-[11px] font-semibold leading-relaxed text-left flex items-start gap-2.5",
                     isRevisionRequired
                         ? "text-amber-700 bg-amber-50 border-amber-200"
                         : "text-teal-700 bg-teal-50 border-teal-200"
@@ -93,14 +93,14 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                 </div>
 
                 {/* SECTION 3: CORE PARAMETERS CARD GRID */}
-                <div className="grid grid-cols-2 gap-3 text-left">
-                    <div className="border border-slate-200 bg-slate-50/30 p-3 rounded-none">
+                <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 text-left">
+                    <div className="bg-white p-4">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none mb-1.5">
                             <Ruler size={10} className="text-slate-400" /> Luas Lahan Pengajuan
                         </span>
                         <span className="text-sm font-black text-slate-800 font-mono leading-none">{submissionData.landArea.toLocaleString('id-ID')} m²</span>
                     </div>
-                    <div className="border border-slate-200 bg-slate-50/30 p-3 rounded-none">
+                    <div className="bg-white p-4">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none mb-1.5">
                             <Percent size={10} className="text-slate-400" /> Estimasi Kepadatan
                         </span>
@@ -109,22 +109,26 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                 </div>
 
                 {/* --- TOMBOL KONSOL 3D CAD/BIM INTERAKTIF (GFW LIGHT NEOMORPHIC STYLE) --- */}
+                <div className="px-4 py-3 border-b border-slate-100">
                 <button
                     type="button"
                     onClick={() => navigate(`/gis/bim/${submissionData.id}`)}
-                    className="w-full h-11 border-2 border-slate-900 bg-slate-900 hover:bg-teal-600 hover:border-teal-600 text-white font-black text-xs uppercase tracking-widest rounded-none shadow-[4px_4px_0px_0px_rgba(20,184,166,0.15)] flex items-center justify-center gap-2 transition-all cursor-pointer outline-none mt-1"
+                    className="w-full h-10 bg-slate-900 hover:bg-teal-600 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 transition-all cursor-pointer outline-none"
                 >
                     <RotateCw size={13} className="animate-spin-slow text-teal-400" />
                     <span>[ KONSOL 3D ] TINJAU SITE PLAN</span>
                 </button>
+                </div>
 
                 {/* SECTION 4: HIGH-DENSITY PERDA VALIDATION MATRIX (Slide 6) */}
-                <div className="space-y-2 text-left pt-2">
-                    <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 leading-none">
-                        <Calculator size={12} className="text-slate-500" /> Matriks Validasi Standar Daerah
-                    </h4>
-                    <div className="border border-slate-200 rounded-none overflow-hidden">
-                        <div className="flex bg-slate-50 border-b text-[8px] font-black uppercase tracking-wider text-slate-400 py-2 px-3">
+                <div className="text-left">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                        <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 leading-none">
+                            <Calculator size={12} className="text-slate-500" /> Matriks Validasi Standar Daerah
+                        </h4>
+                    </div>
+                    <div className="overflow-hidden">
+                        <div className="flex bg-slate-50 border-b text-[8px] font-black uppercase tracking-wider text-slate-400 py-2 px-4">
                             <div className="flex-1 text-left">Parameter Teknis</div>
                             <div className="w-16 text-right">Sistem</div>
                             <div className="w-16 text-right">Perda</div>
@@ -132,16 +136,16 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         </div>
                         <div className="divide-y divide-slate-100 bg-white">
                             {validationMatrix.map((row, idx) => (
-                                <div key={idx} className="flex items-center text-xs py-2 px-3 hover:bg-slate-50/50 transition-colors">
+                                <div key={idx} className="flex items-center text-xs py-2.5 px-4 hover:bg-slate-50/50 transition-colors">
                                     <div className="flex-1 text-left font-semibold text-slate-700 truncate pr-2" title={row.parameter}>{row.parameter}</div>
                                     <div className="w-16 text-right font-mono font-bold text-slate-800">{row.hasilSistem}</div>
                                     <div className="w-16 text-right font-mono text-slate-400">{row.standarPerda}</div>
                                     <div className="w-16 flex justify-center">
                                         <span className={cn(
-                                            "px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider leading-none rounded-none border",
+                                            "px-2 py-0.5 text-[8px] font-black uppercase tracking-wider leading-none rounded-none",
                                             row.status === "LOLOS"
-                                                ? "text-teal-700 bg-teal-50 border-teal-200"
-                                                : "text-amber-700 bg-amber-50 border-amber-200 animate-pulse"
+                                                ? "text-teal-700 bg-teal-50"
+                                                : "text-amber-700 bg-amber-50 animate-pulse"
                                         )}>
                                             {row.status}
                                         </span>
@@ -152,8 +156,9 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </div>
                 </div>
 
+
                 {/* SECTION 5: FOOTER DATA METADATA */}
-                <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                <div className="px-4 py-3.5 space-y-1.5 border-t border-slate-100">
                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">Alamat / Lokasi Administratif</span>
                     <p className="text-xs font-semibold text-slate-500 leading-normal flex items-start gap-1">
                         <MapPin size={11} className="text-slate-400 mt-0.5 shrink-0" />
