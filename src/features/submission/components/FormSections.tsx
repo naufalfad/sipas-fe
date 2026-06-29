@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
-import { UploadCloud, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, CheckCircle2, Loader2, FileUp, Info } from 'lucide-react';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
 
@@ -19,8 +20,34 @@ const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase 
 
 // ─── SECTION 1: DATA PEMOHON ──────────────────────────────────────────────────
 export const ApplicantSection = () => {
-  const { register, watch, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   const applicantType = watch('applicant.type');
+  const [ocrLoading, setOcrLoading] = useState<'KTP' | 'NIB' | null>(null);
+
+  const handleOCRUpload = (file: File, type: 'KTP' | 'NIB') => {
+    if (!file) return;
+    setOcrLoading(type);
+
+    // Mock-up OCR process with 2 seconds delay
+    setTimeout(() => {
+      if (type === 'KTP') {
+        setValue('applicant.name', 'Budi Santoso');
+        setValue('applicant.nik', '3201020304050607');
+        setValue('applicant.address', 'Jl. Raya Pajajaran No. 123, Bogor Tengah, Kota Bogor, Jawa Barat');
+      } else {
+        setValue('applicant.name', 'PT. Maju Bersama Jaya');
+        setValue('applicant.nib', '9120304050607');
+        setValue('applicant.address', 'Kawasan Industri Sentul Blok C2, Babakan Madang, Kabupaten Bogor, Jawa Barat');
+      }
+      setOcrLoading(null);
+    }, 2000);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, type: 'KTP' | 'NIB') => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleOCRUpload(file, type);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -30,6 +57,67 @@ export const ApplicantSection = () => {
           1. Data Pemohon
         </h3>
         <p className="text-[10px] text-slate-400 mt-1">Lengkapi data identitas pemohon perseorangan atau badan usaha secara sah.</p>
+      </div>
+
+      {/* OCR-First Flow Area */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Dropzone KTP */}
+        <div 
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => handleDrop(e, 'KTP')}
+          className="border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 hover:bg-slate-100/50 dark:bg-slate-800/10 dark:hover:bg-slate-800/20 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
+        >
+          <input 
+            type="file" 
+            accept="image/*,application/pdf" 
+            className="absolute inset-0 opacity-0 cursor-pointer" 
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleOCRUpload(file, 'KTP');
+            }}
+          />
+          {ocrLoading === 'KTP' ? (
+            <div className="flex flex-col items-center space-y-2">
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+              <p className="text-[10px] font-bold text-primary">Mengekstrak data KTP (OCR)...</p>
+            </div>
+          ) : (
+            <>
+              <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Upload KTP untuk Auto-Fill</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas gambar KTP Anda di sini</p>
+            </>
+          )}
+        </div>
+
+        {/* Dropzone NIB */}
+        <div 
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => handleDrop(e, 'NIB')}
+          className="border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 hover:bg-slate-100/50 dark:bg-slate-800/10 dark:hover:bg-slate-800/20 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
+        >
+          <input 
+            type="file" 
+            accept="image/*,application/pdf" 
+            className="absolute inset-0 opacity-0 cursor-pointer" 
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleOCRUpload(file, 'NIB');
+            }}
+          />
+          {ocrLoading === 'NIB' ? (
+            <div className="flex flex-col items-center space-y-2">
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+              <p className="text-[10px] font-bold text-primary">Mengekstrak data NIB (OCR)...</p>
+            </div>
+          ) : (
+            <>
+              <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Upload NIB untuk Auto-Fill</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file NIB di sini</p>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
@@ -122,6 +210,16 @@ export const SubmissionSection = () => {
         </div>
 
         <div>
+          <label className={labelClass}>Kategori Rencana Tapak</label>
+          <select {...register('submission.category')} className={inputClass}>
+            <option value="PERUMAHAN">PERUMAHAN</option>
+            <option value="NON_PERUMAHAN">NON_PERUMAHAN</option>
+            <option value="FASUM">FASUM</option>
+            <option value="INDUSTRI">INDUSTRI</option>
+          </select>
+        </div>
+
+        <div className="md:col-span-2">
           <label className={labelClass}>Nama Kegiatan / Pembangunan</label>
           <input {...register('submission.activityName')} type="text" placeholder="Contoh: Perumahan Pakuan Green Regency" className={inputClass} />
           {errors.submission?.activityName && <p className="text-xs text-rose-500 mt-1">{errors.submission.activityName.message}</p>}
@@ -188,6 +286,82 @@ export const LocationSection = () => {
 // ─── SECTION 4: DATA KOORDINAT AREA ──────────────────────────────────────────
 export const CoordinateSection = () => {
   const { register, setValue } = useFormContext<FullSubmissionFormValues>();
+  const [spatialLoading, setSpatialLoading] = useState(false);
+  const [uploadedGeoJson, setUploadedGeoJson] = useState<any>(null);
+
+  const handleSpatialFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSpatialLoading(true);
+    const reader = new FileReader();
+
+    if (file.name.endsWith('.geojson')) {
+      reader.onload = (event) => {
+        try {
+          const geojson = JSON.parse(event.target?.result as string);
+          setUploadedGeoJson(geojson);
+          
+          // Sinkronisasi data koordinat ke form
+          const firstFeature = geojson.features?.[0] || geojson;
+          if (firstFeature && firstFeature.geometry && firstFeature.geometry.type === 'Polygon') {
+             const coords = firstFeature.geometry.coordinates;
+             setValue('coordinate.polygon', coords[0]);
+             setValue('coordinate.coordinatesText', JSON.stringify(coords, null, 2));
+          }
+        } catch (err) {
+          alert('Format GeoJSON tidak valid!');
+        } finally {
+          setSpatialLoading(false);
+        }
+      };
+      reader.readAsText(file);
+    } else if (file.name.endsWith('.zip')) {
+      // ── MOCK SHP EXTRACTION (shpjs) ───────────────────────────────────────
+      // CATATAN PENGEMBANG:
+      // Di sinilah Anda harus memanggil library eksternal 'shpjs' untuk membaca
+      // file Shapefile terkompresi (.zip).
+      // Contoh implementasi:
+      // import shp from 'shpjs';
+      // const geojson = await shp(arrayBuffer);
+      // setUploadedGeoJson(geojson);
+      // ───────────────────────────────────────────────────────────────────────
+      reader.onload = (event) => {
+        setTimeout(() => {
+          // Simulated mock GeoJSON dari file SHP
+          const mockGeoJson = {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [106.8060, -6.5950],
+                      [106.8080, -6.5950],
+                      [106.8080, -6.5970],
+                      [106.8060, -6.5970],
+                      [106.8060, -6.5950]
+                    ]
+                  ]
+                }
+              }
+            ]
+          };
+          setUploadedGeoJson(mockGeoJson);
+          setValue('coordinate.polygon', mockGeoJson.features[0].geometry.coordinates[0]);
+          setValue('coordinate.coordinatesText', JSON.stringify(mockGeoJson.features[0].geometry.coordinates, null, 2));
+          setSpatialLoading(false);
+        }, 1500);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      alert('Format file tidak didukung! Gunakan .geojson atau .zip (SHP)');
+      setSpatialLoading(false);
+    }
+  };
 
   const handleMapChange = (coords: number[][][]) => {
     const coordsString = JSON.stringify(coords, null, 2);
@@ -202,13 +376,45 @@ export const CoordinateSection = () => {
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
           4. Data Koordinat Batas Lahan
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Gunakan alat gambar poligon di sisi kiri peta untuk merekam koordinat koordinat tapak bidang tanah BPN.</p>
+        <p className="text-[10px] text-slate-400 mt-1">Gunakan alat gambar poligon di sisi kiri peta atau unggah file spasial BPN resmi.</p>
+      </div>
+
+      {/* Input File Spasial */}
+      <div className="bg-slate-50 border border-slate-200 dark:bg-slate-800/30 dark:border-slate-700 p-4 transition-all duration-300">
+        <label className={labelClass}>Unggah File Spasial BPN (.shp.zip / .geojson)</label>
+        <div className="relative flex items-center gap-3">
+          <input 
+            type="file" 
+            accept=".geojson,.zip" 
+            className="hidden" 
+            id="spatial-file-input"
+            onChange={handleSpatialFileUpload}
+          />
+          <label 
+            htmlFor="spatial-file-input"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white font-semibold text-xs cursor-pointer hover:bg-slate-800 transition-colors"
+          >
+            <FileUp className="h-4.5 w-4.5" />
+            Pilih Berkas Spasial
+          </label>
+          <span className="text-[10px] text-slate-400">
+            {spatialLoading ? 'Memproses berkas spasial...' : 'Menerima format file ESRI Shapefile (.zip) atau GeoJSON (.geojson)'}
+          </span>
+        </div>
       </div>
 
       {/* Wadah Peta Imersif dengan Outline Tipis untuk Perlindungan Kontras */}
-      <div className="h-[400px] w-full overflow-hidden border border-border shadow-inner">
+      <div className="h-[400px] w-full overflow-hidden border border-border shadow-inner relative">
+        {spatialLoading && (
+          <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[1px] z-50 flex items-center justify-center">
+            <div className="bg-white dark:bg-slate-800 p-3 shadow-md rounded-md flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Memproses Peta Spasial...</span>
+            </div>
+          </div>
+        )}
         <GISMapContainer>
-          <GISDrawingMap onShapeChange={handleMapChange} />
+          <GISDrawingMap onShapeChange={handleMapChange} initialGeoJson={uploadedGeoJson} />
         </GISMapContainer>
       </div>
 
@@ -250,7 +456,9 @@ export const SpatialSection = () => {
 
 // ─── SECTION 6: DATA TEKNIS SITE PLAN ─────────────────────────────────────────
 export const TechnicalSection = () => {
-  const { register, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const { register, watch, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const category = watch('submission.category') || 'PERUMAHAN';
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
@@ -258,15 +466,146 @@ export const TechnicalSection = () => {
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
           6. Parameter Teknis Rencana Tapak
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Rincian parameter struktur bangunan perumahan berdasarkan kriteria teknis Kabupaten Bogor.</p>
+        <p className="text-[10px] text-slate-400 mt-1">Rincian parameter teknis fisik pembangunan berdasarkan kriteria teknis dinas terkait.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
-        <div><label className={labelClass}>Estimasi Jumlah Kavling Unit</label><input {...register('technical.lotCount', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Jumlah unit kavling rencana..." />{errors.technical?.lotCount && <p className="text-xs text-rose-500 mt-1">{errors.technical.lotCount.message}</p>}</div>
-        <div><label className={labelClass}>Rata-rata Luas Bangunan per Unit (m²)</label><input {...register('technical.unitArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Luas unit kavling rata-rata..." />{errors.technical?.unitArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.unitArea.message}</p>}</div>
-        <div><label className={labelClass}>Rencana Lebar Jalan Utama (ROW - Meter)</label><input {...register('technical.roadPlan')} type="text" className={inputClass} placeholder="Contoh: ROW 8 Meter" />{errors.technical?.roadPlan && <p className="text-xs text-rose-500 mt-1">{errors.technical.roadPlan.message}</p>}</div>
-        <div><label className={labelClass}>Deskripsi Sistem Drainase & Pembuangan</label><input {...register('technical.drainagePlan')} type="text" className={inputClass} placeholder="Contoh: Saluran Terbuka Buis Beton U-Ditch" />{errors.technical?.drainagePlan && <p className="text-xs text-rose-500 mt-1">{errors.technical.drainagePlan.message}</p>}</div>
-      </div>
+      {category === 'PERUMAHAN' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
+          <div>
+            <label className={labelClass}>Jumlah Kaveling Efektif</label>
+            <input {...register('technical.lotCount', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 150" />
+            {errors.technical?.lotCount && <p className="text-xs text-rose-500 mt-1">{errors.technical.lotCount.message}</p>}
+          </div>
+          <div>
+            <label className={labelClass}>Tipe Perumahan</label>
+            <select {...register('technical.housingType')} className={inputClass}>
+              <option value="NON_SUBSIDI">Komersil / Non-Subsidi</option>
+              <option value="SUBSIDI">Masyarakat Berpenghasilan Rendah / Subsidi</option>
+              <option value="CAMPURAN">Campuran</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Luas Kaveling Makam / TPU Rencana (m²)</label>
+            <input {...register('technical.cemeteryArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Penyediaan 2% dari luas total" />
+            {errors.technical?.cemeteryArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.cemeteryArea.message}</p>}
+          </div>
+          <div>
+            <label className={labelClass}>Lebar ROW Jalan Utama (m)</label>
+            <input {...register('technical.roadRowMain')} type="text" className={inputClass} placeholder="Contoh: ROW 8 Meter" />
+          </div>
+          <div>
+            <label className={labelClass}>Lebar ROW Jalan Lingkungan (m)</label>
+            <input {...register('technical.roadRowLocal')} type="text" className={inputClass} placeholder="Contoh: ROW 6 Meter" />
+          </div>
+          <div>
+            <label className={labelClass}>Sistem Distribusi Air Bersih</label>
+            <input {...register('technical.waterSystem')} type="text" className={inputClass} placeholder="Contoh: PDAM / Sumur Bor Komunal" />
+          </div>
+        </div>
+      )}
+
+      {category === 'NON_PERUMAHAN' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
+          <div>
+            <label className={labelClass}>Jumlah Blok / Unit Gedung</label>
+            <input {...register('technical.buildingBlocks', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 5 Blok" />
+          </div>
+          <div>
+            <label className={labelClass}>Koefisien Dasar Bangunan (KDB - %)</label>
+            <input {...register('technical.kdb', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 60" />
+            {errors.technical?.kdb && <p className="text-xs text-rose-500 mt-1">{errors.technical.kdb.message}</p>}
+          </div>
+          <div>
+            <label className={labelClass}>Koefisien Lantai Bangunan (KLB)</label>
+            <input {...register('technical.klb', { valueAsNumber: true })} type="number" step="0.1" className={inputClass} placeholder="Contoh: 2.4" />
+          </div>
+          <div>
+            <label className={labelClass}>Koefisien Dasar Hijau (KDH - %)</label>
+            <input {...register('technical.kdh', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 20" />
+          </div>
+          <div>
+            <label className={labelClass}>Kapasitas Satuan Ruang Parkir (SRP)</label>
+            <input {...register('technical.parkingCapacity', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 50 Mobil" />
+          </div>
+          <div>
+            <label className={labelClass}>Jumlah Lantai Bangunan Maksimum</label>
+            <input {...register('technical.maxFloors', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 4 Lantai" />
+          </div>
+          <div className="md:col-span-2">
+            <label className={labelClass}>Total Luas Lantai Bangunan (m²)</label>
+            <input {...register('technical.totalFloorArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 4500" />
+          </div>
+        </div>
+      )}
+
+      {category === 'FASUM' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
+          <div>
+            <label className={labelClass}>Jenis Layanan Fasilitas</label>
+            <select {...register('technical.facilityType')} className={inputClass}>
+              <option value="PERIBADATAN">Fasilitas Peribadatan (Masjid/Gereja)</option>
+              <option value="KESEHATAN">Fasilitas Kesehatan (Rumah Sakit/Klinik)</option>
+              <option value="PENDIDIKAN">Fasilitas Pendidikan (Sekolah/PAUD)</option>
+              <option value="SOSIAL_BUDAYA">Fasilitas Sosial / Balai Warga</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Kapasitas Daya Tampung (Pengunjung/Siswa/Jemaah)</label>
+            <input {...register('technical.capacity', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 300 Jiwa" />
+          </div>
+          <div>
+            <label className={labelClass}>Aksesibilitas Difabel (Ramp/Guiding Block)</label>
+            <select {...register('technical.disabledAccess')} className={inputClass}>
+              <option value="LENGKAP">Tersedia Lengkap</option>
+              <option value="PARSIAL">Tersedia Sebagian</option>
+              <option value="TIDAK_ADA">Tidak Tersedia</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Ketersediaan Parkir Khusus (Ambulans/Bus)</label>
+            <select {...register('technical.specialParking')} className={inputClass}>
+              <option value="ADA">Tersedia Drop-off Khusus</option>
+              <option value="TIDAK_ADA">Tidak Tersedia</option>
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className={labelClass}>Rencana Sistem Proteksi Kebakaran Aktif</label>
+            <input {...register('technical.fireProtection')} type="text" className={inputClass} placeholder="Contoh: Pemasangan Hydrant Mandiri, APAR di setiap koridor" />
+          </div>
+        </div>
+      )}
+
+      {category === 'INDUSTRI' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
+          <div>
+            <label className={labelClass}>Jumlah Unit Gudang / Pabrik</label>
+            <input {...register('technical.warehouseCount', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 12 Unit" />
+          </div>
+          <div>
+            <label className={labelClass}>Muatan Sumbu Terberat Kelas Jalan (MST - Ton)</label>
+            <input {...register('technical.roadLoadMst')} type="text" className={inputClass} placeholder="Contoh: MST 8 Ton / Kelas III-A" />
+          </div>
+          <div>
+            <label className={labelClass}>Daya Listrik Industri Terpasang</label>
+            <input {...register('technical.electricityPower')} type="text" className={inputClass} placeholder="Contoh: 150 kVA" />
+          </div>
+          <div>
+            <label className={labelClass}>Kapasitas Pengolahan IPAL Terencana (m³/hari)</label>
+            <input {...register('technical.ipalCapacity')} type="text" className={inputClass} placeholder="Contoh: 50 m3/hari" />
+          </div>
+          <div>
+            <label className={labelClass}>Luas Sabuk Penyangga Hijau (Green Buffer - m²)</label>
+            <input {...register('technical.greenBufferArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 2500" />
+          </div>
+          <div>
+            <label className={labelClass}>Penyediaan Tempat Pembuangan Sementara B3</label>
+            <select {...register('technical.tpsB3Provision')} className={inputClass}>
+              <option value="YA">Ya, Disediakan TPS Khusus B3 Berizin</option>
+              <option value="TIDAK">Tidak Disediakan (Kerjasama Pihak Ketiga)</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -295,6 +634,43 @@ export const ConsultantSection = () => {
 
 // ─── SECTION 8: LAMPIRAN DOKUMEN ──────────────────────────────────────────────
 export const DocumentSection = () => {
+  const { watch } = useFormContext<FullSubmissionFormValues>();
+  const category = watch('submission.category');
+
+  // Menentukan dokumen dinamis berdasarkan kategori site plan
+  const getConditionalDocs = () => {
+    switch (category) {
+      case 'PERUMAHAN':
+        return [
+          { name: 'Dokumen Rencana PSU', desc: 'Rencana utilitas, jalan, RTH, drainase perumahan' }
+        ];
+      case 'NON_PERUMAHAN':
+        return [
+          { name: 'Kajian Dokumen ANDALIN', desc: 'Analisis Dampak Lalu Lintas perhubungan daerah' }
+        ];
+      case 'FASUM':
+        return [
+          { name: 'Kajian Dokumen ANDALIN', desc: 'Analisis Dampak Lalu Lintas perhubungan daerah' },
+          { name: 'Rekomendasi Instansi Terkait', desc: 'Surat rekomendasi dinas/lembaga vertikal' }
+        ];
+      case 'INDUSTRI':
+        return [
+          { name: 'Kajian Analisis Lingkungan AMDAL', desc: 'Dokumen kelayakan lingkungan AMDAL resmi' },
+          { name: 'Persetujuan Teknis Air Limbah', desc: 'Rencana pengelolaan IPAL & izin buang limbah cair' }
+        ];
+      default:
+        return [];
+    }
+  };
+
+  const defaultDocs = [
+    { name: 'Dokumen Legalitas Lahan (SHM/HGB/KTP)', desc: 'Scan sertifikat kepemilikan tanah & KTP pemohon' },
+    { name: 'Gambar Teknis Rencana Site Plan (CAD/DWG)', desc: 'File gambar tapak format DWG/DXF dari konsultan' },
+  ];
+
+  const conditionalDocs = getConditionalDocs();
+  const allDocs = [...defaultDocs, ...conditionalDocs];
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
@@ -305,11 +681,19 @@ export const DocumentSection = () => {
         <p className="text-[10px] text-slate-400 mt-1">Unggah seluruh dokumen persyaratan administratif dalam bentuk berkas digital resmi.</p>
       </div>
 
+      <div className="bg-slate-50 border border-slate-200 dark:bg-slate-800/30 dark:border-slate-700 px-4 py-2 flex items-center gap-2 mb-4">
+        <Info className="h-4 w-4 text-primary" />
+        <span className="text-[10px] text-slate-500 font-semibold uppercase">
+          Dokumen Persyaratan untuk Kategori: <span className="text-primary">{category || 'PERUMAHAN'}</span>
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
-        {['Dokumen Legalitas Lahan (SHM/HGB/KTP)', 'Gambar Teknis Rencana Site Plan (CAD/DWG)', 'Rekomendasi Lingkungan (AMDAL/UKL-UPL)'].map((doc, idx) => (
-          <div key={idx} className="p-6 flex flex-col items-center justify-center text-center bg-white border border-dashed border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none">
-            <UploadCloud className="h-7 w-7 text-secondary-foreground/60 mb-2.5" />
-            <p className="text-xs font-bold text-slate-700 mb-1">{doc}</p>
+        {allDocs.map((doc, idx) => (
+          <div key={idx} className="p-6 flex flex-col items-center justify-center text-center bg-white border border-dashed border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none relative group min-h-[160px] animate-in zoom-in-95 duration-200">
+            <UploadCloud className="h-7 w-7 text-secondary-foreground/60 mb-2.5 group-hover:text-primary transition-colors" />
+            <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
+            <p className="text-[9px] text-slate-400 mb-2">{doc.desc}</p>
             <p className="text-[10px] text-slate-400">PDF, JPG, PNG atau zip hingga 15MB</p>
           </div>
         ))}

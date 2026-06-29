@@ -12,9 +12,11 @@ import VerificationPage from '@/features/verification/pages/VerificationPage';
 import GISPage from '@/features/gis/pages/GISPage';
 import BimViewerPage from '@/features/gis/pages/BimViewerPage';
 import ReportsPage from '@/features/approval/pages/ReportsPage';
+import ApprovalQueuePage from '@/features/approval/pages/ApprovalQueuePage';
 import UsersPage from '@/features/users/pages/UsersPage';
 import RolesPage from '@/features/users/pages/RolesPage';
 import ReferencesPage from '@/features/users/pages/ReferencesPage';
+import ProfilePage from '@/features/users/pages/ProfilePage';
 
 /**
  * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
@@ -81,6 +83,14 @@ export const router = createBrowserRouter([
       {
         path: 'verifikasi',
         element: <VerificationPage />,
+      },
+      {
+        path: 'persetujuan',
+        element: <ApprovalQueuePage />,
+      },
+      {
+        path: 'profil',
+        element: <ProfilePage />,
       },
       {
         path: 'laporan',

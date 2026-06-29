@@ -27,6 +27,96 @@ export interface ProjectLocation {
   roadPolygons?: [number, number][][];    // Area Jaringan Jalan & Saluran (Slate Terang)
 }
 
+export interface ApplicantDetails {
+  type: 'PERORANGAN' | 'BADAN_USAHA';
+  name: string;
+  nik?: string;
+  nib?: string;
+  npwp: string;
+  directorName?: string;
+  phone: string;
+  email: string;
+  address: string;
+}
+
+export interface SubmissionDetails {
+  submissionType: 'BARU' | 'REVISI' | 'PERPANJANGAN';
+  activityName: string;
+  category: 'PERUMAHAN' | 'NON_PERUMAHAN' | 'FASUM' | 'INDUSTRI';
+}
+
+export interface LocationDetails {
+  locationName: string;
+  village: string;
+  district: string;
+  city: string;
+  province: string;
+  fullAddress: string;
+  landArea: number;
+  ownershipStatus: 'SHM' | 'HGB' | 'HAK_PAKAI' | 'LAINNYA';
+  certificateNumber: string;
+  certificateOwner: string;
+}
+
+export interface SpatialDetails {
+  kkprNumber: string;
+  landUse: string;
+  greenArea: number;
+}
+
+export interface TechnicalDetails {
+  // Perumahan
+  lotCount?: number;
+  housingType?: 'SUBSIDI' | 'NON_SUBSIDI' | 'CAMPURAN';
+  cemeteryArea?: number;
+  roadRowMain?: string;
+  roadRowLocal?: string;
+  waterSystem?: string;
+
+  // Non-Perumahan
+  buildingBlocks?: number;
+  kdb?: number;
+  klb?: number;
+  kdh?: number;
+  parkingCapacity?: number;
+  maxFloors?: number;
+  totalFloorArea?: number;
+
+  // Fasum
+  facilityType?: string;
+  capacity?: number;
+  disabledAccess?: string;
+  specialParking?: string;
+  fireProtection?: string;
+
+  // Industri
+  warehouseCount?: number;
+  roadLoadMst?: string;
+  electricityPower?: string;
+  ipalCapacity?: string;
+  greenBufferArea?: number;
+  tpsB3Provision?: string;
+
+  // Mock compatibility
+  unitArea?: number;
+  roadPlan?: string;
+  drainagePlan?: string;
+}
+
+export interface ConsultantDetails {
+  consultantName: string;
+  companyName: string;
+  picName: string;
+}
+
+export interface PhotoDetails {
+  photoNorth?: string;
+  photoSouth?: string;
+  photoEast?: string;
+  photoWest?: string;
+  photoAccess?: string;
+}
+
 export interface Submission {
   id: string;
   submissionNo: string;
@@ -51,4 +141,13 @@ export interface Submission {
   } [];
   history: StatusHistory[];
   location: ProjectLocation;
-}
+
+  // Full form details
+  applicant?: ApplicantDetails;
+  submissionDetails?: SubmissionDetails;
+  locationDetails?: LocationDetails;
+  spatial?: SpatialDetails;
+  technical?: TechnicalDetails;
+  consultant?: ConsultantDetails;
+  photos?: PhotoDetails;
+}

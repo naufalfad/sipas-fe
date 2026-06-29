@@ -15,6 +15,7 @@ export const applicantSchema = z.object({
 export const submissionDataSchema = z.object({
   submissionType: z.enum(['BARU', 'REVISI', 'PERPANJANGAN']),
   activityName: z.string().min(5, 'Nama kegiatan/pembangunan wajib diisi'),
+  category: z.enum(['PERUMAHAN', 'NON_PERUMAHAN', 'FASUM', 'INDUSTRI']).default('PERUMAHAN'),
 });
 
 export const locationSchema = z.object({
@@ -42,10 +43,81 @@ export const spatialSchema = z.object({
 });
 
 export const technicalSchema = z.object({
-  lotCount: z.number().positive('Jumlah kavling minimal 1'),
-  unitArea: z.number().positive('Luas unit rata-rata minimal 1'),
-  roadPlan: z.string().min(3, 'Rencana jalan wajib diisi'),
-  drainagePlan: z.string().min(3, 'Rencana drainase wajib diisi'),
+  // --- KATEGORI 1: PERUMAHAN ---
+  lotCount: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Jumlah kaveling harus berupa angka positif').optional()
+  ),
+  housingType: z.enum(['SUBSIDI', 'NON_SUBSIDI', 'CAMPURAN']).optional(),
+  cemeteryArea: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0, 'Luas makam tidak boleh negatif').optional()
+  ),
+  roadRowMain: z.string().optional(),      // Lebar ROW Jalan Utama
+  roadRowLocal: z.string().optional(),     // Lebar ROW Jalan Lingkungan
+  waterSystem: z.string().optional(),      // Sistem Penyediaan Air Bersih
+
+  // --- KATEGORI 2: NON_PERUMAHAN ---
+  buildingBlocks: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Jumlah blok harus positif').optional()
+  ),
+  kdb: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0).max(100, 'KDB maksimal 100%').optional()
+  ),
+  klb: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('KLB harus berupa angka positif').optional()
+  ),
+  kdh: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0).max(100, 'KDH maksimal 100%').optional()
+  ),
+  parkingCapacity: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Kapasitas parkir harus positif').optional()
+  ),
+  maxFloors: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Jumlah lantai harus positif').optional()
+  ),
+  totalFloorArea: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Total luas lantai harus positif').optional()
+  ),
+
+  // --- KATEGORI 3: FASUM ---
+  facilityType: z.string().optional(),     // Jenis Layanan (Kesehatan, Pendidikan, dll)
+  capacity: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Daya tampung harus positif').optional()
+  ),
+  disabledAccess: z.string().optional(),   // Deskripsi Aksesibilitas Difabel
+  specialParking: z.string().optional(),   // Sarana Parkir Khusus (Ambulans/Bus)
+  fireProtection: z.string().optional(),   // Sistem Proteksi Kebakaran
+
+  // --- KATEGORI 4: INDUSTRI ---
+  warehouseCount: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Jumlah unit gudang harus positif').optional()
+  ),
+  roadLoadMst: z.string().optional(),      // Muatan Sumbu Terberat (MST - Ton)
+  electricityPower: z.string().optional(), // Daya Listrik Terpasang
+  ipalCapacity: z.string().optional(),     // Kapasitas IPAL/WWTP
+  greenBufferArea: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0, 'Luas penyangga hijau tidak boleh negatif').optional()
+  ),
+  tpsB3Provision: z.string().optional(),   // Deskripsi Penyediaan TPS B3
+
+  // --- MOCK COMPATIBILITY ---
+  unitArea: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().positive('Luas unit rata-rata minimal 1').optional()
+  ),
+  roadPlan: z.string().optional(),
+  drainagePlan: z.string().optional(),
 });
 
 export const consultantSchema = z.object({

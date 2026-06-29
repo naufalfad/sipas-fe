@@ -44,13 +44,7 @@ export default function SubmissionCreatePage() {
 
   const mutation = useMutation({
     mutationFn: async (data: FullSubmissionFormValues) => {
-      // Formats data to send to the submission service
-      return SubmissionService.create({
-        housingName: data.submission.activityName,
-        developerName: data.applicant.name,
-        landArea: data.location.landArea,
-        address: data.location.fullAddress,
-      });
+      return SubmissionService.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });

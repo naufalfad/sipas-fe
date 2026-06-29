@@ -82,6 +82,12 @@ const menuItems: MenuItem[] = [
     roles: ['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
   },
   {
+    title: 'Persetujuan TTE',
+    path: '/persetujuan',
+    icon: ShieldCheck,
+    roles: ['Kepala Bidang', 'Super Admin'],
+  },
+  {
     title: 'GIS Viewer',
     path: '/gis',
     icon: Map,

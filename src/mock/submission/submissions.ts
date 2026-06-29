@@ -1,4 +1,3 @@
-
 import type { Submission } from '@/features/submission/types';
 
 export const mockSubmissions: Submission[] = [
@@ -35,7 +34,6 @@ export const mockSubmissions: Submission[] = [
         [-6.5960, 106.8175],
         [-6.5960, 106.8160],
       ],
-      // --- SUB-POLYGONS DETAIL SITE PLAN (CAD DRAWING LAYOUT) ---
       roadPolygons: [
         [
           [-6.5952, 106.8160],
@@ -74,6 +72,59 @@ export const mockSubmissions: Submission[] = [
           [-6.5959, 106.8168],
         ]
       ]
+    },
+    // Detailed form fields
+    applicant: {
+      type: 'BADAN_USAHA',
+      name: 'PT Maju Jaya Sentosa',
+      nib: '9120301938192',
+      npwp: '01.234.567.8-901.000',
+      directorName: 'Ahmad Fauzi',
+      phone: '081234567890',
+      email: 'ahmad.fauzi@majujaya.co.id',
+      address: 'Gedung Sentosa Lt. 4, Jl. Jend. Sudirman No. 10, Jakarta Pusat'
+    },
+    submissionDetails: {
+      submissionType: 'BARU',
+      activityName: 'Grand Bogor Residence',
+      category: 'PERUMAHAN'
+    },
+    locationDetails: {
+      locationName: 'Lahan Baranangsiang',
+      village: 'Baranangsiang',
+      district: 'Bogor Timur',
+      city: 'Kota Bogor',
+      province: 'Jawa Barat',
+      fullAddress: 'Jl. Raya Pajajaran No.21, Baranangsiang, Kec. Bogor Timur, Kota Bogor, Jawa Barat',
+      landArea: 25000,
+      ownershipStatus: 'SHM',
+      certificateNumber: 'SHM No. 10293/Baranangsiang',
+      certificateOwner: 'PT Maju Jaya Sentosa'
+    },
+    spatial: {
+      kkprNumber: '503/KKPR/PUPR/2026/089',
+      landUse: 'Zona Perumahan Kepadatan Sedang',
+      greenArea: 3850
+    },
+    technical: {
+      lotCount: 120,
+      housingType: 'NON_SUBSIDI',
+      cemeteryArea: 500,
+      roadRowMain: '12 Meter',
+      roadRowLocal: '8 Meter',
+      waterSystem: 'PDAM Tirta Pakuan'
+    },
+    consultant: {
+      consultantName: 'Ir. Hermawan Pratama',
+      companyName: 'CV Rencana Semesta',
+      picName: 'Hermawan Pratama'
+    },
+    photos: {
+      photoNorth: 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
+      photoSouth: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80',
+      photoEast: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
+      photoWest: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
+      photoAccess: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80'
     }
   },
   {
@@ -148,6 +199,58 @@ export const mockSubmissions: Submission[] = [
           [-6.5733, 106.8743],
         ]
       ]
+    },
+    applicant: {
+      type: 'BADAN_USAHA',
+      name: 'PT Properti Indah Raya',
+      nib: '8120309923123',
+      npwp: '02.444.555.6-777.000',
+      directorName: 'Bambang Triyono',
+      phone: '081399887766',
+      email: 'bambang.t@propertiindah.com',
+      address: 'Wisma Properti Lt. 8, Jl. TB Simatupang No. 45, Jakarta Selatan'
+    },
+    submissionDetails: {
+      submissionType: 'BARU',
+      activityName: 'Sentul Green Valley',
+      category: 'PERUMAHAN'
+    },
+    locationDetails: {
+      locationName: 'Sentul Valley Hills',
+      village: 'Citaringgul',
+      district: 'Babakan Madang',
+      city: 'Kabupaten Bogor',
+      province: 'Jawa Barat',
+      fullAddress: 'Kawasan Sentul City, Kec. Babakan Madang, Kabupaten Bogor, Jawa Barat',
+      landArea: 120000,
+      ownershipStatus: 'HGB',
+      certificateNumber: 'HGB No. 556/Citaringgul',
+      certificateOwner: 'PT Properti Indah Raya'
+    },
+    spatial: {
+      kkprNumber: '503/KKPR/PUPR/2026/042',
+      landUse: 'Perumahan Kepadatan Rendah / Villa',
+      greenArea: 8736
+    },
+    technical: {
+      lotCount: 450,
+      housingType: 'CAMPURAN',
+      cemeteryArea: 2400,
+      roadRowMain: '16 Meter',
+      roadRowLocal: '9 Meter',
+      waterSystem: 'WTP Mandiri / PDAM'
+    },
+    consultant: {
+      consultantName: 'Amir Hamzah, M.T.',
+      companyName: 'PT Cipta Karya Persada',
+      picName: 'Amir Hamzah'
+    },
+    photos: {
+      photoNorth: 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
+      photoSouth: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80',
+      photoEast: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
+      photoWest: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
+      photoAccess: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80'
     }
   },
   {
@@ -215,6 +318,59 @@ export const mockSubmissions: Submission[] = [
           [-6.6199, 106.8015],
         ]
       ]
+    },
+    applicant: {
+      type: 'BADAN_USAHA',
+      name: 'PT Graha Kencana',
+      nib: '9120401827361',
+      npwp: '01.555.666.7-888.000',
+      directorName: 'Hendra Setiawan',
+      phone: '081122334455',
+      email: 'hendra.s@grahakencana.co.id',
+      address: 'Pakuwon Tower Lt. 15, Jl. Casablanca Raya, Jakarta Selatan'
+    },
+    submissionDetails: {
+      submissionType: 'BARU',
+      activityName: 'Pakuan Executive Heights',
+      category: 'NON_PERUMAHAN'
+    },
+    locationDetails: {
+      locationName: 'Lahan Pakuan Heights',
+      village: 'Muarasari',
+      district: 'Bogor Selatan',
+      city: 'Kota Bogor',
+      province: 'Jawa Barat',
+      fullAddress: 'Jl. Pakuan No.3, Kec. Bogor Selatan, Kota Bogor, Jawa Barat',
+      landArea: 8000,
+      ownershipStatus: 'SHM',
+      certificateNumber: 'SHM No. 892/Muarasari',
+      certificateOwner: 'PT Graha Kencana'
+    },
+    spatial: {
+      kkprNumber: '503/KKPR/PUPR/2026/112',
+      landUse: 'Zona Perdagangan dan Jasa (Komersial)',
+      greenArea: 2072
+    },
+    technical: {
+      buildingBlocks: 3,
+      kdb: 58.6,
+      klb: 3.1,
+      kdh: 11.2,
+      parkingCapacity: 150,
+      maxFloors: 5,
+      totalFloorArea: 24000
+    },
+    consultant: {
+      consultantName: 'Dian Sastro, M.Arch',
+      companyName: 'PT Dinamika Arsitek Nusantara',
+      picName: 'Dian Sastro'
+    },
+    photos: {
+      photoNorth: 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
+      photoSouth: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80',
+      photoEast: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
+      photoWest: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
+      photoAccess: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80'
     }
   },
   {
@@ -284,6 +440,58 @@ export const mockSubmissions: Submission[] = [
           [-6.6024, 106.8080],
         ]
       ]
+    },
+    applicant: {
+      type: 'BADAN_USAHA',
+      name: 'PT Bangun Bumi Persada',
+      nib: '8120301928374',
+      npwp: '01.999.888.7-666.000',
+      directorName: 'H. Suryadi',
+      phone: '081288889999',
+      email: 'suryadi@bangunbumi.co.id',
+      address: 'Komp. Ruko Pajajaran No. 5, Jl. Pajajaran, Kota Bogor'
+    },
+    submissionDetails: {
+      submissionType: 'BARU',
+      activityName: 'Pajajaran Regency',
+      category: 'PERUMAHAN'
+    },
+    locationDetails: {
+      locationName: 'Lahan Pajajaran Tengah',
+      village: 'Babakan',
+      district: 'Bogor Tengah',
+      city: 'Kota Bogor',
+      province: 'Jawa Barat',
+      fullAddress: 'Kecamatan Bogor Tengah, Kota Bogor, Jawa Barat',
+      landArea: 32000,
+      ownershipStatus: 'SHM',
+      certificateNumber: 'SHM No. 441/Babakan',
+      certificateOwner: 'PT Bangun Bumi Persada'
+    },
+    spatial: {
+      kkprNumber: '503/KKPR/PUPR/2026/020',
+      landUse: 'Zona Pemukiman Kepadatan Tinggi',
+      greenArea: 4544
+    },
+    technical: {
+      lotCount: 180,
+      housingType: 'NON_SUBSIDI',
+      cemeteryArea: 640,
+      roadRowMain: '14 Meter',
+      roadRowLocal: '8 Meter',
+      waterSystem: 'PDAM / Sumur Bor Terpusat'
+    },
+    consultant: {
+      consultantName: 'Ir. Rudi Hartono',
+      companyName: 'PT Rancang Bangun Bogor',
+      picName: 'Rudi Hartono'
+    },
+    photos: {
+      photoNorth: 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
+      photoSouth: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80',
+      photoEast: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
+      photoWest: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
+      photoAccess: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80'
     }
   },
   {
@@ -351,6 +559,59 @@ export const mockSubmissions: Submission[] = [
           [-6.6219, 106.8105],
         ]
       ]
+    },
+    applicant: {
+      type: 'BADAN_USAHA',
+      name: 'PT Jaya Real Estate',
+      nib: '8120304918273',
+      npwp: '01.333.444.5-666.000',
+      directorName: 'Ir. Heru Prasetyo',
+      phone: '081255556666',
+      email: 'heru.p@jayarealestate.com',
+      address: 'Jaya Tower Lt. 12, Jl. MH Thamrin No. 8, Jakarta Pusat'
+    },
+    submissionDetails: {
+      submissionType: 'BARU',
+      activityName: 'Batu Tulis Residence',
+      category: 'NON_PERUMAHAN'
+    },
+    locationDetails: {
+      locationName: 'Lahan Batu Tulis',
+      village: 'Batutulis',
+      district: 'Bogor Selatan',
+      city: 'Kota Bogor',
+      province: 'Jawa Barat',
+      fullAddress: 'Batu Tulis, Kec. Bogor Selatan, Kota Bogor, Jawa Barat',
+      landArea: 12000,
+      ownershipStatus: 'SHM',
+      certificateNumber: 'SHM No. 673/Batutulis',
+      certificateOwner: 'Ir. Heru Prasetyo'
+    },
+    spatial: {
+      kkprNumber: '503/KKPR/PUPR/2026/304',
+      landUse: 'Zona Cagar Budaya & Resapan Air',
+      greenArea: 1452
+    },
+    technical: {
+      buildingBlocks: 2,
+      kdb: 60.5,
+      klb: 3.2,
+      kdh: 12.1,
+      parkingCapacity: 40,
+      maxFloors: 3,
+      totalFloorArea: 9000
+    },
+    consultant: {
+      consultantName: 'Ir. Wahyu Hidayat',
+      companyName: 'PT Wahyu Konsultan Teknik',
+      picName: 'Wahyu Hidayat'
+    },
+    photos: {
+      photoNorth: 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
+      photoSouth: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80',
+      photoEast: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
+      photoWest: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
+      photoAccess: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80'
     }
   }
 ];

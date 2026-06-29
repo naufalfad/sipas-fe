@@ -45,6 +45,9 @@ interface GISDrawingMapProps {
 
     /** Izinkan menggambar lebih dari satu poligon sekaligus. Default: false */
     allowMultiple?: boolean;
+
+    /** GeoJSON dari file eksternal (SHP/GeoJSON) */
+    initialGeoJson?: any;
 }
 
 // ─── Kustomisasi Tema Draw ──────────────────────────────────────────────────────
@@ -115,6 +118,7 @@ export default function GISDrawingMap({
     onShapeChange,
     initialValue,
     allowMultiple = false,
+    initialGeoJson,
 }: GISDrawingMapProps) {
     const { current: map } = useMap();
     const drawRef = useRef<MapboxDraw | null>(null);
@@ -216,6 +220,39 @@ export default function GISDrawingMap({
     }, [map, allowMultiple, collectAndEmit]);
     // CATATAN: `initialValue` sengaja dikecualikan dari deps array.
     // Nilai awal hanya dimuat sekali saat mount, bukan setiap kali prop berubah.
+
+    // ── Load GeoJSON baru saat initialGeoJson berubah ────────────────────────
+    useEffect(() => {
+        if (!map || !drawRef.current || !initialGeoJson) return;
+        try {
+            drawRef.current.set(initialGeoJson);
+            // Kumpulkan koordinat dan emit
+            const all = drawRef.current.getAll();
+            const allCoords: DrawnPolygonCoords = all.features
+                .filter((f) => f.geometry.type === 'Polygon')
+                .map((f) => (f.geometry as GeoJSON.Polygon).coordinates[0] as [number, number][]);
+            onShapeChangeRef.current(allCoords);
+
+            // Fit bounds ke peta
+            if (all.features.length > 0) {
+                const firstFeature = all.features[0];
+                if (firstFeature.geometry.type === 'Polygon') {
+                    const coords = firstFeature.geometry.coordinates[0];
+                    const lngs = coords.map(c => c[0]);
+                    const lats = coords.map(c => c[1]);
+                    const bounds: [number, number, number, number] = [
+                        Math.min(...lngs),
+                        Math.min(...lats),
+                        Math.max(...lngs),
+                        Math.max(...lats)
+                    ];
+                    map.getMap().fitBounds(bounds, { padding: 50, duration: 1000 });
+                }
+            }
+        } catch (err) {
+            console.warn('[GISDrawingMap] Gagal memuat GeoJSON dari prop:', err);
+        }
+    }, [map, initialGeoJson]);
 
     // Komponen ini hanya mengatur logika imperatif, tidak merender elemen HTML
     return null;
