@@ -15,7 +15,7 @@ export const applicantSchema = z.object({
 export const submissionDataSchema = z.object({
   submissionType: z.enum(['BARU', 'REVISI', 'PERPANJANGAN']),
   activityName: z.string().min(5, 'Nama kegiatan/pembangunan wajib diisi'),
-  category: z.enum(['PERUMAHAN', 'NON_PERUMAHAN', 'FASUM', 'INDUSTRI']).default('PERUMAHAN'),
+  category: z.enum(['PERUMAHAN', 'NON_PERUMAHAN', 'FASUM', 'INDUSTRI']),
 });
 
 export const locationSchema = z.object({
@@ -32,8 +32,17 @@ export const locationSchema = z.object({
 });
 
 export const coordinateSchema = z.object({
-  polygon: z.any().optional(), // For drawn coordinates
-  coordinatesText: z.string().optional(), // For manual input
+  polygon: z.any().optional(), // Untuk menyimpan koordinat poligon georeferenced bumi nyata
+  coordinatesText: z.string().optional(), // Untuk menyimpan penulisan manual teks GeoJSON koordinat
+
+  // ─── PARAMETER TRANSFORMASI CAD HELMERT 2D (SINKRONISASI SPASIAL) [Jakarta 5] ───
+  cadFileName: z.string().optional(),       // Nama file CAD (.dwg / .dxf) asal
+  cadParamA: z.number().optional(),         // Nilai parameter A = s * cos(theta)
+  cadParamB: z.number().optional(),         // Nilai parameter B = s * sin(theta)
+  cadParamTx: z.number().optional(),        // Nilai pergeseran sumbu X (Translasi X)
+  cadParamTy: z.number().optional(),        // Nilai pergeseran sumbu Y (Translasi Y)
+  cadScale: z.number().optional(),          // Faktor skala spasial (s) hasil kalibrasi
+  cadRotation: z.number().optional(),       // Sudut rotasi spasial (theta) dalam satuan radian
 });
 
 export const spatialSchema = z.object({

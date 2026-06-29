@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
-import { UploadCloud, CheckCircle2, Loader2, FileUp, Info } from 'lucide-react';
+import {
+  UploadCloud, CheckCircle2, Loader2, FileUp, Info,
+  Settings2, Compass, RefreshCw
+} from 'lucide-react';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 /**
  * ============================================================================
@@ -18,6 +23,212 @@ const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foregr
 
 const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
 
+// ─── SUB-KOMPONEN: CAD GEOREFERENCE WIZARD (MODULAR SPATIAL ALIGNER) ──────────
+export const CADGeoreferenceWizard = ({
+  isOpen,
+  onClose,
+  onComplete,
+  cadFileName,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onComplete: (params: {
+    A: number; B: number; Tx: number; Ty: number;
+    scale: number; rotation: number; polygon: [number, number][]
+  }) => void;
+  cadFileName: string;
+}) => {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [point1Mapped, setPoint1Mapped] = useState(false);
+  const [point2Mapped, setPoint2Mapped] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleMapPoint1 = () => {
+    setPoint1Mapped(true);
+    toast.success('Titik Kontrol 1 berhasil dikunci!');
+    setStep(2);
+  };
+
+  const handleMapPoint2 = () => {
+    setPoint2Mapped(true);
+    toast.success('Titik Kontrol 2 berhasil dikunci!');
+    setStep(3);
+  };
+
+  const handleRunCalibration = () => {
+    setIsCalibrating(true);
+    setTimeout(() => {
+      // Simulasi perhitungan parameter matriks Helmert 2D [Jakarta 5]
+      const scale = 1.0024;
+      const rotation = 0.4812; // rad (~27.5 derajat)
+      const Tx = 106.816629;
+      const Ty = -6.595189;
+      const A = scale * Math.cos(rotation);
+      const B = scale * Math.sin(rotation);
+
+      // Hasil poligon georeferenced bumi nyata [Longitude, Latitude]
+      const transformedPolygon: [number, number][] = [
+        [106.8160, -6.5945],
+        [106.8175, -6.5945],
+        [106.8175, -6.5960],
+        [106.8160, -6.5960],
+        [106.8160, -6.5945]
+      ];
+
+      onComplete({ A, B, Tx, Ty, scale, rotation, polygon: transformedPolygon });
+      setIsCalibrating(false);
+      toast.success('Kalibrasi Helmert 2D Berhasil!', {
+        description: `Skala: ${scale.toFixed(4)} | Rotasi: ${(rotation * (180 / Math.PI)).toFixed(1)}°`,
+      });
+      onClose();
+    }, 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans">
+      <div className="bg-white border border-slate-200 w-full max-w-4xl flex flex-col shadow-2xl h-[85vh]">
+
+        {/* Header Wizard */}
+        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between text-left shrink-0">
+          <div>
+            <span className="text-[10px] font-black text-teal-600 uppercase tracking-widest leading-none">CAD Spasial Aligner</span>
+            <h3 className="text-xs font-bold text-slate-800 leading-tight mt-1.5 uppercase">
+              wizard penyelarasan koordinat: {cadFileName}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-rose-500 font-bold text-sm cursor-pointer outline-none border-none bg-transparent"
+          >
+            Batal
+          </button>
+        </div>
+
+        {/* Wizard Guide */}
+        <div className="px-5 py-3.5 bg-amber-50 border-b border-amber-200 text-left text-[11px] font-semibold text-amber-800 leading-relaxed flex items-center gap-2.5 shrink-0">
+          <Settings2 className="h-4.5 w-4.5 shrink-0 text-amber-500 animate-spin" style={{ animationDuration: '6s' }} />
+          <p>
+            {step === 1 && 'Langkah 1: Klik Titik Batas Tanah Barat Laut di layar CAD kanan, lalu klik posisi yang cocok di Peta Spasial kiri.'}
+            {step === 2 && 'Langkah 2: Klik Titik Batas Tanah Tenggara di layar CAD kanan, lalu klik posisi yang cocok di Peta Spasial kiri.'}
+            {step === 3 && 'Langkah 3: Koordinat kontrol terkunci. Jalankan kalkulasi matriks Helmert untuk mentranslasikan denah CAD.'}
+          </p>
+        </div>
+
+        {/* Main Split Panels Workspace */}
+        <div className="flex-1 flex divide-x divide-slate-200 min-h-0">
+
+          {/* Panel Kiri: Peta Target (Peta Bumi Nyata) */}
+          <div className="w-1/2 h-full relative">
+            <div className="absolute top-3 left-3 z-10 bg-white border border-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-700 uppercase tracking-widest leading-none">
+              Peta Spasial Target (GIS)
+            </div>
+            <GISMapContainer center={[-6.595189, 106.816629]} zoom={16}>
+              {/* Titik Jangkar Peta */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-2 pointer-events-none">
+                {step === 1 && (
+                  <div className="relative flex items-center justify-center h-8 w-8">
+                    <span className="absolute h-full w-full rounded-full bg-teal-400 opacity-70 animate-ping" />
+                    <span className="relative h-3 w-3 rounded-full bg-teal-600 border border-white" />
+                  </div>
+                )}
+                {step === 2 && (
+                  <div className="relative flex items-center justify-center h-8 w-8 translate-x-12 translate-y-12">
+                    <span className="absolute h-full w-full rounded-full bg-amber-400 opacity-70 animate-ping" />
+                    <span className="relative h-3 w-3 rounded-full bg-amber-600 border border-white" />
+                  </div>
+                )}
+              </div>
+            </GISMapContainer>
+          </div>
+
+          {/* Panel Kanan: Gambar CAD (Koordinat Lokal) */}
+          <div className="w-1/2 h-full bg-slate-950 relative flex items-center justify-center overflow-hidden">
+            <div className="absolute top-3 left-3 z-10 bg-slate-900 border border-slate-700 px-2.5 py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">
+              Gambar Kerja CAD (Lokal 0,0)
+            </div>
+
+            {/* Simulasi Gambar CAD Vektor */}
+            <div className="relative w-64 h-64 border border-slate-800 flex items-center justify-center">
+              <Compass className="absolute top-2 right-2 text-slate-700 animate-spin-slow" size={24} />
+              <div className="w-48 h-48 border-2 border-dashed border-teal-500/60 bg-teal-500/5 relative flex items-center justify-center">
+                <span className="text-[10px] font-mono text-teal-500/40 select-none">LAY_PTSP_KDB</span>
+
+                {/* Titik Kontrol CAD 1 */}
+                <button
+                  type="button"
+                  disabled={step !== 1}
+                  onClick={handleMapPoint1}
+                  className={cn(
+                    "absolute -top-2 -left-2 h-5 w-5 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
+                    point1Mapped
+                      ? "bg-teal-600 border-white text-white"
+                      : "bg-slate-900 border-teal-500 text-teal-400 hover:scale-115"
+                  )}
+                >
+                  <span className="text-[9px] font-black leading-none">1</span>
+                </button>
+
+                {/* Titik Kontrol CAD 2 */}
+                <button
+                  type="button"
+                  disabled={step !== 2}
+                  onClick={handleMapPoint2}
+                  className={cn(
+                    "absolute -bottom-2 -right-2 h-5 w-5 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
+                    point2Mapped
+                      ? "bg-amber-600 border-white text-white"
+                      : "bg-slate-900 border-amber-500 text-amber-400 hover:scale-115"
+                  )}
+                >
+                  <span className="text-[9px] font-black leading-none">2</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer Wizard Controls */}
+        <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
+            <span>Status Titik Ikat:</span>
+            <span className={point1Mapped ? 'text-teal-600 font-bold' : 'text-slate-400'}>
+              [1] {point1Mapped ? 'Terkunci' : 'Belum Terikat'}
+            </span>
+            <span>•</span>
+            <span className={point2Mapped ? 'text-amber-600 font-bold' : 'text-slate-400'}>
+              [2] {point2Mapped ? 'Terkunci' : 'Belum Terikat'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            disabled={step !== 3 || isCalibrating}
+            onClick={handleRunCalibration}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 disabled:bg-slate-200 hover:bg-teal-600 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-widest rounded-none transition-colors border-none outline-none cursor-pointer"
+          >
+            {isCalibrating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-white" />
+                <span>Memproses Helmert 2D...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                <span>Kalkulasi & Sinkronisasi Spasial</span>
+              </>
+            )}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 // ─── SECTION 1: DATA PEMOHON ──────────────────────────────────────────────────
 export const ApplicantSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
@@ -28,7 +239,6 @@ export const ApplicantSection = () => {
     if (!file) return;
     setOcrLoading(type);
 
-    // Mock-up OCR process with 2 seconds delay
     setTimeout(() => {
       if (type === 'KTP') {
         setValue('applicant.name', 'Budi Santoso');
@@ -59,18 +269,16 @@ export const ApplicantSection = () => {
         <p className="text-[10px] text-slate-400 mt-1">Lengkapi data identitas pemohon perseorangan atau badan usaha secara sah.</p>
       </div>
 
-      {/* OCR-First Flow Area */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Dropzone KTP */}
-        <div 
+        <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'KTP')}
-          className="border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 hover:bg-slate-100/50 dark:bg-slate-800/10 dark:hover:bg-slate-800/20 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
+          className="border border-dashed border-slate-300 bg-slate-50/50 hover:bg-slate-100/50 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
         >
-          <input 
-            type="file" 
-            accept="image/*,application/pdf" 
-            className="absolute inset-0 opacity-0 cursor-pointer" 
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="absolute inset-0 opacity-0 cursor-pointer"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) handleOCRUpload(file, 'KTP');
@@ -84,22 +292,21 @@ export const ApplicantSection = () => {
           ) : (
             <>
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Upload KTP untuk Auto-Fill</p>
+              <p className="text-xs font-bold text-slate-700">Upload KTP untuk Auto-Fill</p>
               <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas gambar KTP Anda di sini</p>
             </>
           )}
         </div>
 
-        {/* Dropzone NIB */}
-        <div 
+        <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'NIB')}
-          className="border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 hover:bg-slate-100/50 dark:bg-slate-800/10 dark:hover:bg-slate-800/20 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
+          className="border border-dashed border-slate-300 bg-slate-50/50 hover:bg-slate-100/50 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
         >
-          <input 
-            type="file" 
-            accept="image/*,application/pdf" 
-            className="absolute inset-0 opacity-0 cursor-pointer" 
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="absolute inset-0 opacity-0 cursor-pointer"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) handleOCRUpload(file, 'NIB');
@@ -113,7 +320,7 @@ export const ApplicantSection = () => {
           ) : (
             <>
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Upload NIB untuk Auto-Fill</p>
+              <p className="text-xs font-bold text-slate-700">Upload NIB untuk Auto-Fill</p>
               <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file NIB di sini</p>
             </>
           )}
@@ -283,11 +490,15 @@ export const LocationSection = () => {
   );
 };
 
-// ─── SECTION 4: DATA KOORDINAT AREA ──────────────────────────────────────────
+// ─── SECTION 4: DATA KOORDINAT AREA & VALIDASI CAD WIZARD [Jakarta 5] ─────────
 export const CoordinateSection = () => {
   const { register, setValue } = useFormContext<FullSubmissionFormValues>();
   const [spatialLoading, setSpatialLoading] = useState(false);
   const [uploadedGeoJson, setUploadedGeoJson] = useState<any>(null);
+
+  // State untuk kontrol modal Wizard Georeferencing CAD
+  const [isCadWizardOpen, setIsCadWizardOpen] = useState(false);
+  const [cadFileName, setCadFileName] = useState('');
 
   const handleSpatialFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -301,34 +512,25 @@ export const CoordinateSection = () => {
         try {
           const geojson = JSON.parse(event.target?.result as string);
           setUploadedGeoJson(geojson);
-          
+
           // Sinkronisasi data koordinat ke form
           const firstFeature = geojson.features?.[0] || geojson;
           if (firstFeature && firstFeature.geometry && firstFeature.geometry.type === 'Polygon') {
-             const coords = firstFeature.geometry.coordinates;
-             setValue('coordinate.polygon', coords[0]);
-             setValue('coordinate.coordinatesText', JSON.stringify(coords, null, 2));
+            const coords = firstFeature.geometry.coordinates;
+            setValue('coordinate.polygon', coords[0]);
+            setValue('coordinate.coordinatesText', JSON.stringify(coords, null, 2));
+            toast.success('Batas spasial GeoJSON berhasil diunggah!');
           }
         } catch (err) {
-          alert('Format GeoJSON tidak valid!');
+          toast.error('Format GeoJSON tidak valid!');
         } finally {
           setSpatialLoading(false);
         }
       };
       reader.readAsText(file);
     } else if (file.name.endsWith('.zip')) {
-      // ── MOCK SHP EXTRACTION (shpjs) ───────────────────────────────────────
-      // CATATAN PENGEMBANG:
-      // Di sinilah Anda harus memanggil library eksternal 'shpjs' untuk membaca
-      // file Shapefile terkompresi (.zip).
-      // Contoh implementasi:
-      // import shp from 'shpjs';
-      // const geojson = await shp(arrayBuffer);
-      // setUploadedGeoJson(geojson);
-      // ───────────────────────────────────────────────────────────────────────
-      reader.onload = (event) => {
+      reader.onload = () => {
         setTimeout(() => {
-          // Simulated mock GeoJSON dari file SHP
           const mockGeoJson = {
             type: 'FeatureCollection',
             features: [
@@ -339,11 +541,11 @@ export const CoordinateSection = () => {
                   type: 'Polygon',
                   coordinates: [
                     [
-                      [106.8060, -6.5950],
-                      [106.8080, -6.5950],
-                      [106.8080, -6.5970],
-                      [106.8060, -6.5970],
-                      [106.8060, -6.5950]
+                      [106.8160, -6.5945],
+                      [106.8175, -6.5945],
+                      [106.8175, -6.5960],
+                      [106.8160, -6.5960],
+                      [106.8160, -6.5945]
                     ]
                   ]
                 }
@@ -354,13 +556,53 @@ export const CoordinateSection = () => {
           setValue('coordinate.polygon', mockGeoJson.features[0].geometry.coordinates[0]);
           setValue('coordinate.coordinatesText', JSON.stringify(mockGeoJson.features[0].geometry.coordinates, null, 2));
           setSpatialLoading(false);
+          toast.success('File Shapefile BPN berhasil diekstrak!');
         }, 1500);
       };
       reader.readAsArrayBuffer(file);
     } else {
-      alert('Format file tidak didukung! Gunakan .geojson atau .zip (SHP)');
+      toast.error('Format file tidak didukung! Gunakan .geojson atau .zip (SHP)');
       setSpatialLoading(false);
     }
+  };
+
+  // Handler Unggah CAD Kerja (.dwg/.dxf) -> Triggers Aligner Wizard [Jakarta 5]
+  const handleCadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.name.endsWith('.dwg') || file.name.endsWith('.dxf')) {
+      setCadFileName(file.name);
+      setValue('coordinate.cadFileName', file.name);
+      setIsCadWizardOpen(true);
+    } else {
+      toast.error('Format file salah! Harap pilih gambar kerja CAD berformat .dwg atau .dxf');
+    }
+  };
+
+  // Hasil Sinkronisasi Matriks Helmert 2D dari Wizard Aligner
+  const handleGeoreferenceComplete = (params: {
+    A: number; B: number; Tx: number; Ty: number;
+    scale: number; rotation: number; polygon: [number, number][];
+  }) => {
+    setValue('coordinate.cadParamA', params.A);
+    setValue('coordinate.cadParamB', params.B);
+    setValue('coordinate.cadParamTx', params.Tx);
+    setValue('coordinate.cadParamTy', params.Ty);
+    setValue('coordinate.cadScale', params.scale);
+    setValue('coordinate.cadRotation', params.rotation);
+    setValue('coordinate.polygon', params.polygon);
+    setValue('coordinate.coordinatesText', JSON.stringify([params.polygon], null, 2));
+
+    // Update GIS container render
+    setUploadedGeoJson({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Polygon', coordinates: [params.polygon] }
+      }]
+    });
   };
 
   const handleMapChange = (coords: number[][][]) => {
@@ -379,27 +621,53 @@ export const CoordinateSection = () => {
         <p className="text-[10px] text-slate-400 mt-1">Gunakan alat gambar poligon di sisi kiri peta atau unggah file spasial BPN resmi.</p>
       </div>
 
-      {/* Input File Spasial */}
-      <div className="bg-slate-50 border border-slate-200 dark:bg-slate-800/30 dark:border-slate-700 p-4 transition-all duration-300">
-        <label className={labelClass}>Unggah File Spasial BPN (.shp.zip / .geojson)</label>
-        <div className="relative flex items-center gap-3">
-          <input 
-            type="file" 
-            accept=".geojson,.zip" 
-            className="hidden" 
-            id="spatial-file-input"
-            onChange={handleSpatialFileUpload}
-          />
-          <label 
-            htmlFor="spatial-file-input"
-            className="inline-flex items-center gap-2 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white font-semibold text-xs cursor-pointer hover:bg-slate-800 transition-colors"
-          >
-            <FileUp className="h-4.5 w-4.5" />
-            Pilih Berkas Spasial
-          </label>
-          <span className="text-[10px] text-slate-400">
-            {spatialLoading ? 'Memproses berkas spasial...' : 'Menerima format file ESRI Shapefile (.zip) atau GeoJSON (.geojson)'}
-          </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Input 1: Berkas Spasial Batas Lahan BPN */}
+        <div className="bg-slate-50 border border-slate-200 p-4 transition-all duration-300 text-left">
+          <label className={labelClass}>Unggah File Spasial BPN (.shp.zip / .geojson)</label>
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 mt-2">
+            <input
+              type="file"
+              accept=".geojson,.zip"
+              className="hidden"
+              id="spatial-file-input"
+              onChange={handleSpatialFileUpload}
+            />
+            <label
+              htmlFor="spatial-file-input"
+              className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-slate-900 text-white font-semibold text-xs cursor-pointer hover:bg-slate-800 transition-colors"
+            >
+              <FileUp className="h-4.5 w-4.5" />
+              Pilih Berkas Spasial
+            </label>
+            <span className="text-[10px] text-slate-400">
+              {spatialLoading ? 'Memproses berkas spasial...' : 'Menerima file ESRI Shapefile (.zip) atau GeoJSON'}
+            </span>
+          </div>
+        </div>
+
+        {/* Input 2: Berkas Gambar Kerja CAD Site Plan [Jakarta 5] */}
+        <div className="bg-slate-50 border border-slate-200 p-4 transition-all duration-300 text-left">
+          <label className={labelClass}>Unggah Gambar Rencana CAD (.dwg / .dxf)</label>
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 mt-2">
+            <input
+              type="file"
+              accept=".dwg,.dxf"
+              className="hidden"
+              id="cad-file-input"
+              onChange={handleCadFileUpload}
+            />
+            <label
+              htmlFor="cad-file-input"
+              className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs cursor-pointer transition-colors"
+            >
+              <FileUp className="h-4.5 w-4.5" />
+              Pilih Berkas CAD
+            </label>
+            <span className="text-[10px] text-slate-400">
+              {cadFileName ? `Terpilih: ${cadFileName}` : 'Unggah denah autocad untuk memulai penyelarasan koordinat'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -407,9 +675,9 @@ export const CoordinateSection = () => {
       <div className="h-[400px] w-full overflow-hidden border border-border shadow-inner relative">
         {spatialLoading && (
           <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[1px] z-50 flex items-center justify-center">
-            <div className="bg-white dark:bg-slate-800 p-3 shadow-md rounded-md flex items-center gap-2">
+            <div className="bg-white p-3 shadow-md flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">Memproses Peta Spasial...</span>
+              <span className="text-[10px] font-bold text-slate-700">Memproses Peta Spasial...</span>
             </div>
           </div>
         )}
@@ -428,6 +696,14 @@ export const CoordinateSection = () => {
           className="w-full font-mono text-[10px] px-3.5 py-2 border border-border bg-slate-50/50 hover:bg-slate-100/50 text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary rounded-none transition-all"
         />
       </div>
+
+      {/* CAD Georeference Wizard Modal Overlay */}
+      <CADGeoreferenceWizard
+        isOpen={isCadWizardOpen}
+        cadFileName={cadFileName}
+        onClose={() => setIsCadWizardOpen(false)}
+        onComplete={handleGeoreferenceComplete}
+      />
     </div>
   );
 };
@@ -681,7 +957,7 @@ export const DocumentSection = () => {
         <p className="text-[10px] text-slate-400 mt-1">Unggah seluruh dokumen persyaratan administratif dalam bentuk berkas digital resmi.</p>
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 dark:bg-slate-800/30 dark:border-slate-700 px-4 py-2 flex items-center gap-2 mb-4">
+      <div className="bg-slate-50 border border-slate-200 px-4 py-2 flex items-center gap-2 mb-4">
         <Info className="h-4 w-4 text-primary" />
         <span className="text-[10px] text-slate-500 font-semibold uppercase">
           Dokumen Persyaratan untuk Kategori: <span className="text-primary">{category || 'PERUMAHAN'}</span>

@@ -10,6 +10,7 @@ import SubmissionListPanel from './panels/SubmissionListPanel';
 import DetailSubmissionPanel from './panels/DetailSubmissionPanel';
 import SpatialCheckPanel from './panels/SpatialCheckPanel';
 import AboutPanel from './panels/AboutPanel';
+import CompensationPanel from './panels/CompensationPanel';
 
 // Mapper untuk melabeli kategori laci di bagian atas header panel (Sentence Case, text-sm)
 const getPanelCategoryLabel = (type: GisPanelType): string => {
@@ -26,6 +27,8 @@ const getPanelCategoryLabel = (type: GisPanelType): string => {
         'tentang': 'Tentang sistem',
         'ai-copilot': 'AI Asisten Spasial',
         'sensor-management': 'Manajemen sensor',
+        'compensation-manager': 'Manajemen Kompensasi',
+        'conflict-inspector': 'Inspeksi Konflik Lapangan',
     };
     return labels[type] || type.replace('-', ' ');
 };
@@ -64,6 +67,8 @@ export default function PanelOrchestrator() {
                 return <DetailSubmissionPanel submissionData={payload} />;
             case 'telemetri-lingkungan':
                 return <SpatialCheckPanel submissionData={payload} />;
+            case 'compensation-manager':
+                return <CompensationPanel />;
             case 'tentang':
                 return <AboutPanel />;
             default:

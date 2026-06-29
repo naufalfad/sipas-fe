@@ -26,14 +26,26 @@ export type GeoJSONCoord = [number, number];
  * Konversi satu titik dari format Leaflet [lat, lng] → GeoJSON [lng, lat].
  */
 export function leafletToGeoJSON(coord: LeafletCoord): GeoJSONCoord {
-    return [coord[1], coord[0]];
+    const [a, b] = coord;
+    // Deteksi jika koordinat dalam format Leaflet [lat, lng] (lat sekitar -6.5, lng sekitar 106.8 untuk Bogor)
+    if (a >= -15 && a <= 10 && b >= 90 && b <= 145) {
+        return [b, a]; // Ubah ke [lng, lat]
+    }
+    // Jika sudah berupa [lng, lat] (GeoJSON standar), biarkan tetap
+    return [a, b];
 }
 
 /**
  * Konversi satu titik dari format GeoJSON [lng, lat] → Leaflet [lat, lng].
  */
 export function geoJSONToLeaflet(coord: GeoJSONCoord): LeafletCoord {
-    return [coord[1], coord[0]];
+    const [a, b] = coord;
+    // Deteksi jika koordinat dalam format GeoJSON [lng, lat]
+    if (a >= 90 && a <= 145 && b >= -15 && b <= 10) {
+        return [b, a]; // Ubah ke [lat, lng]
+    }
+    // Jika sudah berupa [lat, lng] (Leaflet standar), biarkan tetap
+    return [a, b];
 }
 
 // ─── Konversi Ring Poligon ─────────────────────────────────────────────────────
@@ -73,12 +85,12 @@ export function leafletPolygonToGeoJSON(rings: LeafletCoord[][]): GeoJSONCoord[]
 
 // ─── Kalkulasi Ketinggian Bangunan ─────────────────────────────────────────────
 
-const DEFAULT_HEIGHT_METERS = 12;
-const FLOOR_HEIGHT_METERS   = 4;
+const DEFAULT_HEIGHT_METERS = 30;
+const FLOOR_HEIGHT_METERS   = 8;
 
 /**
  * Hitung tinggi bangunan fill-extrusion dalam meter berdasarkan KLB.
- * Keputusan Arsitektur: Tinggi = KLB * 4m. Fallback = 12m.
+ * Keputusan Arsitektur: Tinggi = KLB * 8m. Fallback = 30m.
  *
  * @param submission - Data pengajuan site plan
  * @returns Tinggi bangunan dalam meter

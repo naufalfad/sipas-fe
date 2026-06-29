@@ -28,7 +28,7 @@
  */
 
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Loader2, Crosshair, XCircle, CheckCircle2, HelpCircle } from 'lucide-react';
+import { Loader2, Crosshair, XCircle, CheckCircle2, HelpCircle, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSpatialValidator, type SpatialAuditResult } from '../../hooks/useSpatialValidator';
 import { toast } from 'sonner';
@@ -95,7 +95,8 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
             if (!isMounted) return;
 
             const polygonCoords = submissionData.location.polygon as [number, number][];
-            const result = await validateRiverBuffer(polygonCoords);
+            const category = submissionData?.submissionDetails?.category || 'PERUMAHAN';
+            const result = await validateRiverBuffer(polygonCoords, category);
 
             if (!isMounted) return; // Guard lagi setelah await (bisa berlangsung 100-500ms)
 
@@ -110,7 +111,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                         },
                     })
                 );
-                toast.warning('Deteksi Spasial: Rencana site plan menabrak sempadan sungai!');
+                toast.warning('Deteksi Spasial: Rencana site plan menabrak area lindung/zona terlarang!');
             } else {
                 window.dispatchEvent(new Event('map-clear-clash'));
             }
@@ -143,7 +144,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
         if (!submissionData?.location) return;
         const { lat, lng } = submissionData.location;
         window.dispatchEvent(new CustomEvent('map-fly-to-coords', { detail: { lat, lng } }));
-        toast.info('Kamera peta diarahkan ke area pelanggaran sempadan.');
+        toast.info('Kamera peta diarahkan ke area benturan spasial.');
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -151,84 +152,165 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
         <div className="flex flex-col h-full w-full bg-white relative font-sans text-slate-800 rounded-none border-slate-200">
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0 text-left">
 
-                {/* ── Status Banner ──────────────────────────────────────────── */}
+                {/* ── Verdict Banner ─────────────────────────────────────────── */}
                 {isProcessing ? (
                     <div className="px-4 py-4 border-b border-slate-200 bg-slate-50 text-slate-500 flex items-center justify-center gap-2.5 select-none">
                         <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
                         <span className="text-[11px] font-black uppercase tracking-widest animate-pulse">
-                            Menghitung Geometri Sungai...
+                            Menganalisis Zonasi Spasial Multi-Layer...
                         </span>
                     </div>
-                ) : auditResult?.isClashing ? (
-                    <div className="px-4 py-3.5 border-b text-[11px] font-semibold leading-relaxed text-left flex items-start gap-2.5 select-none animate-in fade-in duration-300 text-rose-700 bg-rose-50 border-rose-200">
-                        <XCircle className="shrink-0 text-rose-600 mt-0.5" size={14} />
-                        <p className="leading-snug">
-                            Pelanggaran Spasial Terdeteksi! Ditemukan benturan kritis pada sempadan sungai seluas{' '}
-                            <b>{auditResult.clashAreaSqm.toLocaleString('id-ID')} m²</b>. Berkas tidak dapat disetujui.
-                        </p>
+                ) : auditResult ? (
+                    <div className={cn(
+                        'border-b px-4 py-3.5 select-none animate-in fade-in duration-300',
+                        auditResult.verdict === 'TIDAK_LAYAK' ? 'bg-rose-50 border-rose-200' :
+                        auditResult.verdict === 'PERLU_REVISI' ? 'bg-amber-50 border-amber-200' :
+                        'bg-teal-50 border-teal-200'
+                    )}>
+                        <div className="flex items-start gap-2.5 mb-2">
+                            {auditResult.verdict === 'TIDAK_LAYAK'
+                                ? <ShieldX className="shrink-0 text-rose-600 mt-0.5" size={15} />
+                                : auditResult.verdict === 'PERLU_REVISI'
+                                    ? <ShieldAlert className="shrink-0 text-amber-600 mt-0.5" size={15} />
+                                    : <ShieldCheck className="shrink-0 text-teal-600 mt-0.5" size={15} />}
+                            <div className="flex-1">
+                                <p className={cn(
+                                    'text-[11px] font-black leading-none mb-1',
+                                    auditResult.verdict === 'TIDAK_LAYAK' ? 'text-rose-700' :
+                                    auditResult.verdict === 'PERLU_REVISI' ? 'text-amber-700' :
+                                    'text-teal-700'
+                                )}>
+                                    {auditResult.verdict === 'TIDAK_LAYAK'
+                                        ? 'TIDAK LAYAK — Pelanggaran Kritis Terdeteksi'
+                                        : auditResult.verdict === 'PERLU_REVISI'
+                                            ? 'PERLU REVISI — Ada Ketidaksesuaian Zonasi'
+                                            : 'LAYAK — Zonasi Mematuhi RTRW/RDTR'}
+                                </p>
+                                <p className={cn(
+                                    'text-[10px] font-medium leading-snug',
+                                    auditResult.verdict === 'TIDAK_LAYAK' ? 'text-rose-600' :
+                                    auditResult.verdict === 'PERLU_REVISI' ? 'text-amber-600' :
+                                    'text-teal-600'
+                                )}>
+                                    {auditResult.verdict === 'TIDAK_LAYAK'
+                                        ? `Benturan spasial ${auditResult.clashAreaSqm.toLocaleString('id-ID')} m² pada zona dilindungi. Berkas wajib direvisi.`
+                                        : auditResult.verdict === 'PERLU_REVISI'
+                                            ? 'Terdapat ketidaksesuaian peruntukan. Diperlukan kajian dan izin tambahan.'
+                                            : 'Seluruh indikator spasial terpenuhi. Lahan sesuai peruntukan tata ruang.'}
+                                </p>
+                            </div>
+                            {/* Skor Kepatuhan */}
+                            <div className="flex flex-col items-center gap-0.5 shrink-0">
+                                <span className={cn(
+                                    'text-[18px] font-black tabular-nums leading-none',
+                                    auditResult.zoningScore >= 80 ? 'text-teal-700' :
+                                    auditResult.zoningScore >= 50 ? 'text-amber-600' : 'text-rose-700'
+                                )}>{auditResult.zoningScore}</span>
+                                <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">SKOR</span>
+                            </div>
+                        </div>
+                        {/* Progress bar skor */}
+                        <div className="h-1 w-full bg-white/60 rounded-none overflow-hidden">
+                            <div
+                                className={cn(
+                                    'h-full transition-all duration-700 rounded-none',
+                                    auditResult.zoningScore >= 80 ? 'bg-teal-500' :
+                                    auditResult.zoningScore >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                                )}
+                                style={{ width: `${auditResult.zoningScore}%` }}
+                            />
+                        </div>
                     </div>
-                ) : (
-                    <div className="px-4 py-3.5 border-b text-[11px] font-semibold leading-relaxed text-left flex items-start gap-2.5 select-none animate-in fade-in duration-300 text-teal-700 bg-teal-50 border-teal-200">
-                        <CheckCircle2 className="shrink-0 text-teal-600 mt-0.5" size={14} />
-                        <p className="leading-snug">
-                            Hasil Verifikasi Spasial: Lahan bersih dari benturan spasial. Rencana mematuhi batas wilayah.
-                        </p>
-                    </div>
-                )}
+                ) : null}
 
                 {/* ── Laporan Indikator ──────────────────────────────────────── */}
                 <div className="">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 select-none">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">
-                            Laporan Indikator Spasial
+                            Laporan Indikator Spasial (Multi-Layer)
                         </h4>
                     </div>
                     <div className="flex flex-col bg-white divide-y divide-slate-100">
-                        <div className={cn(
-                            'px-4 py-3.5 transition-colors flex items-start justify-between gap-4',
-                            !isProcessing && auditResult?.isClashing
-                                ? 'bg-rose-50/30 border-rose-200 border-2 animate-pulse'
-                                : 'hover:bg-slate-50/40'
-                        )}>
-                            <div className="space-y-1.5 min-w-0 flex-1">
-                                <h5 className={cn(
-                                    'text-[11px] font-black leading-none',
-                                    !isProcessing && auditResult?.isClashing ? 'text-rose-700' : 'text-slate-800'
-                                )}>
-                                    Cek Sempadan Sungai 25m
-                                </h5>
-                                <p className={cn(
-                                    'text-[10px] leading-snug font-medium text-left',
-                                    !isProcessing && auditResult?.isClashing ? 'text-rose-700' : 'text-slate-500'
-                                )}>
-                                    {isProcessing
-                                        ? 'Menghitung validasi jarak 25 meter dari sungai terdekat...'
-                                        : auditResult?.isClashing
-                                            ? `Melanggar: Batas kavling memotong area sempadan sungai 25m seluas ${auditResult.clashAreaSqm.toLocaleString('id-ID')} m²!`
-                                            : 'Lolos: Batas kavling bersih dari zona sempadan sungai 25 meter.'
-                                    }
-                                </p>
-                                {!isProcessing && auditResult?.isClashing && (
-                                    <button
-                                        type="button"
-                                        onClick={handleHighlightClash}
-                                        className="inline-flex items-center gap-1 mt-2 px-2.5 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-black text-[9px] uppercase tracking-widest rounded-none border border-rose-300 transition-colors cursor-pointer outline-none"
-                                    >
-                                        <Crosshair size={10} /> Sorot Area Pelanggaran
-                                    </button>
-                                )}
+                        {isProcessing ? (
+                            <div className="px-4 py-6 text-center text-xs text-slate-400">
+                                <Loader2 className="h-4 w-4 animate-spin inline mr-2 text-teal-600" />
+                                Menjalankan audit spasial multi-layer...
                             </div>
-                            <span className={cn(
-                                'px-2 py-0.5 text-[8px] font-black uppercase tracking-wider leading-none rounded-none border whitespace-nowrap shrink-0 shadow-none',
-                                isProcessing
-                                    ? 'text-slate-500 bg-slate-50 border-slate-200'
-                                    : auditResult?.isClashing
-                                        ? 'text-rose-700 bg-rose-50 border-rose-200 animate-pulse font-black'
-                                        : 'text-teal-700 bg-teal-50 border-teal-200'
-                            )}>
-                                {isProcessing ? 'Memuat...' : auditResult?.isClashing ? 'MELANGGAR' : 'Aman'}
-                            </span>
-                        </div>
+                        ) : auditResult?.details && auditResult.details.length > 0 ? (
+                            auditResult.details.map((detail) => {
+                                const hasClash = detail.clashAreaSqm > 0 && detail.severity !== 'info';
+                                const isClean = detail.clashAreaSqm === 0;
+                                return (
+                                    <div key={detail.layerId} className={cn(
+                                        'px-4 py-3 transition-colors flex items-start justify-between gap-3',
+                                        hasClash
+                                            ? detail.severity === 'danger'
+                                                ? 'bg-rose-50/30 border-l-4 border-rose-600'
+                                                : 'bg-amber-50/30 border-l-4 border-amber-500'
+                                            : isClean
+                                                ? 'border-l-4 border-teal-400 hover:bg-teal-50/10'
+                                                : 'hover:bg-slate-50/40 border-l-4 border-slate-200'
+                                    )}>
+                                        <div className="space-y-1 min-w-0 flex-1">
+                                            <h5 className={cn(
+                                                'text-[11px] font-black leading-none',
+                                                hasClash
+                                                    ? detail.severity === 'danger' ? 'text-rose-700' : 'text-amber-700'
+                                                    : isClean ? 'text-teal-700' : 'text-slate-800'
+                                            )}>
+                                                {detail.layerName}
+                                            </h5>
+                                            <p className={cn(
+                                                'text-[9.5px] leading-snug font-medium text-left',
+                                                hasClash
+                                                    ? detail.severity === 'danger' ? 'text-rose-600' : 'text-amber-600'
+                                                    : isClean ? 'text-teal-600' : 'text-slate-500'
+                                            )}>
+                                                {detail.description}
+                                            </p>
+                                            {detail.zoningNote && (
+                                                <p className="text-[8.5px] text-slate-400 font-semibold italic leading-tight">
+                                                    ⚖ {detail.zoningNote}
+                                                </p>
+                                            )}
+                                            {hasClash && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleHighlightClash}
+                                                    className={cn(
+                                                        "inline-flex items-center gap-1 mt-1.5 px-2 py-1 bg-white hover:bg-slate-50 font-black text-[9px] uppercase tracking-widest rounded-none border transition-colors cursor-pointer outline-none",
+                                                        detail.severity === 'danger'
+                                                            ? 'text-rose-700 border-rose-300'
+                                                            : 'text-amber-700 border-amber-300'
+                                                    )}
+                                                >
+                                                    <Crosshair size={10} /> Sorot Area
+                                                </button>
+                                            )}
+                                        </div>
+                                        <span className={cn(
+                                            'px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider leading-none rounded-none border whitespace-nowrap shrink-0 shadow-none mt-0.5',
+                                            hasClash
+                                                ? detail.severity === 'danger'
+                                                    ? 'text-rose-700 bg-rose-50 border-rose-300 animate-pulse'
+                                                    : 'text-amber-700 bg-amber-50 border-amber-300'
+                                                : isClean
+                                                    ? 'text-teal-700 bg-teal-50 border-teal-300'
+                                                    : 'text-slate-500 bg-slate-50 border-slate-200'
+                                        )}>
+                                            {hasClash
+                                                ? detail.severity === 'danger' ? 'MELANGGAR' : 'PERLU IZIN'
+                                                : isClean ? 'BERSIH' : 'SESUAI'
+                                            }
+                                        </span>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="px-4 py-6 text-center text-xs text-slate-400">
+                                Jalankan analisis untuk memuat indikator spasial.
+                            </div>
+                        )}
                     </div>
                 </div>
 

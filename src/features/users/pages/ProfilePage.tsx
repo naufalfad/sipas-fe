@@ -4,7 +4,6 @@ import {
   Mail,
   Shield,
   Building,
-  Award,
   Calendar,
   Lock,
   Phone,

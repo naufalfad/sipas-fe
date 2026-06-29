@@ -2,25 +2,68 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
+import { useGisUIStore, type LahanKompensasi } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, Clock, CheckCircle2,
   MapPin, File, Loader2,
   XCircle, CheckCircle, FileSignature, AlertTriangle, ShieldCheck,
-  User, Building, Phone, Mail, Award, HardHat, Camera, Landmark
+  User, Phone, Mail, Award, HardHat, Camera, Landmark,
+  Scale, Globe
 } from 'lucide-react';
 import { Source, Layer } from 'react-map-gl/maplibre';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+// ─── MOCK DATA LAHAN KOMPENSASI DAERAH [Purworejo 8, Bogor 11] ────────────────
+const mockKompensasiList: LahanKompensasi[] = [
+  {
+    idKompensasi: 'komp-101',
+    idPermohonan: 'sub-1', // Terkait permohonan PT Maju Jaya Sentosa
+    tipeKompensasi: 'LAHAN_MAKAM_FISIK',
+    luasKompensasiM2: 500,
+    statusPemenuhan: 'PROSES_VERIFIKASI',
+    polygon: [
+      [-6.5940, 106.8155],
+      [-6.5940, 106.8160],
+      [-6.5945, 106.8160],
+      [-6.5945, 106.8155],
+      [-6.5940, 106.8155]
+    ],
+    buktiLegalitasUrl: '#',
+  },
+  {
+    idKompensasi: 'komp-102',
+    idPermohonan: 'sub-5', // Terkait permohonan Batu Tulis Residence (Ditolak)
+    tipeKompensasi: 'LAHAN_SAWAH',
+    luasKompensasiM2: 12000,
+    statusPemenuhan: 'BELUM_TERPENUHI',
+    polygon: [
+      [-6.6210, 106.8110],
+      [-6.6210, 106.8120],
+      [-6.6220, 106.8120],
+      [-6.6220, 106.8110],
+      [-6.6210, 106.8110]
+    ],
+    buktiLegalitasUrl: undefined,
+  }
+];
 
 export default function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const { activeRole, userProfile } = useUIStore();
 
+  // Zustand State Binding [sipas-fe.txt, Purworejo 8]
+  const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
+  const flyTo = useGisUIStore((s) => s.flyTo);
+
   const [notes, setNotes] = useState('');
-  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'foto'>('ringkasan');
-  
+  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto'>('ringkasan');
+
   // Checklist states
   const [adminChecks, setAdminChecks] = useState({
     ktp: false,
@@ -28,7 +71,7 @@ export default function SubmissionDetailPage() {
     npwp: false,
     kkpr: false
   });
-  
+
   const [techChecks, setTechChecks] = useState({
     polygon: false,
     rth: false,
@@ -45,7 +88,7 @@ export default function SubmissionDetailPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ status, notes }: { status: string; notes: string }) => {
+    mutationFn: async ({ status, notes }: { status: SubmissionStatus; notes: string }) => {
       return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes);
     },
     onSuccess: () => {
@@ -55,8 +98,15 @@ export default function SubmissionDetailPage() {
       setAdminChecks({ ktp: false, sertifikat: false, npwp: false, kkpr: false });
       setTechChecks({ polygon: false, rth: false, utilities: false, cad: false });
       setKabidAgreed(false);
+      toast.success('Status berkas berhasil diperbarui!');
     }
   });
+
+  // Filter Kompensasi yang terkait dengan permohonan ini [Purworejo 8]
+  const associatedKompensasi = useMemo(() => {
+    if (!sub) return null;
+    return mockKompensasiList.find(k => k.idPermohonan === sub.id) || null;
+  }, [sub]);
 
   // Memetakan batas luar bidang tanah site plan
   const outerBoundaryGeoJSON = useMemo(() => {
@@ -138,6 +188,10 @@ export default function SubmissionDetailPage() {
     }
   };
 
+  // --- LOGIKA KONTROL SLA CLOCK PAUSE/RESUME [Bogor 16] ---
+  const isSlaPaused = sub.status === 'Ditolak' || sub.status === 'Draft';
+  const mockSlaDaysRemaining = sub.status === 'Disetujui' ? 0 : sub.status === 'Ditolak' ? 11 : 9;
+
   // Helper variables for role-based conditional rendering
   const isAdminActive = activeRole === 'Admin SIPAS' || activeRole === 'Super Admin';
   const isTechActive = activeRole === 'Tim Teknis' || activeRole === 'Super Admin';
@@ -177,6 +231,31 @@ export default function SubmissionDetailPage() {
     });
   };
 
+  // Handler Visualisasi Lahan Kompensasi pada Peta Spasial [Purworejo 8]
+  const handleShowCompensationOnMap = (komp: LahanKompensasi) => {
+    setActiveKompensasi(komp);
+
+    // Hitung centroid poligon kompensasi untuk mengarahkan kamera
+    const centroid = calculateCentroid(komp.polygon);
+    flyTo({
+      longitude: centroid[0],
+      latitude: centroid[1],
+      zoom: 17,
+      pitch: 45
+    });
+    toast.info('GIS Engine memfokuskan kamera ke poligon lahan pengganti!');
+  };
+
+  function calculateCentroid(polygon: [number, number][]): [number, number] {
+    let totalLat = 0;
+    let totalLng = 0;
+    polygon.forEach(([lat, lng]) => {
+      totalLat += lat;
+      totalLng += lng;
+    });
+    return [totalLng / polygon.length, totalLat / polygon.length];
+  }
+
   const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
   const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
 
@@ -188,7 +267,7 @@ export default function SubmissionDetailPage() {
         <Link to="/pengajuan/daftar" className="p-2 bg-white hover:bg-slate-50 border border-border text-slate-500 hover:text-slate-800 transition-colors rounded-none">
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <div className="text-left">
+        <div className="text-left flex-1">
           <h1 className="text-2xl font-bold text-[#111D13] leading-none">
             Rincian Berkas Pengajuan
           </h1>
@@ -196,12 +275,32 @@ export default function SubmissionDetailPage() {
             Informasi administrasi, penelusuran riwayat evaluasi, dan lampiran berkas teknis {sub.submissionNo}.
           </p>
         </div>
+
+        {/* ─── DYNAMIC SLA TRACKER HUD [Bogor 16] ─── */}
+        <div className="shrink-0 select-none flex items-center gap-3">
+          {isSlaPaused ? (
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 animate-pulse text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
+              <Clock className="h-4 w-4 text-rose-600" />
+              SLA: DI-PAUSE (Revisi)
+            </div>
+          ) : sub.status === 'Disetujui' ? (
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
+              <CheckCircle className="h-4 w-4 text-emerald-600" />
+              SLA: BERHASIL (9 Hari)
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
+              <Clock className="h-4 w-4 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
+              SLA: {mockSlaDaysRemaining} Hari Tersisa
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ─── SEKSI 2: CORE WORKSPACE GRID (SPLIT 2/3 DAN 1/3) ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Kolom Kiri (2/3): Informasi Proyek & Berkas Lampiran */}
+        {/* Kolom Kiri (2/3): Informasi Proyek & Berkas Laporan */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Tab Selector */}
@@ -211,16 +310,16 @@ export default function SubmissionDetailPage() {
               { id: 'pemohon', label: 'Pemohon & Konsultan' },
               { id: 'lokasi', label: 'Lokasi & Tata Ruang' },
               { id: 'teknis', label: 'Parameter Teknis' },
+              { id: 'kompensasi', label: 'Kompensasi & Mitigasi' }, // Tab Baru [Purworejo 8]
               { id: 'foto', label: 'Dokumentasi Foto' }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-5 py-3 font-bold text-xs border-b-2 transition-all duration-200 whitespace-nowrap cursor-pointer ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary bg-slate-50/60 font-extrabold'
-                    : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50/20'
-                }`}
+                className={`px-5 py-3 font-bold text-xs border-b-2 transition-all duration-200 whitespace-nowrap cursor-pointer ${activeTab === tab.id
+                  ? 'border-primary text-primary bg-slate-50/60 font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50/20'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -569,7 +668,7 @@ export default function SubmissionDetailPage() {
                   <Award className="h-4.5 w-4.5 text-primary" />
                   Parameter Teknis Kategori: {sub.submissionDetails?.category || 'PERUMAHAN'}
                 </h3>
-                
+
                 {/* Rendering kondisional parameter berdasarkan kategori aktual permohonan */}
                 {(!sub.submissionDetails?.category || sub.submissionDetails.category === 'PERUMAHAN') && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
@@ -681,9 +780,89 @@ export default function SubmissionDetailPage() {
                       <span className="text-xs font-bold text-slate-700 block">{sub.technical?.greenBufferArea ? `${sub.technical.greenBufferArea.toLocaleString('id-ID')} m²` : '-'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Penyediaan TPS Limbah B3</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Penyediaan TPS LImbah B3</span>
                       <span className="text-xs font-semibold text-slate-600 block">{sub.technical?.tpsB3Provision || '-'}</span>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── TAB BARU: KONDISIONAL KELAYAKAN KOMPENSASI & MITIGASI [Purworejo 8] ─── */}
+            {activeTab === 'kompensasi' && (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                <div className="border-b border-border pb-2 flex justify-between items-center">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <Scale className="h-4.5 w-4.5 text-primary" />
+                    Kewajiban Mitigasi & Kompensasi Lahan
+                  </h3>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Aturan Perbup Bogor</span>
+                </div>
+
+                {associatedKompensasi ? (
+                  <div className="space-y-5">
+                    <div className="bg-slate-50 border border-border p-4 space-y-4 text-left">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Tipe Kompensasi</span>
+                          <span className="text-xs font-bold text-slate-800 block mt-1">
+                            {associatedKompensasi.tipeKompensasi === 'LAHAN_MAKAM_FISIK' && 'Penyediaan Lahan Pemakaman (TPU 2%)'}
+                            {associatedKompensasi.tipeKompensasi === 'LAHAN_SAWAH' && 'Penggantian Lahan Pertanian Basah (KP2B 1:1)'}
+                            {associatedKompensasi.tipeKompensasi === 'LAHAN_MAKAM_UANG' && 'Uang Pengganti Lahan Pemakaman'}
+                            {associatedKompensasi.tipeKompensasi === 'PSU_FISIK_TAMBAHAN' && 'Penyediaan PSU Tambahan Luar Kompleks'}
+                          </span>
+                        </div>
+                        <span className={cn(
+                          "px-2 py-0.5 text-[8px] font-black uppercase tracking-wider border leading-none rounded-none shadow-none",
+                          associatedKompensasi.statusPemenuhan === 'TERPENUHI' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            associatedKompensasi.statusPemenuhan === 'PROSES_VERIFIKASI' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' :
+                              'bg-rose-50 text-rose-700 border-rose-200'
+                        )}>
+                          {associatedKompensasi.statusPemenuhan.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-xs pt-1 border-t border-slate-200/50">
+                        <div>
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Luas Kewajiban</span>
+                          <span className="text-xs font-bold text-slate-700 block mt-1">{associatedKompensasi.luasKompensasiM2.toLocaleString('id-ID')} m²</span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Nilai Nominal Pengganti</span>
+                          <span className="text-xs font-bold text-slate-700 block mt-1">
+                            {associatedKompensasi.nilaiNominal ? `Rp ${associatedKompensasi.nilaiNominal.toLocaleString('id-ID')}` : 'N/A (Fisik Lahan)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tombol Terapkan ke Map GIS */}
+                      {associatedKompensasi.polygon && associatedKompensasi.polygon.length >= 3 && (
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => handleShowCompensationOnMap(associatedKompensasi)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 font-black text-[9px] uppercase tracking-widest border border-teal-200 transition-colors cursor-pointer outline-none rounded-none"
+                          >
+                            <Globe size={11} />
+                            Plotting Lahan Pengganti Di Peta
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 bg-amber-50/40 border border-amber-200 text-left flex items-start gap-2.5">
+                      <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <h5 className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">Aturan Pemenuhan Jaminan</h5>
+                        <p className="text-[10px] text-amber-700 leading-relaxed text-justify">
+                          Berdasarkan keputusan rapat komite tim teknis, izin site plan baru hanya dapat disahkan apabila status kompensasi fisik telah dinyatakan 'TERPENUHI' atau memiliki jaminan bank yang sah [Purworejo 8].
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-xs text-slate-400 select-none">
+                    Permohonan ini bebas dari kewajiban kompensasi khusus lahan makam atau sawah produktif.
                   </div>
                 )}
               </div>
@@ -731,7 +910,7 @@ export default function SubmissionDetailPage() {
           </div>
 
           {/* ─── KANVAS TINDAKAN EVALUASI (Dinamis Berdasarkan Hak Akses) ─── */}
-          
+
           {/* Panel Admin SIPAS */}
           {showAdminPanel && (
             <div className="bg-white border border-primary p-5 shadow-[1px_1px_5px_rgba(0,0,0,0.02)] space-y-5 rounded-none text-left animate-in slide-in-from-bottom-2 duration-300">
@@ -746,38 +925,38 @@ export default function SubmissionDetailPage() {
               {/* Checklist */}
               <div className="space-y-2.5">
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={adminChecks.ktp} 
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={adminChecks.ktp}
+                    onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Kesesuaian Identitas Pemohon (KTP / NIB Direktur)</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={adminChecks.sertifikat} 
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, sertifikat: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={adminChecks.sertifikat}
+                    onChange={(e) => setAdminChecks(prev => ({ ...prev, sertifikat: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Keabsahan Sertifikat Kepemilikan Tanah / Surat Hak Atas Lahan</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={adminChecks.npwp} 
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={adminChecks.npwp}
+                    onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Kesesuaian NPWP Wajib Pajak (Badan Usaha / Perorangan)</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={adminChecks.kkpr} 
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, kkpr: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={adminChecks.kkpr}
+                    onChange={(e) => setAdminChecks(prev => ({ ...prev, kkpr: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Sesuai Rencana</span>
                 </label>
@@ -786,11 +965,11 @@ export default function SubmissionDetailPage() {
               {/* Catatan Area */}
               <div className="space-y-1.5">
                 <label className={labelClass}>Catatan Evaluasi / Alasan Penolakan</label>
-                <textarea 
-                  rows={3} 
+                <textarea
+                  rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Berikan keterangan kelayakan administrasi berkas di sini..." 
+                  placeholder="Berikan keterangan kelayakan administrasi berkas di sini..."
                   className={inputClass}
                 />
               </div>
@@ -832,38 +1011,38 @@ export default function SubmissionDetailPage() {
               {/* Checklist */}
               <div className="space-y-2.5">
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={techChecks.polygon} 
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, polygon: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={techChecks.polygon}
+                    onChange={(e) => setTechChecks(prev => ({ ...prev, polygon: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Kesesuaian Batas Lahan & Polygon Spasial Bidang BPN</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={techChecks.rth} 
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, rth: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={techChecks.rth}
+                    onChange={(e) => setTechChecks(prev => ({ ...prev, rth: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Kesesuaian Alokasi RTH & PSU Dinas (Minimum 20%)</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={techChecks.utilities} 
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, utilities: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={techChecks.utilities}
+                    onChange={(e) => setTechChecks(prev => ({ ...prev, utilities: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Rencana Utilitas (ROW Lebar Jalan, Jaringan Air & Drainase) Memenuhi Syarat</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={techChecks.cad} 
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, cad: e.target.checked }))} 
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                  <input
+                    type="checkbox"
+                    checked={techChecks.cad}
+                    onChange={(e) => setTechChecks(prev => ({ ...prev, cad: e.target.checked }))}
+                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
                   <span className="text-xs font-semibold text-slate-700">Gambar CAD / DWG Site Plan Valid & Telah Diasistensi</span>
                 </label>
@@ -872,11 +1051,11 @@ export default function SubmissionDetailPage() {
               {/* Catatan Area */}
               <div className="space-y-1.5">
                 <label className={labelClass}>Catatan Teknis / Rekomendasi Perubahan</label>
-                <textarea 
-                  rows={3} 
+                <textarea
+                  rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Tuliskan catatan teknis detail hasil audit spasial..." 
+                  placeholder="Tuliskan catatan teknis detail hasil audit spasial..."
                   className={inputClass}
                 />
               </div>
@@ -928,11 +1107,11 @@ export default function SubmissionDetailPage() {
 
               {/* Checkbox */}
               <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                <input 
-                  type="checkbox" 
-                  checked={kabidAgreed} 
-                  onChange={(e) => setKabidAgreed(e.target.checked)} 
-                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary" 
+                <input
+                  type="checkbox"
+                  checked={kabidAgreed}
+                  onChange={(e) => setKabidAgreed(e.target.checked)}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                 />
                 <span className="text-xs font-bold text-slate-800">
                   Saya secara sadar menyetujui rekomendasi kelayakan teknis berkas pengajuan dan siap menandatangani SK.
@@ -942,11 +1121,11 @@ export default function SubmissionDetailPage() {
               {/* Catatan Area */}
               <div className="space-y-1.5">
                 <label className={labelClass}>Catatan Pengesahan Pimpinan (Opsional)</label>
-                <textarea 
-                  rows={2} 
+                <textarea
+                  rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Masukkan pesan pengesahan untuk pengaju..." 
+                  placeholder="Masukkan pesan pengesahan untuk pengaju..."
                   className={inputClass}
                 />
               </div>
@@ -988,7 +1167,7 @@ export default function SubmissionDetailPage() {
                 </h4>
                 <p className="text-[10px] text-slate-400 mt-1">Surat Keputusan (SK) resmi dan salinan digital peta rencana tapak telah terbit.</p>
               </div>
-              <button 
+              <button
                 onClick={() => window.alert(`Mengunduh Surat Keputusan Pengesahan Site Plan (${sub.submissionNo}-SK.pdf)...`)}
                 className="px-4 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs transition-colors rounded-none border-none cursor-pointer"
               >

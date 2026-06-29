@@ -30,6 +30,11 @@ const DEFAULT_STYLE: StyleSpecification = {
     glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
 } as StyleSpecification;
 
+const REGIONAL_BOUNDS: [[number, number], [number, number]] = [
+    [90.0, -15.0], // Southwest: [lng, lat]
+    [150.0, 15.0], // Northeast: [lng, lat]
+];
+
 interface GISMapContainerProps {
     /** Pusat awal peta dalam format [latitude, longitude] */
     center?: [number, number];
@@ -73,6 +78,8 @@ export default function GISMapContainer({
                 style={{ width: '100%', height: '100%' }}
                 maxZoom={22}
                 pitchWithRotate={false}
+                renderWorldCopies={false}
+                maxBounds={REGIONAL_BOUNDS}
             >
                 {children}
             </Map>

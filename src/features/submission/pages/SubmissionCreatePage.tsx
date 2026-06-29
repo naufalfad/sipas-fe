@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
@@ -31,10 +31,10 @@ export default function SubmissionCreatePage() {
   const [currentStep, setCurrentStep] = useState(1);
 
   const methods = useForm<FullSubmissionFormValues>({
-    resolver: zodResolver(fullSubmissionSchema),
+    resolver: zodResolver(fullSubmissionSchema) as Resolver<FullSubmissionFormValues>,
     defaultValues: {
       applicant: { type: 'PERORANGAN' },
-      submission: { submissionType: 'BARU' },
+      submission: { submissionType: 'BARU', category: 'PERUMAHAN' },
       location: { ownershipStatus: 'SHM' },
     },
     mode: 'onTouched',

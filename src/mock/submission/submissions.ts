@@ -4,7 +4,7 @@ export const mockSubmissions: Submission[] = [
   {
     id: 'sub-1',
     submissionNo: 'SIPAS-2026-001',
-    housingName: 'Grand Bogor Residence',
+    housingName: 'Grand Cibinong mixed-use',
     developerName: 'PT Maju Jaya Sentosa',
     landArea: 25000,
     submissionDate: '2026-06-20',
@@ -25,55 +25,68 @@ export const mockSubmissions: Submission[] = [
       { date: '2026-06-20 10:30', status: 'Menunggu Verifikasi', notes: 'Berkas berhasil dikirim dan menunggu pemeriksaan berkas', actor: 'Ahmad Fauzi (Developer)' }
     ],
     location: {
-      lat: -6.595189,
-      lng: 106.816629,
-      address: 'Jl. Raya Pajajaran No.21, Baranangsiang, Kec. Bogor Timur, Kota Bogor, Jawa Barat',
+      lat: -6.485,
+      lng: 106.840,
+      address: 'Kawasan Pemda, Tengah, Kec. Cibinong, Kabupaten Bogor, Jawa Barat',
       polygon: [
-        [-6.5945, 106.8160],
-        [-6.5945, 106.8175],
-        [-6.5960, 106.8175],
-        [-6.5960, 106.8160],
+        [-6.483, 106.838],
+        [-6.483, 106.842],
+        [-6.487, 106.842],
+        [-6.487, 106.840],
+        [-6.485, 106.840],
+        [-6.485, 106.838],
       ],
       roadPolygons: [
         [
-          [-6.5952, 106.8160],
-          [-6.5952, 106.8175],
-          [-6.5953, 106.8175],
-          [-6.5953, 106.8160],
+          [-6.484, 106.8385],
+          [-6.484, 106.8415],
+          [-6.4842, 106.8415],
+          [-6.4842, 106.8385],
+        ],
+        [
+          [-6.484, 106.8413],
+          [-6.484, 106.8417],
+          [-6.4865, 106.8417],
+          [-6.4865, 106.8413],
         ]
       ],
       rthPolygons: [
         [
-          [-6.5945, 106.8160],
-          [-6.5945, 106.8165],
-          [-6.5950, 106.8165],
-          [-6.5950, 106.8160],
+          [-6.4831, 106.8385],
+          [-6.4831, 106.840],
+          [-6.4838, 106.840],
+          [-6.4838, 106.8385],
         ]
       ],
       psuPolygons: [
         [
-          [-6.5945, 106.8170],
-          [-6.5945, 106.8175],
-          [-6.5950, 106.8175],
-          [-6.5950, 106.8170],
+          [-6.4831, 106.8402],
+          [-6.4831, 106.8418],
+          [-6.4838, 106.8418],
+          [-6.4838, 106.8402],
         ]
       ],
       kavlingPolygons: [
         [
-          [-6.5954, 106.8160],
-          [-6.5954, 106.8167],
-          [-6.5959, 106.8167],
-          [-6.5959, 106.8160],
+          [-6.4843, 106.8385],
+          [-6.4843, 106.8398],
+          [-6.4848, 106.8398],
+          [-6.4848, 106.8385],
         ],
         [
-          [-6.5954, 106.8168],
-          [-6.5954, 106.8175],
-          [-6.5959, 106.8175],
-          [-6.5959, 106.8168],
+          [-6.4843, 106.840],
+          [-6.4843, 106.8412],
+          [-6.4848, 106.8412],
+          [-6.4848, 106.840],
+        ],
+        [
+          [-6.4845, 106.8402],
+          [-6.4845, 106.8412],
+          [-6.4865, 106.8412],
+          [-6.4865, 106.8402],
         ]
       ]
     },
-    // Detailed form fields
     applicant: {
       type: 'BADAN_USAHA',
       name: 'PT Maju Jaya Sentosa',
@@ -86,19 +99,19 @@ export const mockSubmissions: Submission[] = [
     },
     submissionDetails: {
       submissionType: 'BARU',
-      activityName: 'Grand Bogor Residence',
+      activityName: 'Grand Cibinong mixed-use',
       category: 'PERUMAHAN'
     },
     locationDetails: {
-      locationName: 'Lahan Baranangsiang',
-      village: 'Baranangsiang',
-      district: 'Bogor Timur',
-      city: 'Kota Bogor',
+      locationName: 'Lahan Cibinong Pemda',
+      village: 'Tengah',
+      district: 'Cibinong',
+      city: 'Kabupaten Bogor',
       province: 'Jawa Barat',
-      fullAddress: 'Jl. Raya Pajajaran No.21, Baranangsiang, Kec. Bogor Timur, Kota Bogor, Jawa Barat',
+      fullAddress: 'Kawasan Pemda, Tengah, Kec. Cibinong, Kabupaten Bogor, Jawa Barat',
       landArea: 25000,
       ownershipStatus: 'SHM',
-      certificateNumber: 'SHM No. 10293/Baranangsiang',
+      certificateNumber: 'SHM No. 10293/Cibinong',
       certificateOwner: 'PT Maju Jaya Sentosa'
     },
     spatial: {
@@ -112,7 +125,7 @@ export const mockSubmissions: Submission[] = [
       cemeteryArea: 500,
       roadRowMain: '12 Meter',
       roadRowLocal: '8 Meter',
-      waterSystem: 'PDAM Tirta Pakuan'
+      waterSystem: 'PDAM Tirta Kahuripan'
     },
     consultant: {
       consultantName: 'Ir. Hermawan Pratama',
@@ -156,47 +169,51 @@ export const mockSubmissions: Submission[] = [
       lng: 106.874251,
       address: 'Kawasan Sentul City, Kec. Babakan Madang, Kabupaten Bogor, Jawa Barat',
       polygon: [
-        [-6.5710, 106.8730],
-        [-6.5710, 106.8755],
-        [-6.5735, 106.8755],
-        [-6.5735, 106.8730],
+        [-6.5710, 106.8720],
+        [-6.5705, 106.8750],
+        [-6.5720, 106.8770],
+        [-6.5740, 106.8760],
+        [-6.5745, 106.8730],
+        [-6.5730, 106.8715],
       ],
       roadPolygons: [
         [
-          [-6.5720, 106.8730],
-          [-6.5720, 106.8755],
-          [-6.5722, 106.8755],
-          [-6.5722, 106.8730],
+          [-6.5715, 106.8722],
+          [-6.5712, 106.8748],
+          [-6.5725, 106.8765],
+          [-6.5727, 106.8763],
+          [-6.5714, 106.8746],
+          [-6.5717, 106.8722]
         ]
       ],
       rthPolygons: [
         [
-          [-6.5710, 106.8730],
-          [-6.5710, 106.8738],
-          [-6.5718, 106.8738],
-          [-6.5718, 106.8730],
+          [-6.5730, 106.8720],
+          [-6.5725, 106.8740],
+          [-6.5738, 106.8745],
+          [-6.5740, 106.8725],
         ]
       ],
       psuPolygons: [
         [
-          [-6.5710, 106.8745],
-          [-6.5710, 106.8755],
-          [-6.5718, 106.8755],
-          [-6.5718, 106.8745],
+          [-6.5710, 106.8752],
+          [-6.5718, 106.8762],
+          [-6.5722, 106.8758],
+          [-6.5714, 106.8748]
         ]
       ],
       kavlingPolygons: [
         [
-          [-6.5723, 106.8730],
-          [-6.5723, 106.8742],
-          [-6.5733, 106.8742],
-          [-6.5733, 106.8730],
+          [-6.5728, 106.8748],
+          [-6.5726, 106.8754],
+          [-6.5732, 106.8752],
+          [-6.5734, 106.8746],
         ],
         [
-          [-6.5723, 106.8743],
-          [-6.5723, 106.8755],
-          [-6.5733, 106.8755],
-          [-6.5733, 106.8743],
+          [-6.5734, 106.8750],
+          [-6.5732, 106.8758],
+          [-6.5738, 106.8755],
+          [-6.5740, 106.8747],
         ]
       ]
     },
@@ -256,13 +273,13 @@ export const mockSubmissions: Submission[] = [
   {
     id: 'sub-3',
     submissionNo: 'SIPAS-2026-003',
-    housingName: 'Pakuan Executive Heights',
+    housingName: 'Ciawi Hotel & Resort Area',
     developerName: 'PT Graha Kencana',
     landArea: 8000,
     submissionDate: '2026-06-15',
     status: 'Verifikasi Teknis',
     kdbPercent: 58.6,
-    klbValue: 3.1,
+    klbValue: 5.5,
     kdhPercent: 11.2,
     rthArea: 2072,
     psuArea: 850,
@@ -277,45 +294,53 @@ export const mockSubmissions: Submission[] = [
       { date: '2026-06-17 13:00', status: 'Verifikasi Teknis', notes: 'Pemeriksaan kesesuaian ruang, GSB, RTH, dan jalan oleh Tim Teknis', actor: 'Ir. Budi Santoso (Tim Teknis)' }
     ],
     location: {
-      lat: -6.619042,
-      lng: 106.802315,
-      address: 'Jl. Pakuan No.3, Kec. Bogor Selatan, Kota Bogor, Jawa Barat',
+      lat: -6.655,
+      lng: 106.865,
+      address: 'Jl. Raya Puncak - Gadog No.45, Bendungan, Kec. Ciawi, Kabupaten Bogor, Jawa Barat',
       polygon: [
-        [-6.6180, 106.8015],
-        [-6.6180, 106.8030],
-        [-6.6200, 106.8030],
-        [-6.6200, 106.8015],
+        [-6.653, 106.863],
+        [-6.653, 106.867],
+        [-6.657, 106.867],
+        [-6.657, 106.865],
+        [-6.655, 106.865],
+        [-6.655, 106.863],
       ],
       roadPolygons: [
         [
-          [-6.6190, 106.8015],
-          [-6.6190, 106.8030],
-          [-6.6192, 106.8030],
-          [-6.6192, 106.8015],
+          [-6.654, 106.8635],
+          [-6.654, 106.8665],
+          [-6.6545, 106.8665],
+          [-6.6545, 106.8635],
         ]
       ],
       rthPolygons: [
         [
-          [-6.6180, 106.8015],
-          [-6.6180, 106.8022],
-          [-6.6188, 106.8022],
-          [-6.6188, 106.8015],
+          [-6.6531, 106.8635],
+          [-6.6531, 106.8645],
+          [-6.6538, 106.8645],
+          [-6.6538, 106.8635],
         ]
       ],
       psuPolygons: [
         [
-          [-6.6180, 106.8025],
-          [-6.6180, 106.8030],
-          [-6.6188, 106.8030],
-          [-6.6188, 106.8025],
+          [-6.6531, 106.8650],
+          [-6.6531, 106.8665],
+          [-6.6538, 106.8665],
+          [-6.6538, 106.8650],
         ]
       ],
       kavlingPolygons: [
         [
-          [-6.6193, 106.8015],
-          [-6.6193, 106.8030],
-          [-6.6199, 106.8030],
-          [-6.6199, 106.8015],
+          [-6.6548, 106.8635],
+          [-6.6548, 106.8645],
+          [-6.6558, 106.8645],
+          [-6.6558, 106.8635],
+        ],
+        [
+          [-6.6550, 106.8655],
+          [-6.6550, 106.8665],
+          [-6.6568, 106.8665],
+          [-6.6568, 106.8655],
         ]
       ]
     },
@@ -331,19 +356,19 @@ export const mockSubmissions: Submission[] = [
     },
     submissionDetails: {
       submissionType: 'BARU',
-      activityName: 'Pakuan Executive Heights',
+      activityName: 'Ciawi Hotel & Resort Area',
       category: 'NON_PERUMAHAN'
     },
     locationDetails: {
       locationName: 'Lahan Pakuan Heights',
-      village: 'Muarasari',
-      district: 'Bogor Selatan',
-      city: 'Kota Bogor',
+      village: 'Bendungan',
+      district: 'Ciawi',
+      city: 'Kabupaten Bogor',
       province: 'Jawa Barat',
-      fullAddress: 'Jl. Pakuan No.3, Kec. Bogor Selatan, Kota Bogor, Jawa Barat',
+      fullAddress: 'Jl. Raya Puncak - Gadog No.45, Bendungan, Kec. Ciawi, Kabupaten Bogor, Jawa Barat',
       landArea: 8000,
       ownershipStatus: 'SHM',
-      certificateNumber: 'SHM No. 892/Muarasari',
+      certificateNumber: 'SHM No. 892/Bendungan',
       certificateOwner: 'PT Graha Kencana'
     },
     spatial: {
@@ -354,10 +379,10 @@ export const mockSubmissions: Submission[] = [
     technical: {
       buildingBlocks: 3,
       kdb: 58.6,
-      klb: 3.1,
+      klb: 5.5,
       kdh: 11.2,
       parkingCapacity: 150,
-      maxFloors: 5,
+      maxFloors: 10,
       totalFloorArea: 24000
     },
     consultant: {
@@ -376,13 +401,13 @@ export const mockSubmissions: Submission[] = [
   {
     id: 'sub-4',
     submissionNo: 'SIPAS-2026-004',
-    housingName: 'Pajajaran Regency',
+    housingName: 'Gunung Putri Industrial Park',
     developerName: 'PT Bangun Bumi Persada',
     landArea: 32000,
     submissionDate: '2026-06-10',
     status: 'Disetujui',
     kdbPercent: 54.8,
-    klbValue: 2.5,
+    klbValue: 3.5,
     kdhPercent: 14.2,
     rthArea: 4544,
     psuArea: 1800,
@@ -399,45 +424,46 @@ export const mockSubmissions: Submission[] = [
       { date: '2026-06-14 09:30', status: 'Disetujui', notes: 'Site plan disahkan oleh Kepala Bidang. SK telah terbit.', actor: 'Dr. Hendra Wijaya (Kabid)' }
     ],
     location: {
-      lat: -6.601552,
-      lng: 106.808776,
-      address: 'Kecamatan Bogor Tengah, Kota Bogor, Jawa Barat',
+      lat: -6.425,
+      lng: 106.905,
+      address: 'Kawasan Industri Wanaherang, Kec. Gunung Putri, Kabupaten Bogor, Jawa Barat',
       polygon: [
-        [-6.6005, 106.8080],
-        [-6.6005, 106.8095],
-        [-6.6025, 106.8095],
-        [-6.6025, 106.8080],
+        [-6.422, 106.902],
+        [-6.422, 106.908],
+        [-6.426, 106.908],
+        [-6.426, 106.904],
+        [-6.424, 106.902],
       ],
       roadPolygons: [
         [
-          [-6.6012, 106.8080],
-          [-6.6012, 106.8095],
-          [-6.6014, 106.8095],
-          [-6.6014, 106.8080],
+          [-6.423, 106.9025],
+          [-6.423, 106.9075],
+          [-6.4233, 106.9075],
+          [-6.4233, 106.9025],
         ]
       ],
       rthPolygons: [
         [
-          [-6.6005, 106.8080],
-          [-6.6005, 106.8087],
-          [-6.6010, 106.8087],
-          [-6.6010, 106.8080],
+          [-6.4221, 106.9025],
+          [-6.4221, 106.9075],
+          [-6.4228, 106.9075],
+          [-6.4228, 106.9025],
         ]
       ],
       psuPolygons: [
         [
-          [-6.6005, 106.8089],
-          [-6.6005, 106.8095],
-          [-6.6010, 106.8095],
-          [-6.6010, 106.8089],
+          [-6.4235, 106.9025],
+          [-6.4235, 106.9040],
+          [-6.4245, 106.9040],
+          [-6.4245, 106.9025],
         ]
       ],
       kavlingPolygons: [
         [
-          [-6.6015, 106.8080],
-          [-6.6015, 106.8095],
-          [-6.6024, 106.8095],
-          [-6.6024, 106.8080],
+          [-6.4235, 106.9045],
+          [-6.4235, 106.9075],
+          [-6.4255, 106.9075],
+          [-6.4255, 106.9045],
         ]
       ]
     },
@@ -453,24 +479,24 @@ export const mockSubmissions: Submission[] = [
     },
     submissionDetails: {
       submissionType: 'BARU',
-      activityName: 'Pajajaran Regency',
+      activityName: 'Gunung Putri Industrial Park',
       category: 'PERUMAHAN'
     },
     locationDetails: {
-      locationName: 'Lahan Pajajaran Tengah',
-      village: 'Babakan',
-      district: 'Bogor Tengah',
-      city: 'Kota Bogor',
+      locationName: 'Lahan Gunung Putri Wanaherang',
+      village: 'Wanaherang',
+      district: 'Gunung Putri',
+      city: 'Kabupaten Bogor',
       province: 'Jawa Barat',
-      fullAddress: 'Kecamatan Bogor Tengah, Kota Bogor, Jawa Barat',
+      fullAddress: 'Kawasan Industri Wanaherang, Kec. Gunung Putri, Kabupaten Bogor, Jawa Barat',
       landArea: 32000,
       ownershipStatus: 'SHM',
-      certificateNumber: 'SHM No. 441/Babakan',
+      certificateNumber: 'SHM No. 441/Wanaherang',
       certificateOwner: 'PT Bangun Bumi Persada'
     },
     spatial: {
       kkprNumber: '503/KKPR/PUPR/2026/020',
-      landUse: 'Zona Pemukiman Kepadatan Tinggi',
+      landUse: 'Zona Industri / Pergudangan',
       greenArea: 4544
     },
     technical: {
@@ -479,7 +505,7 @@ export const mockSubmissions: Submission[] = [
       cemeteryArea: 640,
       roadRowMain: '14 Meter',
       roadRowLocal: '8 Meter',
-      waterSystem: 'PDAM / Sumur Bor Terpusat'
+      waterSystem: 'Sumur Bor Terpusat'
     },
     consultant: {
       consultantName: 'Ir. Rudi Hartono',
@@ -497,13 +523,13 @@ export const mockSubmissions: Submission[] = [
   {
     id: 'sub-5',
     submissionNo: 'SIPAS-2026-005',
-    housingName: 'Batu Tulis Residence',
+    housingName: 'Puncak Mountain Villa Resort',
     developerName: 'PT Jaya Real Estate',
     landArea: 12000,
     submissionDate: '2026-06-08',
     status: 'Ditolak',
     kdbPercent: 60.5,
-    klbValue: 3.2,
+    klbValue: 2.2,
     kdhPercent: 12.1,
     rthArea: 1452,
     psuArea: 500,
@@ -518,45 +544,64 @@ export const mockSubmissions: Submission[] = [
       { date: '2026-06-11 11:00', status: 'Ditolak', notes: 'Ditolak secara resmi oleh sistem dengan alasan teknis sempadan sungai.', actor: 'Ir. Budi Santoso (Tim Teknis)' }
     ],
     location: {
-      lat: -6.621234,
-      lng: 106.811234,
-      address: 'Batu Tulis, Kec. Bogor Selatan, Kota Bogor, Jawa Barat',
+      lat: -6.695,
+      lng: 106.935,
+      address: 'Jl. Raya Puncak Km. 82, Cisarua, Kec. Cisarua, Kabupaten Bogor, Jawa Barat',
       polygon: [
-        [-6.6205, 106.8105],
-        [-6.6205, 106.8120],
-        [-6.6220, 106.8120],
-        [-6.6220, 106.8105],
+        [-6.693, 106.932],
+        [-6.693, 106.937],
+        [-6.696, 106.938],
+        [-6.698, 106.935],
+        [-6.696, 106.932],
       ],
       roadPolygons: [
         [
-          [-6.6210, 106.8105],
-          [-6.6210, 106.8120],
-          [-6.6212, 106.8120],
-          [-6.6212, 106.8105],
+          [-6.694, 106.9325],
+          [-6.694, 106.9375],
+          [-6.6943, 106.9375],
+          [-6.6943, 106.9325],
         ]
       ],
       rthPolygons: [
         [
-          [-6.6205, 106.8105],
-          [-6.6205, 106.8112],
-          [-6.6209, 106.8112],
-          [-6.6209, 106.8105],
+          [-6.6931, 106.9325],
+          [-6.6931, 106.9375],
+          [-6.6938, 106.9375],
+          [-6.6938, 106.9325],
         ]
       ],
       psuPolygons: [
         [
-          [-6.6205, 106.8113],
-          [-6.6205, 106.8120],
-          [-6.6209, 106.8120],
-          [-6.6209, 106.8113],
+          [-6.6945, 106.9325],
+          [-6.6945, 106.9345],
+          [-6.6955, 106.9345],
+          [-6.6955, 106.9325],
         ]
       ],
       kavlingPolygons: [
         [
-          [-6.6213, 106.8105],
-          [-6.6213, 106.8120],
-          [-6.6219, 106.8120],
-          [-6.6219, 106.8105],
+          [-6.6945, 106.9350],
+          [-6.6945, 106.9358],
+          [-6.6952, 106.9358],
+          [-6.6952, 106.9350],
+        ],
+        [
+          [-6.6945, 106.9362],
+          [-6.6945, 106.9370],
+          [-6.6952, 106.9370],
+          [-6.6952, 106.9362],
+        ],
+        [
+          [-6.6958, 106.9350],
+          [-6.6958, 106.9358],
+          [-6.6965, 106.9358],
+          [-6.6965, 106.9350],
+        ],
+        [
+          [-6.6958, 106.9362],
+          [-6.6958, 106.9370],
+          [-6.6965, 106.9370],
+          [-6.6965, 106.9362],
         ]
       ]
     },
@@ -572,30 +617,30 @@ export const mockSubmissions: Submission[] = [
     },
     submissionDetails: {
       submissionType: 'BARU',
-      activityName: 'Batu Tulis Residence',
+      activityName: 'Puncak Mountain Villa Resort',
       category: 'NON_PERUMAHAN'
     },
     locationDetails: {
-      locationName: 'Lahan Batu Tulis',
-      village: 'Batutulis',
-      district: 'Bogor Selatan',
-      city: 'Kota Bogor',
+      locationName: 'Lahan Batu Tulis Puncak',
+      village: 'Cisarua',
+      district: 'Cisarua',
+      city: 'Kabupaten Bogor',
       province: 'Jawa Barat',
-      fullAddress: 'Batu Tulis, Kec. Bogor Selatan, Kota Bogor, Jawa Barat',
+      fullAddress: 'Jl. Raya Puncak Km. 82, Cisarua, Kec. Cisarua, Kabupaten Bogor, Jawa Barat',
       landArea: 12000,
       ownershipStatus: 'SHM',
-      certificateNumber: 'SHM No. 673/Batutulis',
+      certificateNumber: 'SHM No. 673/Cisarua',
       certificateOwner: 'Ir. Heru Prasetyo'
     },
     spatial: {
       kkprNumber: '503/KKPR/PUPR/2026/304',
-      landUse: 'Zona Cagar Budaya & Resapan Air',
+      landUse: 'Zona Pariwisata / Villa',
       greenArea: 1452
     },
     technical: {
       buildingBlocks: 2,
       kdb: 60.5,
-      klb: 3.2,
+      klb: 2.2,
       kdh: 12.1,
       parkingCapacity: 40,
       maxFloors: 3,
