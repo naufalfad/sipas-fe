@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Sun, RotateCw, ArrowLeft, MousePointer2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { mockSubmissions } from "@/mock/submission/submissions";
+import { useQuery } from '@tanstack/react-query';
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 
 export default function BimViewerPage() {
     const mountRef = useRef<HTMLDivElement>(null);
@@ -13,11 +15,14 @@ export default function BimViewerPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
 
-    const housingName = useMemo(() => {
-        if (!id) return "Peninjau 3D CAD/BIM";
-        const sub = mockSubmissions.find(s => s.id === id);
-        return sub ? sub.housingName : "Peninjau 3D CAD/BIM";
-    }, [id]);
+    const { data: submission } = useQuery<Submission>({
+        queryKey: ['submission', id],
+        queryFn: () => id ? SubmissionService.getById(id) : Promise.reject(new Error('Invalid submission id')),
+        enabled: !!id,
+        retry: false,
+    });
+
+    const housingName = submission?.housingName || "Peninjau 3D CAD/BIM";
 
     useEffect(() => {
         const container = mountRef.current;
@@ -122,7 +127,7 @@ export default function BimViewerPage() {
 
         // ─── BUILDINGS ────────────────────────────────────────────────────────────
         const houseMat = new THREE.MeshLambertMaterial({ color: 0x0f766e });
-        const roofMat  = new THREE.MeshLambertMaterial({ color: 0x134e4a });
+        const roofMat = new THREE.MeshLambertMaterial({ color: 0x134e4a });
         const facilityMat = new THREE.MeshLambertMaterial({ color: 0xd97706 });
         const facilityRoofMat = new THREE.MeshLambertMaterial({ color: 0x92400e });
 
@@ -131,7 +136,7 @@ export default function BimViewerPage() {
         const allGeoms: THREE.BufferGeometry[] = [];
 
         const placeBuilding = (
-            x: number, z: number, w: number, d: number, h: number, 
+            x: number, z: number, w: number, d: number, h: number,
             bodyMat: THREE.Material, roofMaterial: THREE.Material
         ) => {
             const bodyGeom = new THREE.BoxGeometry(w, h, d);
@@ -337,11 +342,10 @@ export default function BimViewerPage() {
                 <div className="pointer-events-auto flex items-center gap-3">
                     <button
                         onClick={handleSunToggle}
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all shadow-xl cursor-pointer outline-none ${
-                            isSimulatingSun
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all shadow-xl cursor-pointer outline-none ${isSimulatingSun
                                 ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30"
                                 : "bg-slate-900/80 text-slate-300 border-slate-700/50 hover:bg-slate-800 hover:text-white"
-                        }`}
+                            }`}
                     >
                         <Sun size={16} className={isSimulatingSun ? "animate-spin" : ""} style={isSimulatingSun ? { animationDuration: "3s" } : {}} />
                         {isSimulatingSun ? "Hentikan Simulasi" : "Simulasi Matahari"}

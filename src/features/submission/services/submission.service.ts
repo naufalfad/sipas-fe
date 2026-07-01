@@ -1,4 +1,3 @@
-import { mockSubmissions } from '@/mock/submission/submissions';
 import type { Submission, SubmissionStatus } from '../types';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 
@@ -15,35 +14,25 @@ const getAuthHeaders = (extraHeaders?: Record<string, string>) => {
 
 export const SubmissionService = {
   getAll: async (): Promise<Submission[]> => {
-    try {
-      const response = await fetch(API_BASE_URL, {
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) throw new Error('API error');
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      console.warn('[SubmissionService] Gagal memuat dari API backend, menggunakan data mock lokal:', err);
-      return new Promise((resolve) => {
-        setTimeout(() => resolve([...mockSubmissions]), 400);
-      });
+    const response = await fetch(API_BASE_URL, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat daftar permohonan (HTTP ${response.status})`);
     }
+    return await response.json();
   },
 
-  getById: async (id: string): Promise<Submission | undefined> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${id}`, {
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) throw new Error('API error');
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      console.warn(`[SubmissionService] Gagal memuat ID ${id} dari API backend, menggunakan data mock lokal:`, err);
-      return new Promise((resolve) => {
-        setTimeout(() => resolve(mockSubmissions.find(s => s.id === id || s.submissionNo === id)), 300);
-      });
+  getById: async (id: string): Promise<Submission> => {
+    const response = await fetch(`${API_BASE_URL}/${id}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Permohonan dengan ID ${id} tidak ditemukan (HTTP ${response.status})`);
     }
+    return await response.json();
   },
 
   create: async (data: FullSubmissionFormValues, isDraft = false): Promise<Submission> => {
@@ -65,164 +54,74 @@ export const SubmissionService = {
         const errText = await response.text();
         throw new Error(errText || 'Gagal menyimpan permohonan ke API backend');
       }
-      
-      // Jika sukses, kita panggil getById untuk mendapatkan model kaya dari server
+
       const result = await response.json();
-      const serverSub = await fetch(`${API_BASE_URL}/${id_permohonan}`, {
-        headers: getAuthHeaders()
-      }).then(res => res.json()).catch(() => null);
-      if (serverSub) return serverSub;
-
-      // Fallback object jika detail endpoint bermasalah
-      return {
-        id: id_permohonan,
-        submissionNo: `SIPAS-2026-0${mockSubmissions.length + 1}`,
-        housingName: data.submission.activityName,
-        developerName: data.applicant.name,
-        landArea: data.location.landArea,
-        submissionDate: new Date().toISOString().split('T')[0],
-        status: 'Menunggu Verifikasi',
-        location: {
-          lat: -6.595189,
-          lng: 106.816629,
-          address: data.location.fullAddress,
-          polygon: data.coordinate.polygon || []
-        }
-      } as any;
-
+      const createdId = result?.data?.id_permohonan || id_permohonan;
+      return await SubmissionService.getById(createdId);
     } catch (err) {
-      console.warn('[SubmissionService] Gagal menyimpan ke API backend, menyimpan ke data mock lokal:', err);
-      return new Promise((resolve) => {
-        const newSub: Submission = {
-          id: id_permohonan,
-          submissionNo: `SIPAS-2026-0${mockSubmissions.length + 1}`,
-          housingName: data.submission.activityName,
-          developerName: data.applicant.name,
-          landArea: data.location.landArea,
-          submissionDate: new Date().toISOString().split('T')[0],
-          status: 'Menunggu Verifikasi',
-          documents: [
-            { id: `doc-${Date.now()}-1`, name: 'Surat Permohonan.pdf', type: 'pdf', url: '#', uploadedAt: new Date().toISOString().split('T')[0] },
-            { id: `doc-${Date.now()}-2`, name: 'Surat Pengantar Dinas.pdf', type: 'pdf', url: '#', uploadedAt: new Date().toISOString().split('T')[0] }
-          ],
-          history: [
-            { date: new Date().toISOString().replace('T', ' ').slice(0, 16), status: 'Menunggu Verifikasi', notes: 'Berkas berhasil dikirim dan menunggu pemeriksaan berkas', actor: data.applicant.name }
-          ],
-          location: {
-            lat: -6.595189 + (Math.random() - 0.5) * 0.05,
-            lng: 106.816629 + (Math.random() - 0.5) * 0.05,
-            address: data.location.fullAddress,
-            polygon: data.coordinate.polygon || [
-              [106.8160, -6.5945],
-              [106.8175, -6.5945],
-              [106.8175, -6.5960],
-              [106.8160, -6.5960],
-              [106.8160, -6.5945]
-            ]
-          },
-          applicant: {
-            type: data.applicant.type,
-            name: data.applicant.name,
-            nik: data.applicant.nik,
-            nib: data.applicant.nib,
-            npwp: data.applicant.npwp,
-            directorName: data.applicant.directorName,
-            phone: data.applicant.phone,
-            email: data.applicant.email,
-            address: data.applicant.address
-          },
-          submissionDetails: {
-            submissionType: data.submission.submissionType,
-            activityName: data.submission.activityName,
-            category: data.submission.category
-          },
-          locationDetails: {
-            locationName: data.location.locationName,
-            village: data.location.village,
-            district: data.location.district,
-            city: data.location.city,
-            province: data.location.province,
-            fullAddress: data.location.fullAddress,
-            landArea: data.location.landArea,
-            ownershipStatus: data.location.ownershipStatus,
-            certificateNumber: data.location.certificateNumber,
-            certificateOwner: data.location.certificateOwner
-          },
-          spatial: {
-            kkprNumber: data.spatial.kkprNumber,
-            landUse: data.spatial.landUse,
-            greenArea: data.spatial.greenArea
-          },
-          technical: {
-            ...data.technical
-          },
-          consultant: {
-            consultantName: data.consultant.consultantName,
-            companyName: data.consultant.companyName,
-            picName: data.consultant.picName
-          },
-          photos: {
-            photoNorth: data.photo?.photoNorth instanceof File ? URL.createObjectURL(data.photo.photoNorth) : 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
-            photoSouth: data.photo?.photoSouth instanceof File ? URL.createObjectURL(data.photo.photoSouth) : 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80',
-            photoEast: data.photo?.photoEast instanceof File ? URL.createObjectURL(data.photo.photoEast) : 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
-            photoWest: data.photo?.photoWest instanceof File ? URL.createObjectURL(data.photo.photoWest) : 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
-            photoAccess: data.photo?.photoAccess instanceof File ? URL.createObjectURL(data.photo.photoAccess) : 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80',
-          }
-        };
-        mockSubmissions.unshift(newSub);
-        setTimeout(() => resolve(newSub), 500);
-      });
+      const errorMessage = err instanceof Error ? err.message : 'Gagal menyimpan permohonan ke API backend';
+      throw new Error(errorMessage);
     }
   },
 
-  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string): Promise<Submission | undefined> => {
+  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string, passphrase?: string): Promise<Submission | undefined> => {
     // Parsing data aktor dan role untuk integrasi /verify
     const nameMatch = actor.match(/^([^(]+)/);
     const roleMatch = actor.match(/\(([^)]+)\)/);
     const actor_name = nameMatch ? nameMatch[1].trim() : actor;
-    const role = roleMatch ? roleMatch[1].trim() : 'Pemohon';
-    
-    // Tentukan action_type
-    const action_type = status === 'Ditolak' ? 'REJECT' : 'APPROVE';
+    const rawRole = roleMatch ? roleMatch[1].trim() : 'Pemohon';
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/${id}/verify`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          actor_name,
-          role,
-          nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
-          action_type,
-          notes,
-          is_spatially_compliant: true
-        })
-      });
-      if (!response.ok) throw new Error('API error during verify');
-      
-      const serverSub = await fetch(`${API_BASE_URL}/${id}`, {
-        headers: getAuthHeaders()
-      }).then(res => res.json()).catch(() => null);
-      if (serverSub) return serverSub;
-    } catch (err) {
-      console.warn(`[SubmissionService] Gagal verifikasi ID ${id} di API backend, mengupdate data mock lokal:`, err);
+    // Map role FE → BE (sesuai enum UserModel.role di database)
+    let role = 'ADMIN';
+    if (rawRole.toUpperCase().includes('KABID') || rawRole.toUpperCase().includes('BIDANG')) {
+      role = 'KABID_PUPR';
+    } else if (rawRole.toUpperCase().includes('TEKNIS')) {
+      role = 'TIM_TEKNIS';
+    } else if (rawRole.toUpperCase().includes('PEMOHON')) {
+      role = 'PEMOHON';
     }
 
-    // Local update fallback
-    return new Promise((resolve) => {
-      const sub = mockSubmissions.find(s => s.id === id || s.submissionNo === id);
-      if (sub) {
-        sub.status = status;
-        sub.history.push({
-          date: new Date().toISOString().replace('T', ' ').slice(0, 16),
-          status,
-          notes,
-          actor,
-        });
-      }
-      setTimeout(() => resolve(sub), 500);
+    // Tentukan action_type berdasarkan status target
+    const action_type = status === 'Ditolak' ? 'REJECT' : 'APPROVE';
+
+    // ── FASE 1: Kirim keputusan verifikasi ke API Backend ──────────────────
+    const verifyResponse = await fetch(`${API_BASE_URL}/${id}/verify`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        actor_name,
+        role,
+        nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
+        passphrase: passphrase || undefined,
+        action_type,
+        notes,
+        is_spatially_compliant: true
+      })
     });
+
+    // Jika API mengembalikan error (4xx/5xx), ekstrak pesan dan throw — jangan fallback ke mock
+    if (!verifyResponse.ok) {
+      let errMsg = `Gagal memverifikasi permohonan (HTTP ${verifyResponse.status})`;
+      try {
+        const errData = await verifyResponse.json();
+        errMsg = errData.detail || errMsg;
+      } catch { /* biarkan pesan default jika response bukan JSON */ }
+      throw new Error(errMsg);
+    }
+
+    // ── FASE 2: Ambil data terbaru dari server untuk memperbarui UI ────────
+    const refreshResponse = await fetch(`${API_BASE_URL}/${id}`, {
+      headers: getAuthHeaders()
+    });
+
+    if (!refreshResponse.ok) {
+      const errText = await refreshResponse.text();
+      throw new Error(errText || `Gagal memuat ulang permohonan setelah verifikasi (HTTP ${refreshResponse.status})`);
+    }
+
+    return await refreshResponse.json();
   },
+
 
   getGeometries: async (id_permohonan: string): Promise<{
     roadPolygons?: number[][][];

@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -8,6 +10,8 @@ import {
 } from 'lucide-react';
 
 export default function RolesPage() {
+  const { user } = useAuthStore();
+  const activeRole = user ? normalizeRole(user.role) : 'Super Admin';
 
   // Matriks Otoritas Tingkatan Hak Akses GEOSIPAS sesuai Perbup Bogor No. 4 Tahun 2025
   const rolesMatrix = [
@@ -56,8 +60,17 @@ export default function RolesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {rolesMatrix.map((matrix, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                {rolesMatrix.map((matrix, idx) => {
+                  const isActiveRole = normalizeRole(matrix.role) === normalizeRole(activeRole);
+                  return (
+                    <tr
+                      key={idx}
+                      className={`transition-colors ${
+                        isActiveRole 
+                          ? 'bg-[#e8f2ea]/40 border-l-2 border-primary font-bold' 
+                          : 'hover:bg-slate-50/40'
+                      }`}
+                    >
                     {/* Tingkat Peran */}
                     <td className="px-4 py-3.5 font-bold text-slate-800 text-left">
                       <div className="flex items-center space-x-1.5 text-slate-800">
@@ -86,7 +99,8 @@ export default function RolesPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

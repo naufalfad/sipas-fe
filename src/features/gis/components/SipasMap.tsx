@@ -34,7 +34,6 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { toast } from 'sonner';
 
 import { useGisUIStore } from '@/app/store/useGisUIStore';
-import { mockSubmissions } from '@/mock/submission/submissions';
 import type { Submission } from '@/features/submission/types';
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
@@ -583,7 +582,6 @@ export default function SipasMap() {
     const { data: submissions = [] } = useQuery<Submission[]>({
         queryKey: ['submissions'],
         queryFn: SubmissionService.getAll,
-        initialData: mockSubmissions,
     });
 
     useEffect(() => {

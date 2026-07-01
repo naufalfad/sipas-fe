@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
+import { useQuery } from '@tanstack/react-query';
 import { Search, ClipboardList, ChevronRight, MapPin } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
-import { mockSubmissions } from "@/mock/submission/submissions";
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 import { cn } from "@/lib/utils";
 
 /**
@@ -33,9 +35,14 @@ export default function SubmissionListPanel() {
         { value: "Ditolak", label: "Ditolak" }
     ];
 
+    const { data: submissions = [] } = useQuery<Submission[]>({
+        queryKey: ['submissions'],
+        queryFn: SubmissionService.getAll,
+    });
+
     // Penapisan Gabungan (Pencarian Teks & Status Pengajuan) [sipas-fe.txt]
     const filteredSubmissions = useMemo(() => {
-        return mockSubmissions.filter((sub) => {
+        return submissions.filter((sub) => {
             const matchesSearch =
                 sub.housingName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 sub.developerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -45,7 +52,7 @@ export default function SubmissionListPanel() {
 
             return matchesSearch && matchesStatus;
         });
-    }, [searchQuery, statusFilter]);
+    }, [searchQuery, statusFilter, submissions]);
 
     // Handler interaksi baris pengajuan (Satu Sentuhan Spasial) [limbah-fe-gis-only.txt]
     const handleItemClick = (sub: any) => {

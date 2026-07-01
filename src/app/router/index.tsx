@@ -1,7 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
 
-// Page Imports
+// Component & Page Imports
 import DashboardPage from '@/features/dashboard/pages/DashboardPage';
 import SubmissionListPage from '@/features/submission/pages/SubmissionListPage';
 import SubmissionCreatePage from '@/features/submission/pages/SubmissionCreatePage';
@@ -18,21 +18,41 @@ import RolesPage from '@/features/users/pages/RolesPage';
 import ReferencesPage from '@/features/users/pages/ReferencesPage';
 import ProfilePage from '@/features/users/pages/ProfilePage';
 
+// Auth Pages & Route Guard
+import LoginPage from '@/features/auth/pages/LoginPage';
+import RegisterPage from '@/features/auth/pages/RegisterPage';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+
 /**
  * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
  * 
- * Sesuai prinsip Low Coupling & High Cohesion, rute dipisahkan menjadi dua kelompok utama:
- * 1. Kelompok Administratif (Dibalut oleh DashboardLayout):
+ * Sesuai prinsip Low Coupling & High Cohesion, rute dipisahkan menjadi kelompok:
+ * 1. Public Routes: Login dan Register (tidak dilindungi)
+ * 2. Kelompok Administratif (Dibalut oleh DashboardLayout & ProtectedRoute):
  *    Menyajikan halaman tabular, form administratif, laporan, dan pengelolaan data master.
- * 2. Kelompok Spasial Imersif (GIS Page berdiri sendiri):
+ * 3. Kelompok Spasial Imersif (GIS Page dilindungi Route Guard):
  *    Diletakkan di tingkat teratas agar komponen peta dapat mengonsumsi 100% ruang
- *    viewport peramban tanpa terhalang atau terpotong oleh layout pembungkus dashboard.
+ *    viewport peramban.
  */
 export const router = createBrowserRouter([
-  // 1. KELOMPOK ADMINISTRATIF (Dashboard & Dokumen)
+  // 1. PUBLIC ROUTES
+  {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
+  },
+
+  // 2. KELOMPOK ADMINISTRATIF (Dashboard & Dokumen - Terlindungi)
   {
     path: '/',
-    element: <DashboardLayout />,
+    element: (
+      <ProtectedRoute>
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -55,11 +75,19 @@ export const router = createBrowserRouter([
           },
           {
             path: 'tambah',
-            element: <SubmissionCreatePage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Pemohon', 'Super Admin']}>
+                <SubmissionCreatePage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'edit/:id',
-            element: <SubmissionCreatePage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Pemohon', 'Super Admin']}>
+                <SubmissionCreatePage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'detail/:id',
@@ -86,11 +114,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'verifikasi',
-        element: <VerificationPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+            <VerificationPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'persetujuan',
-        element: <ApprovalQueuePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['Kepala Bidang', 'Super Admin']}>
+            <ApprovalQueuePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'profil',
@@ -98,40 +134,63 @@ export const router = createBrowserRouter([
       },
       {
         path: 'laporan',
-        element: <ReportsPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Kepala Bidang', 'Super Admin']}>
+            <ReportsPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'master',
         children: [
           {
             path: 'pengguna',
-            element: <UsersPage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <UsersPage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'role',
-            element: <RolesPage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <RolesPage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'referensi',
-            element: <ReferencesPage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <ReferencesPage />
+              </ProtectedRoute>
+            ),
           },
         ],
       },
     ],
   },
 
-  // 2. KELOMPOK SPASIAL (Immersive Infinite Canvas)
-  // Dilepas dari anak DashboardLayout agar peta bebas mengonsumsi seluruh resolusi layar monitor.
+  // 3. KELOMPOK SPASIAL (Immersive Infinite Canvas - Terlindungi)
   {
     path: '/gis',
-    element: <GISPage />,
+    element: (
+      <ProtectedRoute allowedRoles={['Pemohon', 'Tim Teknis', 'Super Admin']}>
+        <GISPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/gis/bim/:id',
-    element: <BimViewerPage />,
+    element: (
+      <ProtectedRoute allowedRoles={['Pemohon', 'Tim Teknis', 'Super Admin']}>
+        <BimViewerPage />
+      </ProtectedRoute>
+    ),
   },
 
-  // 3. FALLBACK REDIRECT (Fail-Safe Routing)
+  // 4. FALLBACK REDIRECT (Fail-Safe Routing)
   {
     path: '*',
     element: <Navigate to="/dashboard" replace />,

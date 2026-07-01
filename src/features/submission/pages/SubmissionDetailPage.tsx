@@ -10,7 +10,7 @@ import {
   MapPin, File, Loader2,
   XCircle, CheckCircle, FileSignature, AlertTriangle, ShieldCheck,
   User, Phone, Mail, Award, HardHat, Camera, Landmark,
-  Scale, Globe
+  Scale, Globe, Fingerprint
 } from 'lucide-react';
 import { Source, Layer } from 'react-map-gl/maplibre';
 import GISMapContainer from '@/components/maps/GISMapContainer';
@@ -62,6 +62,7 @@ export default function SubmissionDetailPage() {
   const flyTo = useGisUIStore((s) => s.flyTo);
 
   const [notes, setNotes] = useState('');
+  const [passphrase, setPassphrase] = useState('');
   const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto'>('ringkasan');
 
   // Checklist states
@@ -88,17 +89,21 @@ export default function SubmissionDetailPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ status, notes }: { status: SubmissionStatus; notes: string }) => {
-      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes);
+    mutationFn: async ({ status, notes, passphrase }: { status: SubmissionStatus; notes: string; passphrase?: string }) => {
+      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes, passphrase);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submission', id] });
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
       setNotes('');
+      setPassphrase('');
       setAdminChecks({ ktp: false, sertifikat: false, npwp: false, kkpr: false });
       setTechChecks({ polygon: false, rth: false, utilities: false, cad: false });
       setKabidAgreed(false);
       toast.success('Status berkas berhasil diperbarui!');
+    },
+    onError: (error: Error) => {
+      toast.error(`Gagal memproses verifikasi: ${error.message}`);
     }
   });
 
@@ -190,7 +195,7 @@ export default function SubmissionDetailPage() {
 
   // --- LOGIKA KONTROL SLA CLOCK PAUSE/RESUME [Bogor 16] ---
   const isSlaPaused = sub.status === 'Ditolak' || sub.status === 'Draft';
-  const mockSlaDaysRemaining = sub.status === 'Disetujui' ? 0 : sub.status === 'Ditolak' ? 11 : 9;
+  const slaDaysRemaining = sub.remaining_sla_days ?? 0;
 
   // Helper variables for role-based conditional rendering
   const isAdminActive = activeRole === 'Admin SIPAS' || activeRole === 'Super Admin';
@@ -225,10 +230,21 @@ export default function SubmissionDetailPage() {
   const handleKabidAction = (approved: boolean) => {
     const targetStatus = approved ? 'Disetujui' : 'Ditolak';
     const defaultNotes = approved ? 'Dokumen Site Plan disahkan secara hukum menggunakan Tanda Tangan Elektronik (TTE) resmi dinas.' : 'Permohonan pengesahan ditolak oleh Kepala Bidang.';
+
+    if (approved && !passphrase) {
+      toast.error('Passphrase PIN TTE wajib diisi untuk melakukan pengesahan!');
+      return;
+    }
+    if (approved && passphrase.length < 6) {
+      toast.error('Passphrase PIN TTE minimal 6 karakter!');
+      return;
+    }
+
     mutation.mutate({
       status: targetStatus,
-      notes: notes.trim() || defaultNotes
-    });
+      notes: notes.trim() || defaultNotes,
+      passphrase: approved ? passphrase : undefined
+    } as any);
   };
 
   // Handler Visualisasi Lahan Kompensasi pada Peta Spasial [Purworejo 8]
@@ -286,12 +302,12 @@ export default function SubmissionDetailPage() {
           ) : sub.status === 'Disetujui' ? (
             <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
               <CheckCircle className="h-4 w-4 text-emerald-600" />
-              SLA: BERHASIL (9 Hari)
+              SLA: BERHASIL ({slaDaysRemaining} Hari)
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
               <Clock className="h-4 w-4 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
-              SLA: {mockSlaDaysRemaining} Hari Tersisa
+              SLA: {slaDaysRemaining} Hari Tersisa
             </div>
           )}
         </div>
@@ -1130,6 +1146,19 @@ export default function SubmissionDetailPage() {
                 />
               </div>
 
+              {/* Passphrase Input Field */}
+              <div className="space-y-1.5">
+                <label className={labelClass}>Passphrase PIN TTE Pejabat</label>
+                <input
+                  type="password"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  placeholder="Masukkan PIN TTE Anda (Min. 6 Karakter)..."
+                  className={inputClass}
+                  required
+                />
+              </div>
+
               {/* Tindakan */}
               <div className="pt-2 flex items-center justify-end gap-3">
                 <button
@@ -1166,9 +1195,24 @@ export default function SubmissionDetailPage() {
                   Berkas Site Plan Telah Disahkan
                 </h4>
                 <p className="text-[10px] text-slate-400 mt-1">Surat Keputusan (SK) resmi dan salinan digital peta rencana tapak telah terbit.</p>
+                <div className="mt-3">
+                  {sub.signatureHash ? (
+                    <span className="font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 break-all text-[10px] block">
+                      <Fingerprint className="inline mr-1" size={12} /> {sub.signatureHash}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 text-[10px]">Belum Ditandatangani Elektronik</span>
+                  )}
+                </div>
               </div>
               <button
-                onClick={() => window.alert(`Mengunduh Surat Keputusan Pengesahan Site Plan (${sub.submissionNo}-SK.pdf)...`)}
+                onClick={() => {
+                  if (sub.signedPdfUrl) {
+                    window.open(sub.signedPdfUrl, '_blank');
+                  } else {
+                    window.alert(`Mengunduh Surat Keputusan Pengesahan Site Plan (${sub.submissionNo}-SK.pdf)...`);
+                  }
+                }}
                 className="px-4 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs transition-colors rounded-none border-none cursor-pointer"
               >
                 Unduh Surat Keputusan (SK) PDF

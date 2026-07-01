@@ -1,13 +1,24 @@
 import { Link } from 'react-router-dom';
-import { mockSubmissions } from '@/mock/submission/submissions';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 import {
-  ShieldCheck, FileText, Map, AlertTriangle, Eye} from 'lucide-react';
+  ShieldCheck, FileText, Map, AlertTriangle, Eye
+} from 'lucide-react';
 
 export default function VerificationPage() {
+  const { data: submissions = [] } = useQuery<Submission[]>({
+    queryKey: ['submissions'],
+    queryFn: SubmissionService.getAll,
+  });
 
   // Ambil data antrean pengajuan yang saat ini berada dalam tahapan evaluasi/verifikasi dinas
-  const verificationQueue = mockSubmissions.filter(s =>
-    ['Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Menunggu Persetujuan'].includes(s.status)
+  const verificationQueue = useMemo(() =>
+    submissions.filter((s) =>
+      ['Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Menunggu Persetujuan'].includes(s.status)
+    ),
+    [submissions]
   );
 
   // Resolusi warna status badge sesuai standardisasi sistem organik baru (Celadon & Amber Pastel)

@@ -5,6 +5,7 @@ export type SubmissionStatus =
   | 'Verifikasi Administrasi'
   | 'Verifikasi Teknis'
   | 'Menunggu Persetujuan'
+  | 'Proses TTE'
   | 'Disetujui'
   | 'Ditolak';
 
@@ -125,20 +126,24 @@ export interface Submission {
   landArea: number; // Dalam satuan meter persegi (m²)
   submissionDate: string;
   status: SubmissionStatus;
+  base_sla_days?: number;
+  remaining_sla_days?: number;
+  signatureHash?: string;
+  signedPdfUrl?: string;
   // Penambahan parameter hasil hitung sistem (Slide 6)
-  kdbPercent?: number;  
-  klbValue ?: number;   
-  kdhPercent ?: number; 
-  rthArea ?: number;    
-  psuArea ?: number;     
-  roadArea ?: number;   
+  kdbPercent?: number;
+  klbValue?: number;
+  kdhPercent?: number;
+  rthArea?: number;
+  psuArea?: number;
+  roadArea?: number;
   documents: {
     id: string;
     name: string;
     type: 'pdf' | 'cad' | 'image';
     url: string;
     uploadedAt: string;
-  } [];
+  }[];
   history: StatusHistory[];
   location: ProjectLocation;
 
@@ -150,4 +155,4 @@ export interface Submission {
   technical?: TechnicalDetails;
   consultant?: ConsultantDetails;
   photos?: PhotoDetails;
-}
+}

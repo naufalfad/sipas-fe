@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
 import type { UserRole } from '@/app/store/useUIStore';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -127,7 +129,18 @@ const menuItems: MenuItem[] = [
 ];
 
 export default function DashboardLayout() {
-  const { sidebarOpen, activeRole, userProfile, toggleSidebar, setActiveRole } = useUIStore();
+  const { sidebarOpen, activeRole: uiActiveRole, userProfile: uiUserProfile, toggleSidebar, setActiveRole } = useUIStore();
+  const { user, logout } = useAuthStore();
+
+  const activeRole = user ? (normalizeRole(user.role) as UserRole) : uiActiveRole;
+  const userProfile = user ? {
+    name: user.full_name,
+    email: user.email,
+    avatar: user.role === 'PEMOHON'
+      ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+      : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces'
+  } : uiUserProfile;
+
   const location = useLocation();
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -279,40 +292,7 @@ export default function DashboardLayout() {
           {/* Sisi Kanan: Simulasi Role, Notifikasi, & Profil Dropdown */}
           <div className="flex items-center space-x-3.5">
 
-            {/* Widget Ganti Hak Akses (Simulasi Demo) */}
-            <div className="relative">
-              <button
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-secondary text-primary rounded-none text-[10px] font-bold uppercase tracking-wide hover:opacity-90 transition-all cursor-pointer outline-none border-none"
-              >
-                <span>Role: {activeRole}</span>
-                <ChevronDown className="h-3 w-3" />
-              </button>
 
-              {roleMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setRoleMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-none shadow-lg border border-border z-20 overflow-hidden text-left">
-                    <div className="px-3 py-2 text-[9px] font-black text-slate-400 bg-slate-50 border-b border-border uppercase tracking-widest leading-none">
-                      Ganti Hak Akses
-                    </div>
-                    {rolesList.map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => {
-                          setActiveRole(role);
-                          setRoleMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2 text-xs hover:bg-slate-50 transition-colors block border-none bg-transparent font-semibold text-slate-700 cursor-pointer ${activeRole === role ? 'font-black text-primary bg-secondary/50' : ''
-                          }`}
-                      >
-                        {role}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
 
             {/* Panel Notifikasi */}
             <div className="relative">
@@ -394,7 +374,10 @@ export default function DashboardLayout() {
                       Profil Saya
                     </Link>
                     <button
-                      onClick={() => setProfileOpen(false)}
+                      onClick={() => {
+                        setProfileOpen(false);
+                        logout();
+                      }}
                       className="w-full flex items-center px-4 py-2.5 text-xs text-rose-600 hover:bg-[#ef4444]/5 transition-colors text-left rounded-none border-none bg-transparent font-bold cursor-pointer"
                     >
                       <LogOut className="h-4 w-4 mr-3 text-rose-500" />

@@ -13,8 +13,10 @@
  */
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useGisUIStore } from '@/app/store/useGisUIStore';
-import { mockSubmissions } from '@/mock/submission/submissions';
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 import {
     FileText, Loader2, AlertTriangle, HelpCircle, Save, Globe
 } from 'lucide-react';
@@ -32,9 +34,13 @@ export default function CompensationPanel() {
     const activeKompensasiMap = useGisUIStore((s) => s.activeKompensasi);
 
     // Cari data permohonan terpilih untuk asosiasi data [sipas-fe.txt]
-    const currentSubmission = useMemo(() => {
-        return mockSubmissions.find(s => s.id === selectedCompanyId) || null;
-    }, [selectedCompanyId]);
+    const { data: currentSubmission } = useQuery<Submission | undefined>({
+        queryKey: ['submission', selectedCompanyId],
+        queryFn: () => selectedCompanyId ? SubmissionService.getById(selectedCompanyId) : Promise.reject(new Error('No submission selected')),
+        enabled: !!selectedCompanyId,
+        retry: false,
+        staleTime: 1000 * 60 * 2,
+    });
 
     // Form states
     const [tipeKompensasi, setTipeKompensasi] = useState<'LAHAN_SAWAH' | 'LAHAN_MAKAM_FISIK' | 'LAHAN_MAKAM_UANG' | 'PSU_FISIK_TAMBAHAN'>('LAHAN_MAKAM_FISIK');

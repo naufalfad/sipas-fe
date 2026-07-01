@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { mockUsers } from '@/mock/users/users';
+import { toast } from 'sonner';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import {
   UserCog,
   Plus,
@@ -10,8 +12,51 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
+interface UserItem {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: string;
+  status: 'Aktif' | 'Nonaktif';
+}
+
 export default function UsersPage() {
-  const [usersList, setUsersList] = useState(mockUsers);
+  const [usersList, setUsersList] = useState<UserItem[]>([]);
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8000/api/v1/auth/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('API error');
+      const data = await response.json();
+      const mapped = data.map((u: any, idx: number) => ({
+        id: `usr-${idx + 1}`,
+        username: u.username,
+        name: u.full_name,
+        email: u.email,
+        role: normalizeRole(u.role),
+        status: u.status
+      }));
+      setUsersList(mapped);
+    } catch (err) {
+      console.warn('[UsersPage] Gagal memuat dari BE, menggunakan mock data:', err);
+      // fallback
+      const fallback = mockUsers.map(u => ({
+        ...u,
+        username: u.email.split('@')[0]
+      }));
+      setUsersList(fallback as UserItem[]);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // Penyelarasan warna badge status ke dalam palet organik baru kita (Celadon & Rose Pastel)
   const getStatusBadgeClass = (status: 'Aktif' | 'Nonaktif') => {
@@ -29,11 +74,32 @@ export default function UsersPage() {
     window.alert(`Mengedit profil akun: ${name}`);
   };
 
-  const handleDeleteUser = (id: string, name: string) => {
+  const handleDeleteUser = async (username: string, name: string) => {
     if (window.confirm(`Apakah Anda yakin ingin menonaktifkan akun ${name}?`)) {
-      setUsersList(prev =>
-        prev.map(u => u.id === id ? { ...u, status: 'Nonaktif' } : u)
-      );
+      const toastId = toast.loading('Memproses penonaktifan akun...');
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:8000/api/v1/auth/users/${username}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'Nonaktif' })
+        });
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Gagal mengubah status pengguna.');
+        }
+        toast.success(`Akun ${name} berhasil dinonaktifkan.`, { id: toastId });
+        fetchUsers();
+      } catch (err: any) {
+        toast.error(err.message || 'Gagal merubah status.', { id: toastId });
+        // Local fallback
+        setUsersList(prev =>
+          prev.map(u => u.username === username ? { ...u, status: 'Nonaktif' } : u)
+        );
+      }
     }
   };
 
@@ -130,7 +196,7 @@ export default function UsersPage() {
                         {user.status === 'Aktif' && (
                           <div className="relative group inline-block">
                             <button
-                              onClick={() => handleDeleteUser(user.id, user.name)}
+                              onClick={() => handleDeleteUser(user.username || user.id, user.name)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-none bg-transparent transition-colors cursor-pointer outline-none"
                             >
                               <Trash2 className="h-3.5 w-3.5" />

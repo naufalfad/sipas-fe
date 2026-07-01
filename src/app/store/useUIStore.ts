@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAuthStore } from './useAuthStore';
 
 // ─── DEFINISI TIPE & ANTARMUKA MODULAR ──────────────────────────────────────────
 
@@ -132,9 +133,10 @@ export const useUIStore = create<UIState>((set) => ({
     else if (role === 'Admin SIPAS') username = 'siti_rahma';
     else if (role === 'Tim Teknis') username = 'budi_santoso';
     else if (role === 'Kepala Bidang') username = 'hendra_wijaya';
+    else if (role === 'Super Admin') username = 'superadmin';
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/submissions/auth/token', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -144,7 +146,8 @@ export const useUIStore = create<UIState>((set) => ({
       });
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('token', data.access_token);
+        // Update useAuthStore
+        useAuthStore.getState().login(data.access_token, data.user);
         console.log(`[useUIStore] Berhasil sinkronisasi login JWT untuk role: ${role}`);
       }
     } catch (err) {
