@@ -344,7 +344,7 @@ export default function SubmissionDetailPage() {
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Luas Lahan</span>
-                      <span className="text-xs font-bold text-slate-700 block">{sub.landArea.toLocaleString('id-ID')} m²</span>
+                      <span className="text-xs font-bold text-slate-700 block">{sub.landArea ? `${sub.landArea.toLocaleString('id-ID')} m²` : '-'}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Tanggal Diajukan</span>
@@ -497,7 +497,7 @@ export default function SubmissionDetailPage() {
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Luas Lahan Terdaftar</span>
-                        <span className="text-xs font-bold text-slate-700 block">{sub.locationDetails?.landArea ? `${sub.locationDetails.landArea.toLocaleString('id-ID')} m²` : `${sub.landArea.toLocaleString('id-ID')} m²`}</span>
+                        <span className="text-xs font-bold text-slate-700 block">{sub.locationDetails?.landArea ? `${sub.locationDetails.landArea.toLocaleString('id-ID')} m²` : (sub.landArea ? `${sub.landArea.toLocaleString('id-ID')} m²` : '-')}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Desa / Kelurahan</span>

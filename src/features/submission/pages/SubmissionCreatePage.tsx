@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, Link } from 'react-router-dom';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Save, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import { fullSubmissionSchema, type FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 import {
@@ -28,6 +29,7 @@ const steps = [
 export default function SubmissionCreatePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { id } = useParams<{ id: string }>();
   const [currentStep, setCurrentStep] = useState(1);
 
   const methods = useForm<FullSubmissionFormValues>({
@@ -42,9 +44,128 @@ export default function SubmissionCreatePage() {
 
   const { handleSubmit, trigger } = methods;
 
+  // Fetch data permohonan jika sedang mengedit/melanjutkan draf
+  const { data: existingSub, isLoading: isLoadingDraft } = useQuery({
+    queryKey: ['submission', id],
+    queryFn: () => SubmissionService.getById(id || ''),
+    enabled: !!id,
+  });
+
+  // Pre-load data draf ke form
+  useEffect(() => {
+    if (existingSub) {
+      methods.reset({
+        id_permohonan: existingSub.id,
+        applicant: {
+          type: existingSub.applicant?.type || 'PERORANGAN',
+          name: existingSub.applicant?.name || '',
+          nik: existingSub.applicant?.nik || undefined,
+          nib: existingSub.applicant?.nib || undefined,
+          npwp: existingSub.applicant?.npwp || '',
+          directorName: existingSub.applicant?.directorName || undefined,
+          phone: existingSub.applicant?.phone || '',
+          email: existingSub.applicant?.email || '',
+          address: existingSub.applicant?.address || '',
+        },
+        submission: {
+          submissionType: existingSub.submissionDetails?.submissionType || 'BARU',
+          activityName: existingSub.housingName || '',
+          category: existingSub.submissionDetails?.category || 'PERUMAHAN',
+        },
+        location: {
+          locationName: existingSub.locationDetails?.locationName || '',
+          village: existingSub.locationDetails?.village || '',
+          district: existingSub.locationDetails?.district || '',
+          city: existingSub.locationDetails?.city || 'Kabupaten Bogor',
+          province: existingSub.locationDetails?.province || 'Jawa Barat',
+          fullAddress: existingSub.locationDetails?.fullAddress || '',
+          landArea: existingSub.locationDetails?.landArea || 0,
+          ownershipStatus: existingSub.locationDetails?.ownershipStatus || 'SHM',
+          certificateNumber: existingSub.locationDetails?.certificateNumber || '',
+          certificateOwner: existingSub.locationDetails?.certificateOwner || '',
+        },
+        coordinate: {
+          polygon: existingSub.location?.polygon || undefined,
+          cadFileName: existingSub.coordinate?.cadFileName || undefined,
+          cadParamA: existingSub.coordinate?.cadParamA || undefined,
+          cadParamB: existingSub.coordinate?.cadParamB || undefined,
+          cadParamTx: existingSub.coordinate?.cadParamTx || undefined,
+          cadParamTy: existingSub.coordinate?.cadParamTy || undefined,
+          cadScale: existingSub.coordinate?.cadScale || undefined,
+          cadRotation: existingSub.coordinate?.cadRotation || undefined,
+        },
+        spatial: {
+          kkprNumber: existingSub.spatial?.kkprNumber || '',
+          landUse: existingSub.spatial?.landUse || '',
+          greenArea: existingSub.spatial?.greenArea || 0,
+        },
+        technical: {
+          lotCount: existingSub.technical?.lotCount || undefined,
+          housingType: existingSub.technical?.housingType || undefined,
+          cemeteryArea: existingSub.technical?.cemeteryArea || undefined,
+          roadRowMain: existingSub.technical?.roadRowMain || undefined,
+          roadRowLocal: existingSub.technical?.roadRowLocal || undefined,
+          waterSystem: existingSub.technical?.waterSystem || undefined,
+          buildingBlocks: existingSub.technical?.buildingBlocks || undefined,
+          kdb: existingSub.technical?.kdb || undefined,
+          klb: existingSub.technical?.klb || undefined,
+          kdh: existingSub.technical?.kdh || undefined,
+          parkingCapacity: existingSub.technical?.parkingCapacity || undefined,
+          maxFloors: existingSub.technical?.maxFloors || undefined,
+          totalFloorArea: existingSub.technical?.totalFloorArea || undefined,
+          facilityType: existingSub.technical?.facilityType || undefined,
+          capacity: existingSub.technical?.capacity || undefined,
+          disabledAccess: existingSub.technical?.disabledAccess || undefined,
+          specialParking: existingSub.technical?.specialParking || undefined,
+          fireProtection: existingSub.technical?.fireProtection || undefined,
+          warehouseCount: existingSub.technical?.warehouseCount || undefined,
+          roadLoadMst: existingSub.technical?.roadLoadMst || undefined,
+          electricityPower: existingSub.technical?.electricityPower || undefined,
+          ipalCapacity: existingSub.technical?.ipalCapacity || undefined,
+          greenBufferArea: existingSub.technical?.greenBufferArea || undefined,
+          tpsB3Provision: existingSub.technical?.tpsB3Provision || undefined,
+        },
+        consultant: {
+          consultantName: existingSub.consultant?.consultantName || '',
+          companyName: existingSub.consultant?.consultantCompanyName || '',
+          picName: existingSub.consultant?.consultantPicName || '',
+        },
+        statement: {
+          agreed: existingSub.statement?.agreed || false,
+        }
+      });
+    }
+  }, [existingSub]);
+
+  // Mutation untuk Simpan Draf (isDraft = true)
+  const draftMutation = useMutation({
+    mutationFn: async (data: FullSubmissionFormValues) => {
+      return SubmissionService.create(data, true);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      toast.success('Draf permohonan berhasil disimpan!');
+      navigate('/pengajuan/daftar');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Gagal menyimpan draf');
+    }
+  });
+
+  const handleSaveDraft = () => {
+    const currentValues = methods.getValues();
+    if (id) {
+      currentValues.id_permohonan = id;
+    }
+    draftMutation.mutate(currentValues);
+  };
+
   const mutation = useMutation({
     mutationFn: async (data: FullSubmissionFormValues) => {
-      return SubmissionService.create(data);
+      if (id) {
+        data.id_permohonan = id;
+      }
+      return SubmissionService.create(data, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
@@ -85,6 +206,15 @@ export default function SubmissionCreatePage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  if (id && isLoadingDraft) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center space-y-4 font-sans">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-xs text-slate-500">Memuat draf permohonan...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto font-sans">
@@ -183,6 +313,26 @@ export default function SubmissionCreatePage() {
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" />
                     Sebelumnya
+                  </button>
+
+                  {/* Tombol Simpan Draf */}
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={draftMutation.isPending || mutation.isPending}
+                    className="inline-flex items-center justify-center px-4.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-slate-800 border border-border rounded-none transition-colors cursor-pointer outline-none"
+                  >
+                    {draftMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        <span>Menyimpan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-3.5 w-3.5 mr-1.5" />
+                        <span>{id ? 'Perbarui Draf' : 'Simpan Draf'}</span>
+                      </>
+                    )}
                   </button>
 
                   {currentStep < steps.length ? (

@@ -46,11 +46,12 @@ export const SubmissionService = {
     }
   },
 
-  create: async (data: FullSubmissionFormValues): Promise<Submission> => {
-    // Generasikan id_permohonan client-side agar berkas tidak yatim piatu (Logical Fallacy #3)
-    const id_permohonan = `sub-${Date.now()}`;
+  create: async (data: FullSubmissionFormValues, isDraft = false): Promise<Submission> => {
+    // Generasikan id_permohonan client-side jika belum ada (misal draf baru)
+    const id_permohonan = data.id_permohonan || `sub-${Date.now()}`;
     const payload = {
       id_permohonan,
+      is_draft: isDraft,
       ...data
     };
 

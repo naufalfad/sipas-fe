@@ -152,7 +152,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none mb-1.5">
                             <Ruler size={10} className="text-slate-400" /> Luas Lahan Pengajuan
                         </span>
-                        <span className="text-sm font-black text-slate-800 font-mono leading-none">{submissionData.landArea.toLocaleString('id-ID')} m²</span>
+                        <span className="text-sm font-black text-slate-800 font-mono leading-none">{submissionData.landArea ? `${submissionData.landArea.toLocaleString('id-ID')} m²` : '-'}</span>
                     </div>
                     <div className="bg-white p-4">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none mb-1.5">

@@ -156,6 +156,7 @@ export const statementSchema = z.object({
 });
 
 export const fullSubmissionSchema = z.object({
+  id_permohonan: z.string().optional(),
   applicant: applicantSchema,
   submission: submissionDataSchema,
   location: locationSchema,

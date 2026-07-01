@@ -58,6 +58,10 @@ export const router = createBrowserRouter([
             element: <SubmissionCreatePage />,
           },
           {
+            path: 'edit/:id',
+            element: <SubmissionCreatePage />,
+          },
+          {
             path: 'detail/:id',
             element: <SubmissionDetailPage />,
           },

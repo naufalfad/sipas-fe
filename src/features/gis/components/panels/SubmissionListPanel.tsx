@@ -171,13 +171,13 @@ export default function SubmissionListPanel() {
 
                                     {/* Nama Developer & Ukuran Lahan */}
                                     <p className="text-[10px] text-slate-400 mt-0.5 font-medium leading-none">
-                                        Oleh: {sub.developerName} • {sub.landArea.toLocaleString("id-ID")} m²
+                                        Oleh: {sub.developerName || '-'} • {sub.landArea ? `${sub.landArea.toLocaleString("id-ID")} m²` : '-'}
                                     </p>
 
                                     {/* Alamat Singkat Geografis */}
                                     <span className="text-[9px] text-slate-400 mt-1 flex items-center gap-1 leading-none">
                                         <MapPin size={10} className="shrink-0 text-slate-300" />
-                                        <span className="truncate max-w-[210px]">{sub.location.address}</span>
+                                        <span className="truncate max-w-[210px]">{sub.location?.address || '-'}</span>
                                     </span>
 
                                 </div>

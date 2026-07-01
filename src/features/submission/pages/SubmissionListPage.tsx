@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import {
-  ClipboardList, Plus, Search, Filter, Eye
+  ClipboardList, Plus, Search, Filter, Eye, Pencil
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
@@ -18,7 +18,7 @@ export default function SubmissionListPage() {
   });
 
   // Kategori tab filter pencarian dokumen
-  const filterTabs = ['Semua', 'Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Disetujui', 'Ditolak'];
+  const filterTabs = ['Semua', 'Draft', 'Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Disetujui', 'Ditolak'];
 
   // Penapisan data berdasarkan input pencarian dan status dokumen
   const filteredSubmissions = submissions.filter((sub) => {
@@ -36,6 +36,8 @@ export default function SubmissionListPage() {
   // Manajemen warna badge status dengan kontras pastel yang lembut (WCAG compliant)
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
+      case 'Draft':
+        return 'bg-slate-100 text-slate-600 border border-slate-200'; // Gray theme for Draft
       case 'Disetujui':
         return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon soft theme
       case 'Ditolak':
@@ -160,7 +162,7 @@ export default function SubmissionListPage() {
 
                     {/* Kolom 3: Luas Lahan */}
                     <td className="px-6 py-4 text-slate-600 font-medium">
-                      {sub.landArea.toLocaleString('id-ID')} m²
+                      {sub.landArea ? `${sub.landArea.toLocaleString('id-ID')} m²` : '-'}
                     </td>
 
                     {/* Kolom 4: Tanggal Pengajuan */}
@@ -177,21 +179,39 @@ export default function SubmissionListPage() {
 
                     {/* Kolom 6: Aksi (Ikon Mata Tunggal + CSS Group-Hover Tooltip) */}
                     <td className="px-6 py-4 text-right">
-                      <div className="relative group inline-block">
-                        <Link
-                          to={`/pengajuan/detail/${sub.id}`}
-                          className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-primary hover:bg-[#e8f2ea]/50 transition-colors rounded-none outline-none"
-                        >
-                          <Eye className="h-4.5 w-4.5" />
-                        </Link>
+                      {sub.status === 'Draft' ? (
+                        <div className="relative group inline-block">
+                          <Link
+                            to={`/pengajuan/edit/${sub.id}`}
+                            className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-primary hover:bg-[#e8f2ea]/50 transition-colors rounded-none outline-none"
+                          >
+                            <Pencil className="h-4.5 w-4.5" />
+                          </Link>
 
-                        {/* ─── DYNAMIC CSS-ONLY HOVER TOOLTIP ─── */}
-                        <div className="absolute bottom-full right-0 mb-2.5 hidden group-hover:block bg-[#111D13] text-white text-[10px] font-medium px-2.5 py-1 pointer-events-none z-50 whitespace-nowrap rounded-none shadow-md border border-[#709775]/25">
-                          Tinjau Berkas Detail
-                          {/* Segitiga Penunjuk (Arrow) */}
-                          <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-[#111D13]" />
+                          {/* ─── DYNAMIC CSS-ONLY HOVER TOOLTIP ─── */}
+                          <div className="absolute bottom-full right-0 mb-2.5 hidden group-hover:block bg-[#111D13] text-white text-[10px] font-medium px-2.5 py-1 pointer-events-none z-50 whitespace-nowrap rounded-none shadow-md border border-[#709775]/25">
+                            Lanjutkan Pengisian Draf
+                            {/* Segitiga Penunjuk (Arrow) */}
+                            <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-[#111D13]" />
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="relative group inline-block">
+                          <Link
+                            to={`/pengajuan/detail/${sub.id}`}
+                            className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-primary hover:bg-[#e8f2ea]/50 transition-colors rounded-none outline-none"
+                          >
+                            <Eye className="h-4.5 w-4.5" />
+                          </Link>
+
+                          {/* ─── DYNAMIC CSS-ONLY HOVER TOOLTIP ─── */}
+                          <div className="absolute bottom-full right-0 mb-2.5 hidden group-hover:block bg-[#111D13] text-white text-[10px] font-medium px-2.5 py-1 pointer-events-none z-50 whitespace-nowrap rounded-none shadow-md border border-[#709775]/25">
+                            Tinjau Berkas Detail
+                            {/* Segitiga Penunjuk (Arrow) */}
+                            <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-[#111D13]" />
+                          </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
