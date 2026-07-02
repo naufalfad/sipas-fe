@@ -132,6 +132,19 @@ export default function SubmissionCreatePage() {
         },
         statement: {
           agreed: existingSub.statement?.agreed || false,
+        },
+        document: {
+          legalDoc: existingSub.document?.legalDoc || undefined,
+          technicalDoc: existingSub.document?.technicalDoc || undefined,
+          supportDoc: existingSub.document?.supportDoc || undefined,
+          supportDoc2: existingSub.document?.supportDoc2 || undefined,
+        },
+        photo: {
+          photoNorth: existingSub.photo?.photoNorth || undefined,
+          photoSouth: existingSub.photo?.photoSouth || undefined,
+          photoEast: existingSub.photo?.photoEast || undefined,
+          photoWest: existingSub.photo?.photoWest || undefined,
+          photoAccess: existingSub.photo?.photoAccess || undefined,
         }
       });
     }

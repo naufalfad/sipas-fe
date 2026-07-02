@@ -10,6 +10,28 @@ import GISDrawingMap from '@/components/maps/GISDrawingMap';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+const uploadFileToBackend = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const token = localStorage.getItem('token');
+  const response = await fetch('http://localhost:8000/api/v1/submissions/upload', {
+    method: 'POST',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: formData
+  });
+  
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(errText || 'Gagal mengunggah berkas ke server');
+  }
+  
+  const data = await response.json();
+  return data; // { file_name, file_path, file_url }
+};
+
 /**
  * ============================================================================
  * FORM CONTROL STYLE SPECIFICATION (PROTECTED VARIATIONS)
@@ -910,7 +932,7 @@ export const ConsultantSection = () => {
 
 // ─── SECTION 8: LAMPIRAN DOKUMEN ──────────────────────────────────────────────
 export const DocumentSection = () => {
-  const { watch } = useFormContext<FullSubmissionFormValues>();
+  const { watch, setValue } = useFormContext<FullSubmissionFormValues>();
   const category = watch('submission.category');
 
   // Menentukan dokumen dinamis berdasarkan kategori site plan
@@ -947,6 +969,42 @@ export const DocumentSection = () => {
   const conditionalDocs = getConditionalDocs();
   const allDocs = [...defaultDocs, ...conditionalDocs];
 
+  const getFieldKey = (docName: string) => {
+    if (docName.includes('Legalitas') || docName.includes('KTP')) return 'document.legalDoc';
+    if (docName.includes('Gambar Teknis') || docName.includes('CAD') || docName.includes('DWG')) return 'document.technicalDoc';
+    if (docName.includes('Instansi') || docName.includes('Air Limbah')) return 'document.supportDoc2';
+    return 'document.supportDoc';
+  };
+
+  const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: true }));
+        const uploadResult = await uploadFileToBackend(file);
+        setValue(fieldKey, uploadResult.file_url);
+        toast.success(`Berhasil mengunggah: ${file.name}`);
+      } catch (err) {
+        toast.error('Gagal mengunggah berkas ke server');
+      } finally {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: false }));
+      }
+    }
+  };
+
+  const handleClearFile = (fieldKey: any) => {
+    setValue(fieldKey, undefined);
+  };
+
+  const triggerFileInput = (idx: number) => {
+    const input = document.getElementById(`doc-upload-${idx}`) as HTMLInputElement;
+    if (input) {
+      input.click();
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
@@ -965,14 +1023,54 @@ export const DocumentSection = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
-        {allDocs.map((doc, idx) => (
-          <div key={idx} className="p-6 flex flex-col items-center justify-center text-center bg-white border border-dashed border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none relative group min-h-[160px] animate-in zoom-in-95 duration-200">
-            <UploadCloud className="h-7 w-7 text-secondary-foreground/60 mb-2.5 group-hover:text-primary transition-colors" />
-            <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
-            <p className="text-[9px] text-slate-400 mb-2">{doc.desc}</p>
-            <p className="text-[10px] text-slate-400">PDF, JPG, PNG atau zip hingga 15MB</p>
-          </div>
-        ))}
+        {allDocs.map((doc, idx) => {
+          const fieldKey = getFieldKey(doc.name);
+          const fileValue = watch(fieldKey as any);
+
+          return (
+            <div key={idx} className="relative group min-h-[160px]">
+              <input
+                type="file"
+                id={`doc-upload-${idx}`}
+                className="hidden"
+                onChange={(e) => handleFileChange(e, fieldKey)}
+                accept=".pdf,.jpg,.jpeg,.png,.zip"
+              />
+
+              {isUploading[fieldKey] ? (
+                <div className="p-6 flex flex-col items-center justify-center text-center bg-slate-50 border border-dashed border-border h-full min-h-[160px] rounded-none">
+                  <Loader2 className="h-7 w-7 text-primary mb-2.5 animate-spin" />
+                  <p className="text-xs text-slate-500 font-semibold uppercase">Mengunggah...</p>
+                </div>
+              ) : fileValue ? (
+                <div className="p-6 flex flex-col items-center justify-center text-center bg-[#e8f2ea]/20 border border-primary/45 h-full min-h-[160px] rounded-none">
+                  <CheckCircle2 className="h-7 w-7 text-primary mb-2.5" />
+                  <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
+                  <p className="text-[10px] text-primary font-mono max-w-full truncate px-2 mb-3">
+                    {fileValue instanceof File ? fileValue.name : typeof fileValue === 'string' ? fileValue : 'File terunggah'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleClearFile(fieldKey)}
+                    className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 text-[10px] font-bold rounded-none transition-colors cursor-pointer outline-none"
+                  >
+                    Hapus Berkas
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => triggerFileInput(idx)}
+                  className="p-6 flex flex-col items-center justify-center text-center bg-white border border-dashed border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none h-full min-h-[160px] rounded-none"
+                >
+                  <UploadCloud className="h-7 w-7 text-secondary-foreground/60 mb-2.5 group-hover:text-primary transition-colors" />
+                  <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
+                  <p className="text-[9px] text-slate-400 mb-2">{doc.desc}</p>
+                  <p className="text-[10px] text-slate-400">PDF, JPG, PNG or zip hingga 15MB</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -980,6 +1078,45 @@ export const DocumentSection = () => {
 
 // ─── SECTION 9: FOTO LOKASI ───────────────────────────────────────────────────
 export const PhotoSection = () => {
+  const { watch, setValue } = useFormContext<FullSubmissionFormValues>();
+
+  const getPhotoFieldKey = (dir: string) => {
+    if (dir.includes('Utara')) return 'photo.photoNorth';
+    if (dir.includes('Selatan')) return 'photo.photoSouth';
+    if (dir.includes('Timur')) return 'photo.photoEast';
+    if (dir.includes('Barat')) return 'photo.photoWest';
+    return 'photo.photoAccess';
+  };
+
+  const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: true }));
+        const uploadResult = await uploadFileToBackend(file);
+        setValue(fieldKey, uploadResult.file_url);
+        toast.success(`Berhasil mengunggah foto: ${file.name}`);
+      } catch (err) {
+        toast.error('Gagal mengunggah foto ke server');
+      } finally {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: false }));
+      }
+    }
+  };
+
+  const handleClearPhoto = (fieldKey: any) => {
+    setValue(fieldKey, undefined);
+  };
+
+  const triggerPhotoInput = (idx: number) => {
+    const input = document.getElementById(`photo-upload-${idx}`) as HTMLInputElement;
+    if (input) {
+      input.click();
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
@@ -991,12 +1128,56 @@ export const PhotoSection = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-left">
-        {['Sisi Utara', 'Sisi Selatan', 'Sisi Timur', 'Sisi Barat', 'Akses Jalan Utama'].map((dir, idx) => (
-          <div key={idx} className="p-4 flex flex-col items-center justify-center text-center aspect-square bg-white border border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none">
-            <UploadCloud className="h-5 w-5 text-secondary-foreground/60 mb-2" />
-            <p className="text-[11px] font-bold text-slate-700">{dir}</p>
-          </div>
-        ))}
+        {['Sisi Utara', 'Sisi Selatan', 'Sisi Timur', 'Sisi Barat', 'Akses Jalan Utama'].map((dir, idx) => {
+          const fieldKey = getPhotoFieldKey(dir);
+          const fileValue = watch(fieldKey as any);
+
+          return (
+            <div key={idx} className="relative group aspect-square border border-border bg-white overflow-hidden select-none rounded-none">
+              <input
+                type="file"
+                id={`photo-upload-${idx}`}
+                className="hidden"
+                onChange={(e) => handlePhotoChange(e, fieldKey)}
+                accept="image/*"
+              />
+
+              {isUploading[fieldKey] ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 bg-slate-50">
+                  <Loader2 className="h-5 w-5 text-primary mb-2 animate-spin" />
+                  <p className="text-[8px] text-slate-400 uppercase tracking-wider">Mengunggah...</p>
+                </div>
+              ) : fileValue ? (
+                <div className="relative w-full h-full flex flex-col items-center justify-center p-1.5 animate-in zoom-in-95 duration-200">
+                  <img
+                    src={fileValue instanceof File ? URL.createObjectURL(fileValue) : fileValue}
+                    alt={dir}
+                    className="object-cover w-full h-full border border-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearPhoto(fieldKey);
+                    }}
+                    className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-none text-[8px] font-black uppercase tracking-wider border-none cursor-pointer shadow-md transition-colors outline-none"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => triggerPhotoInput(idx)}
+                  className="w-full h-full flex flex-col items-center justify-center text-center p-4 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                >
+                  <UploadCloud className="h-5 w-5 text-secondary-foreground/60 mb-2 group-hover:text-primary transition-colors" />
+                  <p className="text-[10px] font-bold text-slate-700 leading-snug">{dir}</p>
+                  <p className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider">Pilih Foto</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

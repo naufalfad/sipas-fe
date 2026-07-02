@@ -139,6 +139,7 @@ export const documentSchema = z.object({
   legalDoc: z.any().optional(),
   technicalDoc: z.any().optional(),
   supportDoc: z.any().optional(),
+  supportDoc2: z.any().optional(),
 });
 
 export const photoSchema = z.object({

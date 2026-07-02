@@ -19,6 +19,7 @@ import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import AuditTrailViewer from '@/features/approval/components/AuditTrailViewer';
 
 // ─── MOCK DATA LAHAN KOMPENSASI DAERAH [Purworejo 8, Bogor 11] ────────────────
 const mockKompensasiList: LahanKompensasi[] = [
@@ -154,7 +155,7 @@ export default function SubmissionDetailPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setSignature('');
   };
-  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto'>('ringkasan');
+  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'audit'>('ringkasan');
 
   // Checklist states
   const [adminChecks, setAdminChecks] = useState({
@@ -204,9 +205,11 @@ export default function SubmissionDetailPage() {
         actionTypeOverride
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['submission', id] });
-      queryClient.invalidateQueries({ queryKey: ['submissions'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['submission', id] }),
+        queryClient.invalidateQueries({ queryKey: ['submissions'] })
+      ]);
       setNotes('');
       setPassphrase('');
       setSignature('');
@@ -495,7 +498,8 @@ export default function SubmissionDetailPage() {
               { id: 'lokasi', label: 'Lokasi & Tata Ruang' },
               { id: 'teknis', label: 'Parameter Teknis' },
               { id: 'kompensasi', label: 'Kompensasi & Mitigasi' }, // Tab Baru [Purworejo 8]
-              { id: 'foto', label: 'Dokumentasi Foto' }
+              { id: 'foto', label: 'Dokumentasi Foto' },
+              { id: 'audit', label: 'Jejak Audit' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1089,6 +1093,12 @@ export default function SubmissionDetailPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'audit' && (
+              <div className="animate-in fade-in duration-200">
+                <AuditTrailViewer submissionId={sub.id} />
               </div>
             )}
           </div>
