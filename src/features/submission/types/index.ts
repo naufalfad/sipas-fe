@@ -118,6 +118,21 @@ export interface PhotoDetails {
   photoAccess?: string;
 }
 
+export interface CoordinateDetails {
+  polygon?: [number, number][];
+  cadFileName?: string;
+  cadParamA?: number;
+  cadParamB?: number;
+  cadParamTx?: number;
+  cadParamTy?: number;
+  cadScale?: number;
+  cadRotation?: number;
+}
+
+export interface StatementDetails {
+  agreed: boolean;
+}
+
 export interface Submission {
   id: string;
   submissionNo: string;
@@ -151,8 +166,11 @@ export interface Submission {
   applicant?: ApplicantDetails;
   submissionDetails?: SubmissionDetails;
   locationDetails?: LocationDetails;
+  coordinate?: CoordinateDetails;
   spatial?: SpatialDetails;
   technical?: TechnicalDetails;
   consultant?: ConsultantDetails;
   photos?: PhotoDetails;
+  statement?: StatementDetails;
 }
+

@@ -559,6 +559,7 @@ export default App
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import AppProviders from './app/providers'
 import { router } from './app/router'
 import './index.css'
@@ -566,6 +567,7 @@ import './index.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppProviders>
+      <Toaster position="top-right" expand={false} richColors />
       <RouterProvider router={router} />
     </AppProviders>
   </StrictMode>,
@@ -601,7 +603,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
 
-// Page Imports
+// Component & Page Imports
 import DashboardPage from '@/features/dashboard/pages/DashboardPage';
 import SubmissionListPage from '@/features/submission/pages/SubmissionListPage';
 import SubmissionCreatePage from '@/features/submission/pages/SubmissionCreatePage';
@@ -618,21 +620,41 @@ import RolesPage from '@/features/users/pages/RolesPage';
 import ReferencesPage from '@/features/users/pages/ReferencesPage';
 import ProfilePage from '@/features/users/pages/ProfilePage';
 
+// Auth Pages & Route Guard
+import LoginPage from '@/features/auth/pages/LoginPage';
+import RegisterPage from '@/features/auth/pages/RegisterPage';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+
 /**
  * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
  *
- * Sesuai prinsip Low Coupling & High Cohesion, rute dipisahkan menjadi dua kelompok utama:
- * 1. Kelompok Administratif (Dibalut oleh DashboardLayout):
+ * Sesuai prinsip Low Coupling & High Cohesion, rute dipisahkan menjadi kelompok:
+ * 1. Public Routes: Login dan Register (tidak dilindungi)
+ * 2. Kelompok Administratif (Dibalut oleh DashboardLayout & ProtectedRoute):
  *    Menyajikan halaman tabular, form administratif, laporan, dan pengelolaan data master.
- * 2. Kelompok Spasial Imersif (GIS Page berdiri sendiri):
+ * 3. Kelompok Spasial Imersif (GIS Page dilindungi Route Guard):
  *    Diletakkan di tingkat teratas agar komponen peta dapat mengonsumsi 100% ruang
- *    viewport peramban tanpa terhalang atau terpotong oleh layout pembungkus dashboard.
+ *    viewport peramban.
  */
 export const router = createBrowserRouter([
-  // 1. KELOMPOK ADMINISTRATIF (Dashboard & Dokumen)
+  // 1. PUBLIC ROUTES
+  {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
+  },
+
+  // 2. KELOMPOK ADMINISTRATIF (Dashboard & Dokumen - Terlindungi)
   {
     path: '/',
-    element: <DashboardLayout />,
+    element: (
+      <ProtectedRoute>
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -655,11 +677,19 @@ export const router = createBrowserRouter([
           },
           {
             path: 'tambah',
-            element: <SubmissionCreatePage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Pemohon', 'Super Admin']}>
+                <SubmissionCreatePage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'edit/:id',
-            element: <SubmissionCreatePage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Pemohon', 'Super Admin']}>
+                <SubmissionCreatePage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'detail/:id',
@@ -686,11 +716,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'verifikasi',
-        element: <VerificationPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+            <VerificationPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'persetujuan',
-        element: <ApprovalQueuePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['Kepala Bidang', 'Super Admin']}>
+            <ApprovalQueuePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'profil',
@@ -698,45 +736,128 @@ export const router = createBrowserRouter([
       },
       {
         path: 'laporan',
-        element: <ReportsPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Kepala Bidang', 'Super Admin']}>
+            <ReportsPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'master',
         children: [
           {
             path: 'pengguna',
-            element: <UsersPage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <UsersPage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'role',
-            element: <RolesPage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <RolesPage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'referensi',
-            element: <ReferencesPage />,
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <ReferencesPage />
+              </ProtectedRoute>
+            ),
           },
         ],
       },
     ],
   },
 
-  // 2. KELOMPOK SPASIAL (Immersive Infinite Canvas)
-  // Dilepas dari anak DashboardLayout agar peta bebas mengonsumsi seluruh resolusi layar monitor.
+  // 3. KELOMPOK SPASIAL (Immersive Infinite Canvas - Terlindungi)
   {
     path: '/gis',
-    element: <GISPage />,
+    element: (
+      <ProtectedRoute allowedRoles={['Pemohon', 'Tim Teknis', 'Super Admin']}>
+        <GISPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/gis/bim/:id',
-    element: <BimViewerPage />,
+    element: (
+      <ProtectedRoute allowedRoles={['Pemohon', 'Tim Teknis', 'Super Admin']}>
+        <BimViewerPage />
+      </ProtectedRoute>
+    ),
   },
 
-  // 3. FALLBACK REDIRECT (Fail-Safe Routing)
+  // 4. FALLBACK REDIRECT (Fail-Safe Routing)
   {
     path: '*',
     element: <Navigate to="/dashboard" replace />,
   },
 ]);
+
+--- FILE: src\app\store\useAuthStore.ts ---
+import { create } from 'zustand';
+
+export interface UserAuthProfile {
+  username: string;
+  email: string;
+  full_name: string;
+  role: string;
+  nip?: string | null;
+  company?: string | null;
+  phone?: string | null;
+  status: string;
+}
+
+interface AuthState {
+  token: string | null;
+  user: UserAuthProfile | null;
+  isAuthenticated: boolean;
+  login: (token: string, user: UserAuthProfile) => void;
+  logout: () => void;
+  updateUser: (user: Partial<UserAuthProfile>) => void;
+}
+
+// Helper to safely parse user from localStorage
+const getSavedUser = (): UserAuthProfile | null => {
+  try {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const useAuthStore = create<AuthState>((set) => ({
+  token: localStorage.getItem('token'),
+  user: getSavedUser(),
+  isAuthenticated: !!localStorage.getItem('token'),
+
+  login: (token, user) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    set({ token, user, isAuthenticated: true });
+  },
+
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    set({ token: null, user: null, isAuthenticated: false });
+  },
+
+  updateUser: (updatedFields) => {
+    set((state) => {
+      if (!state.user) return {};
+      const newUser = { ...state.user, ...updatedFields };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return { user: newUser };
+    });
+  }
+}));
 
 --- FILE: src\app\store\useGisUIStore.ts ---
 import { create } from 'zustand';
@@ -1013,6 +1134,7 @@ export const useGisUIStore = create<GisUIState>((set) => ({
 
 --- FILE: src\app\store\useUIStore.ts ---
 import { create } from 'zustand';
+import { useAuthStore } from './useAuthStore';
 
 // ─── DEFINISI TIPE & ANTARMUKA MODULAR ──────────────────────────────────────────
 
@@ -1146,9 +1268,10 @@ export const useUIStore = create<UIState>((set) => ({
     else if (role === 'Admin SIPAS') username = 'siti_rahma';
     else if (role === 'Tim Teknis') username = 'budi_santoso';
     else if (role === 'Kepala Bidang') username = 'hendra_wijaya';
+    else if (role === 'Super Admin') username = 'superadmin';
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/submissions/auth/token', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -1158,7 +1281,8 @@ export const useUIStore = create<UIState>((set) => ({
       });
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('token', data.access_token);
+        // Update useAuthStore
+        useAuthStore.getState().login(data.access_token, data.user);
         console.log(`[useUIStore] Berhasil sinkronisasi login JWT untuk role: ${role}`);
       }
     } catch (err) {
@@ -1205,6 +1329,64 @@ export const useUIStore = create<UIState>((set) => ({
 
   clearAuditLogs: () => set({ auditTrailLogs: [] })
 }));
+
+--- FILE: src\components\auth\ProtectedRoute.tsx ---
+import React, { useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { toast } from 'sonner';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+}
+
+export const normalizeRole = (role: string): string => {
+  const r = role.toUpperCase();
+  if (r === 'PEMOHON') return 'Pemohon';
+  if (r === 'ADMIN' || r === 'ADMIN SIPAS') return 'Admin SIPAS';
+  if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') return 'Tim Teknis';
+  if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') return 'Kepala Bidang';
+  if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') return 'Super Admin';
+  return role;
+};
+
+export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+  const { isAuthenticated, user } = useAuthStore();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error('Silakan login terlebih dahulu untuk mengakses halaman ini.');
+    } else if (allowedRoles && user) {
+      const normalizedUserRole = normalizeRole(user.role);
+      const isAllowed = allowedRoles.some(
+        (role) => normalizeRole(role) === normalizedUserRole
+      );
+      if (!isAllowed) {
+        toast.error('Hak akses ditolak. Peran Anda tidak memiliki wewenang untuk halaman ini.');
+      }
+    }
+  }, [isAuthenticated, allowedRoles, user]);
+
+  if (!isAuthenticated) {
+    // Redirect to login page and keep track of where the user was trying to go
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles && user) {
+    const normalizedUserRole = normalizeRole(user.role);
+    const isAllowed = allowedRoles.some(
+      (role) => normalizeRole(role) === normalizedUserRole
+    );
+    if (!isAllowed) {
+      // Redirect to dashboard page
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  return <>{children}</>;
+}
 
 --- FILE: src\components\maps\CADGeoreferenceWizard.tsx ---
 /**
@@ -2827,6 +3009,485 @@ export default function ReportsPage() {
   );
 }
 
+--- FILE: src\features\auth\pages\LoginPage.tsx ---
+import { useForm } from 'react-hook-form';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'sonner';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { Lock, User, Layers, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+
+const loginSchema = z.object({
+  username: z.string().min(3, 'Username minimal 3 karakter'),
+  password: z.string().min(6, 'Password minimal 6 karakter')
+});
+
+type LoginSchemaType = z.infer<typeof loginSchema>;
+
+export default function LoginPage() {
+  const { login } = useAuthStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const from = (location.state as any)?.from?.pathname || '/dashboard';
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors }
+  } = useForm<LoginSchemaType>({
+    resolver: zodResolver(loginSchema)
+  });
+
+  const onSubmit = async (data: LoginSchemaType) => {
+    setIsLoading(true);
+    const toastId = toast.loading('Sedang mengautentikasi...');
+
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          username: data.username,
+          password: data.password
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Username atau password salah.');
+      }
+
+      const resData = await response.json();
+      login(resData.access_token, resData.user);
+
+      toast.success(`Selamat datang kembali, ${resData.user.full_name}!`, { id: toastId });
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal login. Cek koneksi server Anda.', { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f4f7f4] flex flex-col justify-center items-center p-4 font-sans select-none text-foreground">
+      {/* ─── KARTU UTAMA LOGIN ─── */}
+      <div className="w-full max-w-md bg-white border border-[#DAE4DB] p-8 shadow-[6px_6px_0px_0px_rgba(65,93,67,0.08)] space-y-6">
+
+        {/* Branding & Logo */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex p-3 bg-[#e8f2ea] text-[#415D43] mb-1">
+            <Layers className="h-7 w-7 stroke-[2.5]" />
+          </div>
+          <h2 className="text-xl font-bold text-[#111D13] tracking-tight uppercase">
+            Masuk GEOSIPAS
+          </h2>
+          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+            Sistem Informasi Pelayanan Pengesahan Site Plan Digital Kabupaten Bogor
+          </p>
+        </div>
+
+        {/* Formulir Input */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+
+          {/* Input Username */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+              Username
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                <User className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                {...register('username')}
+                placeholder="Masukkan username Anda"
+                disabled={isLoading}
+                className="w-full pl-9 pr-3 py-2.5 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] focus:ring-1 focus:ring-[#415D43] text-slate-800 disabled:opacity-50"
+              />
+            </div>
+            {errors.username && (
+              <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                {errors.username.message}
+              </span>
+            )}
+          </div>
+
+          {/* Input Password */}
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Password
+              </label>
+            </div>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                <Lock className="h-4 w-4" />
+              </span>
+              <input
+                type="password"
+                {...register('password')}
+                placeholder="••••••••"
+                disabled={isLoading}
+                className="w-full pl-9 pr-3 py-2.5 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] focus:ring-1 focus:ring-[#415D43] text-slate-800 disabled:opacity-50"
+              />
+            </div>
+            {errors.password && (
+              <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                {errors.password.message}
+              </span>
+            )}
+          </div>
+
+          {/* Tombol Submit */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center p-3 bg-[#415D43] hover:opacity-95 text-white font-bold transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-[#415D43] cursor-pointer outline-none disabled:opacity-60"
+          >
+            <span>{isLoading ? 'Sedang Masuk...' : 'Autentikasi Akun'}</span>
+            {!isLoading && <ArrowRight className="h-4 w-4" />}
+          </button>
+        </form>
+
+        {/* Footer Links */}
+        <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-[10px] font-semibold text-slate-500">
+          <span>Belum punya akun?</span>
+          <Link to="/register" className="text-[#415D43] hover:underline font-bold">
+            Daftar Sekarang
+          </Link>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+--- FILE: src\features\auth\pages\RegisterPage.tsx ---
+import { useForm } from 'react-hook-form';
+import { useNavigate, Link } from 'react-router-dom';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'sonner';
+import { Layers, ArrowRight, Shield, User, Mail, Lock, Phone, Briefcase } from 'lucide-react';
+import { useState } from 'react';
+
+const registerSchema = z.object({
+  username: z.string().min(3, 'Username minimal 3 karakter').regex(/^[a-zA-Z0-9_]+$/, 'Username hanya boleh huruf, angka, dan underscore'),
+  email: z.string().email('Format email tidak valid'),
+  password: z.string().min(6, 'Password minimal 6 karakter'),
+  full_name: z.string().min(3, 'Nama Lengkap minimal 3 karakter'),
+  role: z.enum(['PEMOHON', 'ADMIN', 'TIM_TEKNIS', 'KABID_PUPR']),
+  nip: z.string().min(6, 'NIP/NIB minimal 6 karakter'),
+  company: z.string().optional(),
+  phone: z.string().min(9, 'Nomor telepon tidak valid')
+}).refine(data => {
+  if (data.role === 'PEMOHON' && (!data.company || data.company.trim() === '')) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Nama Perusahaan wajib diisi untuk Pemohon/Developer',
+  path: ['company']
+});
+
+type RegisterSchemaType = z.infer<typeof registerSchema>;
+
+export default function RegisterPage() {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors }
+  } = useForm<RegisterSchemaType>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      role: 'PEMOHON'
+    }
+  });
+
+  const selectedRole = watch('role');
+
+  const onSubmit = async (data: RegisterSchemaType) => {
+    setIsLoading(true);
+    const toastId = toast.loading('Sedang mendaftarkan akun...');
+
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Registrasi gagal. Harap coba lagi.');
+      }
+
+      toast.success('Pendaftaran sukses! Silakan login.', { id: toastId });
+      navigate('/login');
+    } catch (err: any) {
+      toast.error(err.message || 'Terjadi kesalahan sistem.', { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f4f7f4] flex flex-col justify-center items-center p-4 font-sans select-none text-foreground">
+      {/* ─── KARTU UTAMA REGISTRASI ─── */}
+      <div className="w-full max-w-xl bg-white border border-[#DAE4DB] p-8 shadow-[6px_6px_0px_0px_rgba(65,93,67,0.08)] space-y-6">
+
+        {/* Header */}
+        <div className="text-center space-y-1">
+          <div className="inline-flex p-3 bg-[#e8f2ea] text-[#415D43] mb-1">
+            <Layers className="h-7 w-7 stroke-[2.5]" />
+          </div>
+          <h2 className="text-xl font-bold text-[#111D13] tracking-tight uppercase">
+            Pendaftaran Kredensial GEOSIPAS
+          </h2>
+          <p className="text-[10px] text-slate-400 max-w-xs mx-auto">
+            Daftarkan akun Developer Mitra atau Aparatur Dinas PUPR Kabupaten Bogor
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+
+          {/* Pemilihan Peran (Developer vs Aparatur Dinas) */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+              Tipe Pengguna (Peran)
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { role: 'PEMOHON', label: 'Developer' },
+                { role: 'ADMIN', label: 'Admin SIPAS' },
+                { role: 'TIM_TEKNIS', label: 'Tim Teknis' },
+                { role: 'KABID_PUPR', label: 'Kabid PUPR' }
+              ].map(opt => (
+                <button
+                  key={opt.role}
+                  type="button"
+                  onClick={() => setValue('role', opt.role as any)}
+                  className={`py-2 text-[10px] font-bold uppercase border transition-all text-center cursor-pointer outline-none ${
+                    selectedRole === opt.role
+                      ? 'bg-[#415D43] text-white border-[#415D43]'
+                      : 'bg-white text-slate-600 border-[#DAE4DB] hover:bg-slate-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Username */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Username
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <User className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="text"
+                  {...register('username')}
+                  placeholder="Contoh: ahmad_fauzi"
+                  disabled={isLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                />
+              </div>
+              {errors.username && (
+                <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                  {errors.username.message}
+                </span>
+              )}
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Alamat Email
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <Mail className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="email"
+                  {...register('email')}
+                  placeholder="Contoh: developer@company.com"
+                  disabled={isLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                />
+              </div>
+              {errors.email && (
+                <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                  {errors.email.message}
+                </span>
+              )}
+            </div>
+
+            {/* Nama Lengkap */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Nama Lengkap
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <User className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="text"
+                  {...register('full_name')}
+                  placeholder="Masukkan nama lengkap"
+                  disabled={isLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                />
+              </div>
+              {errors.full_name && (
+                <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                  {errors.full_name.message}
+                </span>
+              )}
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Password
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <Lock className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="password"
+                  {...register('password')}
+                  placeholder="Minimal 6 karakter"
+                  disabled={isLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                />
+              </div>
+              {errors.password && (
+                <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                  {errors.password.message}
+                </span>
+              )}
+            </div>
+
+            {/* NIP / NIB */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                {selectedRole === 'PEMOHON' ? 'NIB (Nomor Induk Berusaha)' : 'NIP (Nomor Induk Pegawai)'}
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <Shield className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="text"
+                  {...register('nip')}
+                  placeholder={selectedRole === 'PEMOHON' ? 'Masukkan NIB perushaan' : 'Masukkan NIP aparatur'}
+                  disabled={isLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                />
+              </div>
+              {errors.nip && (
+                <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                  {errors.nip.message}
+                </span>
+              )}
+            </div>
+
+            {/* Nomor Telepon */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Nomor Telepon
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <Phone className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="text"
+                  {...register('phone')}
+                  placeholder="Contoh: 081234567890"
+                  disabled={isLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                />
+              </div>
+              {errors.phone && (
+                <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                  {errors.phone.message}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Perusahaan/Asosiasi (Hanya tampil jika Pemohon/Developer) */}
+          {selectedRole === 'PEMOHON' && (
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Nama Perusahaan / Developer
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                  <Briefcase className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="text"
+                  {...register('company')}
+                  placeholder="Masukkan nama perseroan terbatas (PT)"
+                  disabled={isLoading}
+                  className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                />
+              </div>
+              {errors.company && (
+                <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                  {errors.company.message}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center p-3 bg-[#415D43] hover:opacity-95 text-white font-bold transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-[#415D43] cursor-pointer outline-none disabled:opacity-60"
+          >
+            <span>{isLoading ? 'Sedang Mendaftarkan...' : 'Daftarkan Akun Baru'}</span>
+            {!isLoading && <ArrowRight className="h-4 w-4" />}
+          </button>
+
+        </form>
+
+        {/* Footer */}
+        <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-[10px] font-semibold text-slate-500">
+          <span>Sudah memiliki kredensial?</span>
+          <Link to="/login" className="text-[#415D43] hover:underline font-bold">
+            Masuk Sekarang
+          </Link>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 --- FILE: src\features\dashboard\pages\DashboardPage.tsx ---
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
@@ -4102,7 +4763,6 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { toast } from 'sonner';
 
 import { useGisUIStore } from '@/app/store/useGisUIStore';
-import { mockSubmissions } from '@/mock/submission/submissions';
 import type { Submission } from '@/features/submission/types';
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
@@ -4650,7 +5310,6 @@ export default function SipasMap() {
     const { data: submissions = [] } = useQuery<Submission[]>({
         queryKey: ['submissions'],
         queryFn: SubmissionService.getAll,
-        initialData: mockSubmissions,
     });
 
     useEffect(() => {
@@ -6387,8 +7046,10 @@ export default function BasemapPanel() {
  */
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useGisUIStore } from '@/app/store/useGisUIStore';
-import { mockSubmissions } from '@/mock/submission/submissions';
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 import {
     FileText, Loader2, AlertTriangle, HelpCircle, Save, Globe
 } from 'lucide-react';
@@ -6406,9 +7067,13 @@ export default function CompensationPanel() {
     const activeKompensasiMap = useGisUIStore((s) => s.activeKompensasi);
 
     // Cari data permohonan terpilih untuk asosiasi data [sipas-fe.txt]
-    const currentSubmission = useMemo(() => {
-        return mockSubmissions.find(s => s.id === selectedCompanyId) || null;
-    }, [selectedCompanyId]);
+    const { data: currentSubmission } = useQuery<Submission | undefined>({
+        queryKey: ['submission', selectedCompanyId],
+        queryFn: () => selectedCompanyId ? SubmissionService.getById(selectedCompanyId) : Promise.reject(new Error('No submission selected')),
+        enabled: !!selectedCompanyId,
+        retry: false,
+        staleTime: 1000 * 60 * 2,
+    });
 
     // Form states
     const [tipeKompensasi, setTipeKompensasi] = useState<'LAHAN_SAWAH' | 'LAHAN_MAKAM_FISIK' | 'LAHAN_MAKAM_UANG' | 'PSU_FISIK_TAMBAHAN'>('LAHAN_MAKAM_FISIK');
@@ -7662,9 +8327,11 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
 
 --- FILE: src\features\gis\components\panels\SubmissionListPanel.tsx ---
 import { useState, useMemo } from "react";
+import { useQuery } from '@tanstack/react-query';
 import { Search, ClipboardList, ChevronRight, MapPin } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
-import { mockSubmissions } from "@/mock/submission/submissions";
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 import { cn } from "@/lib/utils";
 
 /**
@@ -7696,9 +8363,14 @@ export default function SubmissionListPanel() {
         { value: "Ditolak", label: "Ditolak" }
     ];
 
+    const { data: submissions = [] } = useQuery<Submission[]>({
+        queryKey: ['submissions'],
+        queryFn: SubmissionService.getAll,
+    });
+
     // Penapisan Gabungan (Pencarian Teks & Status Pengajuan) [sipas-fe.txt]
     const filteredSubmissions = useMemo(() => {
-        return mockSubmissions.filter((sub) => {
+        return submissions.filter((sub) => {
             const matchesSearch =
                 sub.housingName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 sub.developerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -7708,7 +8380,7 @@ export default function SubmissionListPanel() {
 
             return matchesSearch && matchesStatus;
         });
-    }, [searchQuery, statusFilter]);
+    }, [searchQuery, statusFilter, submissions]);
 
     // Handler interaksi baris pengajuan (Satu Sentuhan Spasial) [limbah-fe-gis-only.txt]
     const handleItemClick = (sub: any) => {
@@ -8242,12 +8914,14 @@ export function useSpatialValidator() {
 }
 
 --- FILE: src\features\gis\pages\BimViewerPage.tsx ---
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Sun, RotateCw, ArrowLeft, MousePointer2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { mockSubmissions } from "@/mock/submission/submissions";
+import { useQuery } from '@tanstack/react-query';
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 
 export default function BimViewerPage() {
     const mountRef = useRef<HTMLDivElement>(null);
@@ -8257,11 +8931,14 @@ export default function BimViewerPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
 
-    const housingName = useMemo(() => {
-        if (!id) return "Peninjau 3D CAD/BIM";
-        const sub = mockSubmissions.find(s => s.id === id);
-        return sub ? sub.housingName : "Peninjau 3D CAD/BIM";
-    }, [id]);
+    const { data: submission } = useQuery<Submission>({
+        queryKey: ['submission', id],
+        queryFn: () => id ? SubmissionService.getById(id) : Promise.reject(new Error('Invalid submission id')),
+        enabled: !!id,
+        retry: false,
+    });
+
+    const housingName = submission?.housingName || "Peninjau 3D CAD/BIM";
 
     useEffect(() => {
         const container = mountRef.current;
@@ -8366,7 +9043,7 @@ export default function BimViewerPage() {
 
         // ─── BUILDINGS ────────────────────────────────────────────────────────────
         const houseMat = new THREE.MeshLambertMaterial({ color: 0x0f766e });
-        const roofMat  = new THREE.MeshLambertMaterial({ color: 0x134e4a });
+        const roofMat = new THREE.MeshLambertMaterial({ color: 0x134e4a });
         const facilityMat = new THREE.MeshLambertMaterial({ color: 0xd97706 });
         const facilityRoofMat = new THREE.MeshLambertMaterial({ color: 0x92400e });
 
@@ -8581,11 +9258,10 @@ export default function BimViewerPage() {
                 <div className="pointer-events-auto flex items-center gap-3">
                     <button
                         onClick={handleSunToggle}
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all shadow-xl cursor-pointer outline-none ${
-                            isSimulatingSun
+                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all shadow-xl cursor-pointer outline-none ${isSimulatingSun
                                 ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30"
                                 : "bg-slate-900/80 text-slate-300 border-slate-700/50 hover:bg-slate-800 hover:text-white"
-                        }`}
+                            }`}
                     >
                         <Sun size={16} className={isSimulatingSun ? "animate-spin" : ""} style={isSimulatingSun ? { animationDuration: "3s" } : {}} />
                         {isSimulatingSun ? "Hentikan Simulasi" : "Simulasi Matahari"}
@@ -10239,7 +10915,7 @@ export default function SubmissionCreatePage() {
 }
 
 --- FILE: src\features\submission\pages\SubmissionDetailPage.tsx ---
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
@@ -10304,6 +10980,90 @@ export default function SubmissionDetailPage() {
 
   const [notes, setNotes] = useState('');
   const [passphrase, setPassphrase] = useState('');
+  const [signature, setSignature] = useState('');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDrawingRef = useRef(false);
+
+  // Canvas drawing handlers for signature pad
+  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+
+    // Get actual display size
+    const displayWidth = rect.width;
+    const displayHeight = rect.height;
+
+    // Get logical canvas dimensions
+    const logicalWidth = canvas.width;
+    const logicalHeight = canvas.height;
+
+    // For touch events
+    if ('touches' in e) {
+      if (e.touches.length === 0) return { x: 0, y: 0 };
+      const clientX = e.touches[0].clientX - rect.left;
+      const clientY = e.touches[0].clientY - rect.top;
+      return {
+        x: (clientX / displayWidth) * logicalWidth,
+        y: (clientY / displayHeight) * logicalHeight
+      };
+    }
+
+    // For mouse events
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    return {
+      x: (clientX / displayWidth) * logicalWidth,
+      y: (clientY / displayHeight) * logicalHeight
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { x, y } = getCoordinates(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    isDrawingRef.current = true;
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { x, y } = getCoordinates(e);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#0f172a'; // slate-900
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Export signature as base64 png
+    const dataUrl = canvas.toDataURL('image/png');
+    setSignature(dataUrl);
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSignature('');
+  };
   const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto'>('ringkasan');
 
   // Checklist states
@@ -10330,18 +11090,22 @@ export default function SubmissionDetailPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ status, notes, passphrase }: { status: SubmissionStatus; notes: string; passphrase?: string }) => {
-      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes, passphrase);
+    mutationFn: async ({ status, notes, passphrase, signatureBase64 }: { status: SubmissionStatus; notes: string; passphrase?: string; signatureBase64?: string }) => {
+      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes, passphrase, signatureBase64);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submission', id] });
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
       setNotes('');
       setPassphrase('');
+      setSignature('');
       setAdminChecks({ ktp: false, sertifikat: false, npwp: false, kkpr: false });
       setTechChecks({ polygon: false, rth: false, utilities: false, cad: false });
       setKabidAgreed(false);
       toast.success('Status berkas berhasil diperbarui!');
+    },
+    onError: (error: Error) => {
+      toast.error(`Gagal memproses verifikasi: ${error.message}`);
     }
   });
 
@@ -10433,7 +11197,7 @@ export default function SubmissionDetailPage() {
 
   // --- LOGIKA KONTROL SLA CLOCK PAUSE/RESUME [Bogor 16] ---
   const isSlaPaused = sub.status === 'Ditolak' || sub.status === 'Draft';
-  const mockSlaDaysRemaining = sub.status === 'Disetujui' ? 0 : sub.status === 'Ditolak' ? 11 : 9;
+  const slaDaysRemaining = sub.remaining_sla_days ?? 0;
 
   // Helper variables for role-based conditional rendering
   const isAdminActive = activeRole === 'Admin SIPAS' || activeRole === 'Super Admin';
@@ -10469,20 +11233,27 @@ export default function SubmissionDetailPage() {
     const targetStatus = approved ? 'Disetujui' : 'Ditolak';
     const defaultNotes = approved ? 'Dokumen Site Plan disahkan secara hukum menggunakan Tanda Tangan Elektronik (TTE) resmi dinas.' : 'Permohonan pengesahan ditolak oleh Kepala Bidang.';
 
-    if (approved && !passphrase) {
-      toast.error('Passphrase PIN TTE wajib diisi untuk melakukan pengesahan!');
-      return;
-    }
-    if (approved && passphrase.length < 6) {
-      toast.error('Passphrase PIN TTE minimal 6 karakter!');
-      return;
+    if (approved) {
+      if (!passphrase) {
+        toast.error('Passphrase PIN TTE wajib diisi untuk melakukan pengesahan!');
+        return;
+      }
+      if (passphrase.length < 6) {
+        toast.error('Passphrase PIN TTE minimal 6 karakter!');
+        return;
+      }
+      if (!signature) {
+        toast.error('Tanda Tangan Pejabat wajib digambar pada pad drawer!');
+        return;
+      }
     }
 
     mutation.mutate({
       status: targetStatus,
       notes: notes.trim() || defaultNotes,
-      passphrase: approved ? passphrase : undefined
-    } as any);
+      passphrase: approved ? passphrase : undefined,
+      signatureBase64: approved ? signature : undefined
+    });
   };
 
   // Handler Visualisasi Lahan Kompensasi pada Peta Spasial [Purworejo 8]
@@ -10540,12 +11311,12 @@ export default function SubmissionDetailPage() {
           ) : sub.status === 'Disetujui' ? (
             <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
               <CheckCircle className="h-4 w-4 text-emerald-600" />
-              SLA: BERHASIL (9 Hari)
+              SLA: BERHASIL ({slaDaysRemaining} Hari)
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
               <Clock className="h-4 w-4 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
-              SLA: {mockSlaDaysRemaining} Hari Tersisa
+              SLA: {slaDaysRemaining} Hari Tersisa
             </div>
           )}
         </div>
@@ -11397,6 +12168,40 @@ export default function SubmissionDetailPage() {
                 />
               </div>
 
+              {/* Tanda Tangan Canvas Pad */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className={labelClass}>Tanda Tangan Pejabat (TTD Drawer)</label>
+                  <button
+                    type="button"
+                    onClick={clearSignature}
+                    className="text-[10px] text-rose-500 hover:text-rose-700 font-bold transition-colors cursor-pointer"
+                  >
+                    Hapus TTD
+                  </button>
+                </div>
+                <div className="relative border border-slate-200 rounded-none bg-slate-50 overflow-hidden select-none">
+                  <canvas
+                    ref={canvasRef}
+                    width={380}
+                    height={150}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                    className="w-full h-[150px] cursor-crosshair touch-none bg-slate-50"
+                  />
+                  {!signature && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-[11px] text-slate-400 font-medium">
+                      Goreskan tanda tangan Anda di sini
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Tindakan */}
               <div className="pt-2 flex items-center justify-end gap-3">
                 <button
@@ -11444,7 +12249,13 @@ export default function SubmissionDetailPage() {
                 </div>
               </div>
               <button
-                onClick={() => window.alert(`Mengunduh Surat Keputusan Pengesahan Site Plan (${sub.submissionNo}-SK.pdf)...`)}
+                onClick={() => {
+                  if (sub.signedPdfUrl) {
+                    window.open(sub.signedPdfUrl, '_blank');
+                  } else {
+                    window.alert(`Mengunduh Surat Keputusan Pengesahan Site Plan (${sub.submissionNo}-SK.pdf)...`);
+                  }
+                }}
                 className="px-4 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs transition-colors rounded-none border-none cursor-pointer"
               >
                 Unduh Surat Keputusan (SK) PDF
@@ -11907,7 +12718,6 @@ export const fullSubmissionSchema = z.object({
 export type FullSubmissionFormValues = z.infer<typeof fullSubmissionSchema>;
 
 --- FILE: src\features\submission\services\submission.service.ts ---
-import { mockSubmissions } from '@/mock/submission/submissions';
 import type { Submission, SubmissionStatus } from '../types';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 
@@ -11924,35 +12734,25 @@ const getAuthHeaders = (extraHeaders?: Record<string, string>) => {
 
 export const SubmissionService = {
   getAll: async (): Promise<Submission[]> => {
-    try {
-      const response = await fetch(API_BASE_URL, {
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) throw new Error('API error');
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      console.warn('[SubmissionService] Gagal memuat dari API backend, menggunakan data mock lokal:', err);
-      return new Promise((resolve) => {
-        setTimeout(() => resolve([...mockSubmissions]), 400);
-      });
+    const response = await fetch(API_BASE_URL, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat daftar permohonan (HTTP ${response.status})`);
     }
+    return await response.json();
   },
 
-  getById: async (id: string): Promise<Submission | undefined> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${id}`, {
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) throw new Error('API error');
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      console.warn(`[SubmissionService] Gagal memuat ID ${id} dari API backend, menggunakan data mock lokal:`, err);
-      return new Promise((resolve) => {
-        setTimeout(() => resolve(mockSubmissions.find(s => s.id === id || s.submissionNo === id)), 300);
-      });
+  getById: async (id: string): Promise<Submission> => {
+    const response = await fetch(`${API_BASE_URL}/${id}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Permohonan dengan ID ${id} tidak ditemukan (HTTP ${response.status})`);
     }
+    return await response.json();
   },
 
   create: async (data: FullSubmissionFormValues, isDraft = false): Promise<Submission> => {
@@ -11975,171 +12775,72 @@ export const SubmissionService = {
         throw new Error(errText || 'Gagal menyimpan permohonan ke API backend');
       }
 
-      // Jika sukses, kita panggil getById untuk mendapatkan model kaya dari server
       const result = await response.json();
-      const serverSub = await fetch(`${API_BASE_URL}/${id_permohonan}`, {
-        headers: getAuthHeaders()
-      }).then(res => res.json()).catch(() => null);
-      if (serverSub) return serverSub;
-
-      // Fallback object jika detail endpoint bermasalah
-      return {
-        id: id_permohonan,
-        submissionNo: `SIPAS-2026-0${mockSubmissions.length + 1}`,
-        housingName: data.submission.activityName,
-        developerName: data.applicant.name,
-        landArea: data.location.landArea,
-        submissionDate: new Date().toISOString().split('T')[0],
-        status: 'Menunggu Verifikasi',
-        location: {
-          lat: -6.595189,
-          lng: 106.816629,
-          address: data.location.fullAddress,
-          polygon: data.coordinate.polygon || []
-        }
-      } as any;
-
+      const createdId = result?.data?.id_permohonan || id_permohonan;
+      return await SubmissionService.getById(createdId);
     } catch (err) {
-      console.warn('[SubmissionService] Gagal menyimpan ke API backend, menyimpan ke data mock lokal:', err);
-      return new Promise((resolve) => {
-        const newSub: Submission = {
-          id: id_permohonan,
-          submissionNo: `SIPAS-2026-0${mockSubmissions.length + 1}`,
-          housingName: data.submission.activityName,
-          developerName: data.applicant.name,
-          landArea: data.location.landArea,
-          submissionDate: new Date().toISOString().split('T')[0],
-          status: 'Menunggu Verifikasi',
-          documents: [
-            { id: `doc-${Date.now()}-1`, name: 'Surat Permohonan.pdf', type: 'pdf', url: '#', uploadedAt: new Date().toISOString().split('T')[0] },
-            { id: `doc-${Date.now()}-2`, name: 'Surat Pengantar Dinas.pdf', type: 'pdf', url: '#', uploadedAt: new Date().toISOString().split('T')[0] }
-          ],
-          history: [
-            { date: new Date().toISOString().replace('T', ' ').slice(0, 16), status: 'Menunggu Verifikasi', notes: 'Berkas berhasil dikirim dan menunggu pemeriksaan berkas', actor: data.applicant.name }
-          ],
-          location: {
-            lat: -6.595189 + (Math.random() - 0.5) * 0.05,
-            lng: 106.816629 + (Math.random() - 0.5) * 0.05,
-            address: data.location.fullAddress,
-            polygon: data.coordinate.polygon || [
-              [106.8160, -6.5945],
-              [106.8175, -6.5945],
-              [106.8175, -6.5960],
-              [106.8160, -6.5960],
-              [106.8160, -6.5945]
-            ]
-          },
-          applicant: {
-            type: data.applicant.type,
-            name: data.applicant.name,
-            nik: data.applicant.nik,
-            nib: data.applicant.nib,
-            npwp: data.applicant.npwp,
-            directorName: data.applicant.directorName,
-            phone: data.applicant.phone,
-            email: data.applicant.email,
-            address: data.applicant.address
-          },
-          submissionDetails: {
-            submissionType: data.submission.submissionType,
-            activityName: data.submission.activityName,
-            category: data.submission.category
-          },
-          locationDetails: {
-            locationName: data.location.locationName,
-            village: data.location.village,
-            district: data.location.district,
-            city: data.location.city,
-            province: data.location.province,
-            fullAddress: data.location.fullAddress,
-            landArea: data.location.landArea,
-            ownershipStatus: data.location.ownershipStatus,
-            certificateNumber: data.location.certificateNumber,
-            certificateOwner: data.location.certificateOwner
-          },
-          spatial: {
-            kkprNumber: data.spatial.kkprNumber,
-            landUse: data.spatial.landUse,
-            greenArea: data.spatial.greenArea
-          },
-          technical: {
-            ...data.technical
-          },
-          consultant: {
-            consultantName: data.consultant.consultantName,
-            companyName: data.consultant.companyName,
-            picName: data.consultant.picName
-          },
-          photos: {
-            photoNorth: data.photo?.photoNorth instanceof File ? URL.createObjectURL(data.photo.photoNorth) : 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
-            photoSouth: data.photo?.photoSouth instanceof File ? URL.createObjectURL(data.photo.photoSouth) : 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=400&q=80',
-            photoEast: data.photo?.photoEast instanceof File ? URL.createObjectURL(data.photo.photoEast) : 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
-            photoWest: data.photo?.photoWest instanceof File ? URL.createObjectURL(data.photo.photoWest) : 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=400&q=80',
-            photoAccess: data.photo?.photoAccess instanceof File ? URL.createObjectURL(data.photo.photoAccess) : 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80',
-          }
-        };
-        mockSubmissions.unshift(newSub);
-        setTimeout(() => resolve(newSub), 500);
-      });
+      const errorMessage = err instanceof Error ? err.message : 'Gagal menyimpan permohonan ke API backend';
+      throw new Error(errorMessage);
     }
   },
 
-  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string, passphrase?: string): Promise<Submission | undefined> => {
+  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string, passphrase?: string, signatureBase64?: string): Promise<Submission | undefined> => {
     // Parsing data aktor dan role untuk integrasi /verify
     const nameMatch = actor.match(/^([^(]+)/);
     const roleMatch = actor.match(/\(([^)]+)\)/);
     const actor_name = nameMatch ? nameMatch[1].trim() : actor;
     const rawRole = roleMatch ? roleMatch[1].trim() : 'Pemohon';
 
-    // Map role to backend expected roles
+    // Map role FE → BE (sesuai enum UserModel.role di database)
     let role = 'ADMIN';
     if (rawRole.toUpperCase().includes('KABID') || rawRole.toUpperCase().includes('BIDANG')) {
       role = 'KABID_PUPR';
     } else if (rawRole.toUpperCase().includes('TEKNIS')) {
       role = 'TIM_TEKNIS';
+    } else if (rawRole.toUpperCase().includes('PEMOHON')) {
+      role = 'PEMOHON';
     }
 
-    // Tentukan action_type
+    // Tentukan action_type berdasarkan status target
     const action_type = status === 'Ditolak' ? 'REJECT' : 'APPROVE';
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/${id}/verify`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          actor_name,
-          role,
-          nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
-          passphrase: passphrase || undefined,
-          action_type,
-          notes,
-          is_spatially_compliant: true
-        })
-      });
-      if (!response.ok) throw new Error('API error during verify');
+    // ── FASE 1: Kirim keputusan verifikasi ke API Backend ──────────────────
+    const verifyResponse = await fetch(`${API_BASE_URL}/${id}/verify`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        actor_name,
+        role,
+        nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
+        passphrase: passphrase || undefined,
+        signature_base64: signatureBase64 || undefined,
+        action_type,
+        notes,
+        is_spatially_compliant: true
+      })
+    });
 
-      const serverSub = await fetch(`${API_BASE_URL}/${id}`, {
-        headers: getAuthHeaders()
-      }).then(res => res.json()).catch(() => null);
-      if (serverSub) return serverSub;
-    } catch (err) {
-      console.warn(`[SubmissionService] Gagal verifikasi ID ${id} di API backend, mengupdate data mock lokal:`, err);
+    // Jika API mengembalikan error (4xx/5xx), ekstrak pesan dan throw — jangan fallback ke mock
+    if (!verifyResponse.ok) {
+      let errMsg = `Gagal memverifikasi permohonan (HTTP ${verifyResponse.status})`;
+      try {
+        const errData = await verifyResponse.json();
+        errMsg = errData.detail || errMsg;
+      } catch { /* biarkan pesan default jika response bukan JSON */ }
+      throw new Error(errMsg);
     }
 
-    // Local update fallback
-    return new Promise((resolve) => {
-      const sub = mockSubmissions.find(s => s.id === id || s.submissionNo === id);
-      if (sub) {
-        sub.status = status;
-        sub.history.push({
-          date: new Date().toISOString().replace('T', ' ').slice(0, 16),
-          status,
-          notes,
-          actor,
-        });
-      }
-      setTimeout(() => resolve(sub), 500);
+    // ── FASE 2: Ambil data terbaru dari server untuk memperbarui UI ────────
+    const refreshResponse = await fetch(`${API_BASE_URL}/${id}`, {
+      headers: getAuthHeaders()
     });
+
+    if (!refreshResponse.ok) {
+      const errText = await refreshResponse.text();
+      throw new Error(errText || `Gagal memuat ulang permohonan setelah verifikasi (HTTP ${refreshResponse.status})`);
+    }
+
+    return await refreshResponse.json();
   },
 
   getGeometries: async (id_permohonan: string): Promise<{
@@ -12291,22 +12992,24 @@ export interface Submission {
   landArea: number; // Dalam satuan meter persegi (m²)
   submissionDate: string;
   status: SubmissionStatus;
+  base_sla_days?: number;
+  remaining_sla_days?: number;
   signatureHash?: string;
   signedPdfUrl?: string;
   // Penambahan parameter hasil hitung sistem (Slide 6)
   kdbPercent?: number;
-  klbValue ?: number;
-  kdhPercent ?: number;
-  rthArea ?: number;
-  psuArea ?: number;
-  roadArea ?: number;
+  klbValue?: number;
+  kdhPercent?: number;
+  rthArea?: number;
+  psuArea?: number;
+  roadArea?: number;
   documents: {
     id: string;
     name: string;
     type: 'pdf' | 'cad' | 'image';
     url: string;
     uploadedAt: string;
-  } [];
+  }[];
   history: StatusHistory[];
   location: ProjectLocation;
 
@@ -12321,22 +13024,91 @@ export interface Submission {
 }
 
 --- FILE: src\features\users\pages\ProfilePage.tsx ---
-import { useUIStore } from '@/app/store/useUIStore';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'sonner';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import {
   User,
   Mail,
   Shield,
   Building,
-  Calendar,
   Lock,
   Phone,
-  Fingerprint
+  Fingerprint,
+  Save
 } from 'lucide-react';
+import { useState } from 'react';
+
+const profileSchema = z.object({
+  full_name: z.string().min(3, 'Nama Lengkap minimal 3 karakter'),
+  email: z.string().email('Format email tidak valid'),
+  phone: z.string().min(9, 'Nomor telepon tidak valid'),
+  password: z.string().optional().refine(val => !val || val.length >= 6, {
+    message: 'Password baru minimal 6 karakter'
+  })
+});
+
+type ProfileSchemaType = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { userProfile, activeRole } = useUIStore();
+  const { user, updateUser } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
 
+  const activeRole = user ? normalizeRole(user.role) : 'Pemohon';
   const isDinasActor = ['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'].includes(activeRole);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors }
+  } = useForm<ProfileSchemaType>({
+    resolver: zodResolver(profileSchema),
+    values: {
+      full_name: user?.full_name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      password: ''
+    }
+  });
+
+  const onSubmit = async (data: ProfileSchemaType) => {
+    setIsLoading(true);
+    const toastId = toast.loading('Sedang memperbarui profil...');
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8000/api/v1/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Gagal memperbarui profil.');
+      }
+
+      const updatedUser = await response.json();
+      updateUser(updatedUser);
+      toast.success('Profil berhasil diperbarui!', { id: toastId });
+      setValue('password', ''); // Clear password input
+    } catch (err: any) {
+      toast.error(err.message || 'Terjadi kesalahan.', { id: toastId });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const avatarUrl = user?.role === 'PEMOHON'
+    ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+    : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces';
 
   return (
     <div className="space-y-6 font-sans">
@@ -12358,12 +13130,9 @@ export default function ProfilePage() {
         <div className="bg-white border border-border p-6 text-center space-y-5 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] rounded-none">
           <div className="relative inline-block">
             <img
-              src={userProfile.avatar}
-              alt={userProfile.name}
+              src={avatarUrl}
+              alt={user?.full_name}
               className="h-28 w-28 rounded-full border-4 border-slate-100 object-cover mx-auto"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces';
-              }}
             />
             <span className="absolute bottom-1 right-1 bg-[#415D43] border-2 border-white p-1.5 rounded-full text-white shadow-sm">
               <Shield className="h-3.5 w-3.5" />
@@ -12371,7 +13140,7 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <h3 className="font-bold text-base text-[#111D13] leading-snug">{userProfile.name}</h3>
+            <h3 className="font-bold text-base text-[#111D13] leading-snug">{user?.full_name}</h3>
             <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 font-bold text-[10px] uppercase rounded-none">
               {activeRole}
             </span>
@@ -12380,123 +13149,166 @@ export default function ProfilePage() {
           <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-center text-xs">
             <div className="p-2.5 bg-slate-50/50 border border-border/40">
               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Status Akun</span>
-              <span className="text-xs font-bold text-emerald-700 block mt-1">Aktif</span>
+              <span className="text-xs font-bold text-emerald-700 block mt-1">
+                {user?.status === 'Aktif' ? 'Aktif' : 'Nonaktif'}
+              </span>
             </div>
             <div className="p-2.5 bg-slate-50/50 border border-border/40">
               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">TTE BSrE</span>
-              <span className="text-xs font-bold text-emerald-700 block mt-1">Tersertifikasi</span>
+              <span className="text-xs font-bold text-emerald-700 block mt-1">
+                {isDinasActor ? 'Tersertifikasi' : 'Tidak Ada'}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Kolom Kanan: Rincian Data Diri */}
+        {/* Kolom Kanan: Rincian Data Diri & Form Edit */}
         <div className="lg:col-span-2 bg-white border border-border p-6 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] rounded-none text-left space-y-6">
 
-          {/* Bagian 1: Informasi Akun Utama */}
-          <div>
-            <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4">
-              Informasi Pengguna
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nama Lengkap</span>
-                <span className="text-xs font-bold text-slate-700 block">{userProfile.name}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Surel / Email</span>
-                <span className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5 text-slate-400" />
-                  {userProfile.email}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Telepon Kontak</span>
-                <span className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5 text-slate-400" />
-                  +62 812-3456-7890
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Otoritas Peran Peran</span>
-                <span className="text-xs font-bold text-slate-700 block">{activeRole}</span>
-              </div>
-            </div>
-          </div>
+          {/* Edit Profile Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4">
+                Informasi Pengguna
+              </h3>
 
-          {/* Bagian 2: Informasi Kelembagaan / Perusahaan */}
-          <div className="pt-2">
-            <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4">
-              {isDinasActor ? 'Detail Instansi Kedinasan' : 'Detail Asosiasi Pengembang'}
-            </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Nama Lengkap */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Nama Lengkap
+                  </label>
+                  <input
+                    type="text"
+                    {...register('full_name')}
+                    disabled={isLoading}
+                    className="w-full px-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                  />
+                  {errors.full_name && (
+                    <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                      {errors.full_name.message}
+                    </span>
+                  )}
+                </div>
 
-            {isDinasActor ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Lembaga / Instansi</span>
-                  <span className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
-                    <Building className="h-3.5 w-3.5 text-slate-400" />
-                    Dinas PUPR Kabupaten Bogor
-                  </span>
+                {/* Email */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Surel / Email
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                      <Mail className="h-3.5 w-3.5" />
+                    </span>
+                    <input
+                      type="email"
+                      {...register('email')}
+                      disabled={isLoading}
+                      className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                    />
+                  </div>
+                  {errors.email && (
+                    <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                      {errors.email.message}
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">NIP Pegawai (Aparatur)</span>
-                  <span className="text-xs font-mono font-bold text-slate-700 block">19880412 201212 1 002</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Unit Kerja / Bidang</span>
-                  <span className="text-xs font-bold text-slate-700 block">Bidang Penataan Ruang</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Sertifikat TTE (BSrE)</span>
-                  <span className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
-                    <Fingerprint className="h-3.5 w-3.5 text-slate-400" />
-                    Aktif / Terverifikasi Resmi
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Perusahaan Developer</span>
-                  <span className="text-xs font-bold text-slate-700 block flex items-center gap-1.5">
-                    <Building className="h-3.5 w-3.5 text-slate-400" />
-                    PT Maju Jaya Sentosa
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nomor Induk Berusaha (NIB)</span>
-                  <span className="text-xs font-mono font-bold text-slate-700 block">9120301938192</span>
-                </div>
-                <div className="md:col-span-2">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Alamat Kantor Pengembang</span>
-                  <span className="text-xs font-semibold text-slate-600 block">Gedung Sentosa Lt. 4, Jl. Jend. Sudirman No. 10, Jakarta Pusat</span>
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Bagian 3: Keamanan & Sistem */}
-          <div className="pt-2">
-            <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4">
-              Keamanan & Riwayat Log
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
-              <div className="flex items-center space-x-3 p-3 bg-slate-50/50 border border-border/40">
-                <Calendar className="h-4.5 w-4.5 text-slate-400 shrink-0" />
-                <div>
-                  <span className="text-[9px] text-slate-400 font-bold uppercase block">Kunjungan Terakhir</span>
-                  <span className="text-xs font-bold text-slate-700 block mt-0.5">2026-06-26 08:30 WITA</span>
+                {/* Phone */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Telepon Kontak
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                      <Phone className="h-3.5 w-3.5" />
+                    </span>
+                    <input
+                      type="text"
+                      {...register('phone')}
+                      disabled={isLoading}
+                      className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                    />
+                  </div>
+                  {errors.phone && (
+                    <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                      {errors.phone.message}
+                    </span>
+                  )}
                 </div>
-              </div>
-              <div className="flex items-center space-x-3 p-3 bg-slate-50/50 border border-border/40">
-                <Lock className="h-4.5 w-4.5 text-slate-400 shrink-0" />
-                <div>
-                  <span className="text-[9px] text-slate-400 font-bold uppercase block">Metode Otentikasi</span>
-                  <span className="text-xs font-bold text-slate-700 block mt-0.5">Single Sign-On (SSO) Dinas</span>
+
+                {/* Password Baru */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Ubah Password (Opsional)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                      <Lock className="h-3.5 w-3.5" />
+                    </span>
+                    <input
+                      type="password"
+                      {...register('password')}
+                      placeholder="Masukkan password baru"
+                      disabled={isLoading}
+                      className="w-full pl-9 pr-3 py-2 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] text-slate-800 disabled:opacity-50"
+                    />
+                  </div>
+                  {errors.password && (
+                    <span className="text-[10px] font-bold text-rose-600 block mt-0.5">
+                      {errors.password.message}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
+
+            {/* Bagian 2: Informasi Kelembagaan / Perusahaan */}
+            <div className="pt-2 border-t border-slate-100">
+              <h3 className="text-xs font-bold text-slate-800 pb-2 uppercase tracking-wide mb-4">
+                {isDinasActor ? 'Detail Instansi Kedinasan' : 'Detail Asosiasi Pengembang'}
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Lembaga / Perusahaan</span>
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 p-2 bg-slate-50 border border-border/60">
+                    <Building className="h-3.5 w-3.5 text-slate-400" />
+                    {user?.company || (isDinasActor ? 'Dinas PUPR Kabupaten Bogor' : 'Mitra Pengembang')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                    {isDinasActor ? 'NIP Pegawai (Aparatur)' : 'Nomor Induk Berusaha (NIB)'}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-700 block p-2 bg-slate-50 border border-border/60">
+                    {user?.nip || '-'}
+                  </span>
+                </div>
+                {isDinasActor && (
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Sertifikat TTE (BSrE)</span>
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 p-2 bg-slate-50 border border-border/60">
+                      <Fingerprint className="h-3.5 w-3.5 text-slate-400" />
+                      Aktif / Terverifikasi Resmi
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tombol Simpan Perubahan */}
+            <div className="pt-4 border-t border-slate-100 text-right">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="inline-flex items-center p-3 bg-[#415D43] hover:opacity-95 text-white font-bold transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-[#415D43] cursor-pointer outline-none disabled:opacity-60"
+              >
+                <Save className="h-4 w-4" />
+                <span>Simpan Perubahan Profil</span>
+              </button>
+            </div>
+          </form>
 
         </div>
 
@@ -12659,6 +13471,8 @@ export default function ReferencesPage() {
 }
 
 --- FILE: src\features\users\pages\RolesPage.tsx ---
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -12669,6 +13483,8 @@ import {
 } from 'lucide-react';
 
 export default function RolesPage() {
+  const { user } = useAuthStore();
+  const activeRole = user ? normalizeRole(user.role) : 'Super Admin';
 
   // Matriks Otoritas Tingkatan Hak Akses GEOSIPAS sesuai Perbup Bogor No. 4 Tahun 2025
   const rolesMatrix = [
@@ -12717,8 +13533,17 @@ export default function RolesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {rolesMatrix.map((matrix, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                {rolesMatrix.map((matrix, idx) => {
+                  const isActiveRole = normalizeRole(matrix.role) === normalizeRole(activeRole);
+                  return (
+                    <tr
+                      key={idx}
+                      className={`transition-colors ${
+                        isActiveRole
+                          ? 'bg-[#e8f2ea]/40 border-l-2 border-primary font-bold'
+                          : 'hover:bg-slate-50/40'
+                      }`}
+                    >
                     {/* Tingkat Peran */}
                     <td className="px-4 py-3.5 font-bold text-slate-800 text-left">
                       <div className="flex items-center space-x-1.5 text-slate-800">
@@ -12747,7 +13572,8 @@ export default function RolesPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -12805,8 +13631,10 @@ export default function RolesPage() {
 }
 
 --- FILE: src\features\users\pages\UsersPage.tsx ---
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { mockUsers } from '@/mock/users/users';
+import { toast } from 'sonner';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import {
   UserCog,
   Plus,
@@ -12817,8 +13645,51 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
+interface UserItem {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: string;
+  status: 'Aktif' | 'Nonaktif';
+}
+
 export default function UsersPage() {
-  const [usersList, setUsersList] = useState(mockUsers);
+  const [usersList, setUsersList] = useState<UserItem[]>([]);
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8000/api/v1/auth/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('API error');
+      const data = await response.json();
+      const mapped = data.map((u: any, idx: number) => ({
+        id: `usr-${idx + 1}`,
+        username: u.username,
+        name: u.full_name,
+        email: u.email,
+        role: normalizeRole(u.role),
+        status: u.status
+      }));
+      setUsersList(mapped);
+    } catch (err) {
+      console.warn('[UsersPage] Gagal memuat dari BE, menggunakan mock data:', err);
+      // fallback
+      const fallback = mockUsers.map(u => ({
+        ...u,
+        username: u.email.split('@')[0]
+      }));
+      setUsersList(fallback as UserItem[]);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // Penyelarasan warna badge status ke dalam palet organik baru kita (Celadon & Rose Pastel)
   const getStatusBadgeClass = (status: 'Aktif' | 'Nonaktif') => {
@@ -12836,11 +13707,32 @@ export default function UsersPage() {
     window.alert(`Mengedit profil akun: ${name}`);
   };
 
-  const handleDeleteUser = (id: string, name: string) => {
+  const handleDeleteUser = async (username: string, name: string) => {
     if (window.confirm(`Apakah Anda yakin ingin menonaktifkan akun ${name}?`)) {
-      setUsersList(prev =>
-        prev.map(u => u.id === id ? { ...u, status: 'Nonaktif' } : u)
-      );
+      const toastId = toast.loading('Memproses penonaktifan akun...');
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:8000/api/v1/auth/users/${username}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'Nonaktif' })
+        });
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Gagal mengubah status pengguna.');
+        }
+        toast.success(`Akun ${name} berhasil dinonaktifkan.`, { id: toastId });
+        fetchUsers();
+      } catch (err: any) {
+        toast.error(err.message || 'Gagal merubah status.', { id: toastId });
+        // Local fallback
+        setUsersList(prev =>
+          prev.map(u => u.username === username ? { ...u, status: 'Nonaktif' } : u)
+        );
+      }
     }
   };
 
@@ -12937,7 +13829,7 @@ export default function UsersPage() {
                         {user.status === 'Aktif' && (
                           <div className="relative group inline-block">
                             <button
-                              onClick={() => handleDeleteUser(user.id, user.name)}
+                              onClick={() => handleDeleteUser(user.username || user.id, user.name)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-none bg-transparent transition-colors cursor-pointer outline-none"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -13009,15 +13901,26 @@ export const UserService = {
 
 --- FILE: src\features\verification\pages\VerificationPage.tsx ---
 import { Link } from 'react-router-dom';
-import { mockSubmissions } from '@/mock/submission/submissions';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { Submission } from '@/features/submission/types';
 import {
-  ShieldCheck, FileText, Map, AlertTriangle, Eye} from 'lucide-react';
+  ShieldCheck, FileText, Map, AlertTriangle, Eye
+} from 'lucide-react';
 
 export default function VerificationPage() {
+  const { data: submissions = [] } = useQuery<Submission[]>({
+    queryKey: ['submissions'],
+    queryFn: SubmissionService.getAll,
+  });
 
   // Ambil data antrean pengajuan yang saat ini berada dalam tahapan evaluasi/verifikasi dinas
-  const verificationQueue = mockSubmissions.filter(s =>
-    ['Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Menunggu Persetujuan'].includes(s.status)
+  const verificationQueue = useMemo(() =>
+    submissions.filter((s) =>
+      ['Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Menunggu Persetujuan'].includes(s.status)
+    ),
+    [submissions]
   );
 
   // Resolusi warna status badge sesuai standardisasi sistem organik baru (Celadon & Amber Pastel)
@@ -13173,6 +14076,8 @@ import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
 import type { UserRole } from '@/app/store/useUIStore';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -13298,7 +14203,18 @@ const menuItems: MenuItem[] = [
 ];
 
 export default function DashboardLayout() {
-  const { sidebarOpen, activeRole, userProfile, toggleSidebar, setActiveRole } = useUIStore();
+  const { sidebarOpen, activeRole: uiActiveRole, userProfile: uiUserProfile, toggleSidebar, setActiveRole } = useUIStore();
+  const { user, logout } = useAuthStore();
+
+  const activeRole = user ? (normalizeRole(user.role) as UserRole) : uiActiveRole;
+  const userProfile = user ? {
+    name: user.full_name,
+    email: user.email,
+    avatar: user.role === 'PEMOHON'
+      ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+      : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces'
+  } : uiUserProfile;
+
   const location = useLocation();
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -13450,41 +14366,6 @@ export default function DashboardLayout() {
           {/* Sisi Kanan: Simulasi Role, Notifikasi, & Profil Dropdown */}
           <div className="flex items-center space-x-3.5">
 
-            {/* Widget Ganti Hak Akses (Simulasi Demo) */}
-            <div className="relative">
-              <button
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-secondary text-primary rounded-none text-[10px] font-bold uppercase tracking-wide hover:opacity-90 transition-all cursor-pointer outline-none border-none"
-              >
-                <span>Role: {activeRole}</span>
-                <ChevronDown className="h-3 w-3" />
-              </button>
-
-              {roleMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setRoleMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-none shadow-lg border border-border z-20 overflow-hidden text-left">
-                    <div className="px-3 py-2 text-[9px] font-black text-slate-400 bg-slate-50 border-b border-border uppercase tracking-widest leading-none">
-                      Ganti Hak Akses
-                    </div>
-                    {rolesList.map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => {
-                          setActiveRole(role);
-                          setRoleMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2 text-xs hover:bg-slate-50 transition-colors block border-none bg-transparent font-semibold text-slate-700 cursor-pointer ${activeRole === role ? 'font-black text-primary bg-secondary/50' : ''
-                          }`}
-                      >
-                        {role}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
             {/* Panel Notifikasi */}
             <div className="relative">
               <button
@@ -13565,7 +14446,10 @@ export default function DashboardLayout() {
                       Profil Saya
                     </Link>
                     <button
-                      onClick={() => setProfileOpen(false)}
+                      onClick={() => {
+                        setProfileOpen(false);
+                        logout();
+                      }}
                       className="w-full flex items-center px-4 py-2.5 text-xs text-rose-600 hover:bg-[#ef4444]/5 transition-colors text-left rounded-none border-none bg-transparent font-bold cursor-pointer"
                     >
                       <LogOut className="h-4 w-4 mr-3 text-rose-500" />

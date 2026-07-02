@@ -44,8 +44,7 @@ export interface SpatialAuditResult {
 // ──────────────────────────────────────────────────────────────────────────────
 
 type ZonaType = 'sawah' | 'pasir' | 'kebun' | 'ladang' | 'pemukiman' | 'sungai';
-type KategoriType = 'PERUMAHAN' | 'INDUSTRI' | 'KOMERSIAL' | 'FASILITAS' | string;
-type SeverityLevel = 'danger' | 'warning' | 'info' | 'ok';
+type SeverityLevel = 'danger' | 'warning' | 'info';
 
 interface ZoningRule {
     severity: SeverityLevel;
@@ -243,8 +242,7 @@ export function useSpatialValidator() {
                 let combinedClashGeometry: any = null;
                 let totalDangerWarningArea = 0;
 
-                const mergeGeometry = (intersection: any, severity: SeverityLevel) => {
-                    if (severity === 'ok') return; // 'ok' tidak divisualisasikan sebagai clash
+                const mergeGeometry = (intersection: any) => {
                     if (!combinedClashGeometry) {
                         combinedClashGeometry = intersection;
                     } else {
@@ -280,8 +278,7 @@ export function useSpatialValidator() {
                                 if (intersection) {
                                     const areaSqm = turf.area(intersection);
                                     clashArea += areaSqm;
-                                    const rule = getZoningRule(zona, category);
-                                    mergeGeometry(intersection, rule.severity);
+                                    mergeGeometry(intersection);
                                 }
                             } catch { /* skip malformed feature */ }
                         }

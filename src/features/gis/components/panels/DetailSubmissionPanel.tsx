@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import {
     MapPin, CheckCircle2,
     AlertTriangle, Calculator, Percent, Ruler, RotateCw,
-    Globe, Crosshair, Loader2, XCircle, ShieldAlert, ShieldCheck, ShieldX
+    Globe, Crosshair, Loader2
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';

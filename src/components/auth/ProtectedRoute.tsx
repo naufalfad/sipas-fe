@@ -8,6 +8,23 @@ interface ProtectedRouteProps {
   allowedRoles?: string[];
 }
 
+/**
+ * normalizeRole — Pemetaan Kanonik Peran (SoD-Safe Role Normalization)
+ *
+ * KEBIJAKAN SOD:
+ *   Fungsi ini memetakan nama peran dari format database (snake_case/UPPER_CASE)
+ *   ke nama tampilan frontend secara BIJEKTIF (satu-ke-satu, tidak ada overlap).
+ *   Setiap peran harus dipetakan secara eksplisit; tidak ada fallthrough yang
+ *   memungkinkan satu peran menyamar sebagai peran lain.
+ *
+ *   Pemetaan kanonik:
+ *     DB role         → Frontend display role
+ *     PEMOHON         → 'Pemohon'
+ *     ADMIN / ADMIN SIPAS → 'Admin SIPAS'
+ *     TIM_TEKNIS      → 'Tim Teknis'
+ *     KABID_PUPR / KEPALA BIDANG → 'Kepala Bidang'
+ *     SUPER_ADMIN     → 'Super Admin'
+ */
 export const normalizeRole = (role: string): string => {
   const r = role.toUpperCase();
   if (r === 'PEMOHON') return 'Pemohon';

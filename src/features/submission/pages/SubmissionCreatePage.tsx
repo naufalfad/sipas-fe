@@ -127,8 +127,8 @@ export default function SubmissionCreatePage() {
         },
         consultant: {
           consultantName: existingSub.consultant?.consultantName || '',
-          companyName: existingSub.consultant?.consultantCompanyName || '',
-          picName: existingSub.consultant?.consultantPicName || '',
+          companyName: existingSub.consultant?.companyName || '',
+          picName: existingSub.consultant?.picName || '',
         },
         statement: {
           agreed: existingSub.statement?.agreed || false,

@@ -81,13 +81,16 @@ const menuItems: MenuItem[] = [
     title: 'Verifikasi',
     path: '/verifikasi',
     icon: ShieldAlert,
-    roles: ['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
+    // SOD: Super Admin tidak boleh mengakses panel verifikasi fungsional.
+    // Hanya pejabat operasional (Admin SIPAS, Tim Teknis, Kepala Bidang) yang berwenang.
+    roles: ['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang'],
   },
   {
     title: 'Persetujuan TTE',
     path: '/persetujuan',
     icon: ShieldCheck,
-    roles: ['Kepala Bidang', 'Super Admin'],
+    // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Bidang PUPR.
+    roles: ['Kepala Bidang'],
   },
   {
     title: 'GIS Viewer',
@@ -104,32 +107,33 @@ const menuItems: MenuItem[] = [
   {
     title: 'Master Data',
     icon: Database,
-    roles: ['Admin SIPAS', 'Super Admin'],
+    // SOD: Master Data (User, Role, Referensi) adalah domain eksklusif Super Admin.
+    roles: ['Super Admin'],
     submenu: [
       {
         title: 'User',
         path: '/master/pengguna',
         icon: Users,
-        roles: ['Admin SIPAS', 'Super Admin'],
+        roles: ['Super Admin'],
       },
       {
         title: 'Role',
         path: '/master/role',
         icon: ShieldCheck,
-        roles: ['Admin SIPAS', 'Super Admin'],
+        roles: ['Super Admin'],
       },
       {
         title: 'Referensi',
         path: '/master/referensi',
         icon: Bookmark,
-        roles: ['Admin SIPAS', 'Super Admin'],
+        roles: ['Super Admin'],
       },
     ],
   },
 ];
 
 export default function DashboardLayout() {
-  const { sidebarOpen, activeRole: uiActiveRole, userProfile: uiUserProfile, toggleSidebar, setActiveRole } = useUIStore();
+  const { sidebarOpen, activeRole: uiActiveRole, userProfile: uiUserProfile, toggleSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
 
   const activeRole = user ? (normalizeRole(user.role) as UserRole) : uiActiveRole;
@@ -142,28 +146,25 @@ export default function DashboardLayout() {
   } : uiUserProfile;
 
   const location = useLocation();
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Filter menu secara dinamis berdasarkan wewenang peran aktif
+  // Filter menu secara dinamis berdasarkan wewenang peran aktif.
+  // KEBIJAKAN SOD: Tidak ada peran yang mendapat bypass universal — setiap item
+  // menu HARUS mendaftarkan peran yang diizinkan secara eksplisit pada array `roles`-nya.
   const filteredMenu = menuItems.filter(item => {
-    if (activeRole === 'Super Admin') return true;
     return item.roles.includes(activeRole);
   }).map(item => {
     if (item.submenu) {
       return {
         ...item,
         submenu: item.submenu.filter(sub => {
-          if (activeRole === 'Super Admin') return true;
           return sub.roles.includes(activeRole);
         })
       };
     }
     return item;
   });
-
-  const rolesList: UserRole[] = ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'];
 
   const mockNotifs = [
     { id: 1, title: 'Pengajuan Baru', desc: 'Berkas SIPAS-2026-001 butuh verifikasi.', type: 'info', time: '10 m yang lalu' },

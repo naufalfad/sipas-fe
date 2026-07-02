@@ -64,7 +64,19 @@ export const SubmissionService = {
     }
   },
 
-  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string, passphrase?: string, signatureBase64?: string): Promise<Submission | undefined> => {
+  updateStatus: async (
+    id: string,
+    status: SubmissionStatus,
+    actor: string,
+    notes: string,
+    passphrase?: string,
+    signatureBase64?: string,
+    // Opsional: override eksplisit action_type untuk jalur mundur internal.
+    // Jika tidak disediakan, akan disimpulkan dari parameter `status`:
+    //   status === 'Ditolak'  → 'REJECT'
+    //   status !== 'Ditolak'  → 'APPROVE'
+    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE'
+  ): Promise<Submission | undefined> => {
     // Parsing data aktor dan role untuk integrasi /verify
     const nameMatch = actor.match(/^([^(]+)/);
     const roleMatch = actor.match(/\(([^)]+)\)/);
@@ -81,8 +93,9 @@ export const SubmissionService = {
       role = 'PEMOHON';
     }
 
-    // Tentukan action_type berdasarkan status target
-    const action_type = status === 'Ditolak' ? 'REJECT' : 'APPROVE';
+    // Tentukan action_type: gunakan override eksplisit jika ada,
+    // jika tidak, simpulkan dari parameter status target.
+    const action_type: string = actionTypeOverride ?? (status === 'Ditolak' ? 'REJECT' : 'APPROVE');
 
     // ── FASE 1: Kirim keputusan verifikasi ke API Backend ──────────────────
     const verifyResponse = await fetch(`${API_BASE_URL}/${id}/verify`, {

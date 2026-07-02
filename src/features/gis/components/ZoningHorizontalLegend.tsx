@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Minus, Maximize2, Mountain, ChevronDown, ChevronUp, Navigation } from "lucide-react";
+import { Plus, Minus, Maximize2, Mountain, ChevronDown, ChevronUp } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 

@@ -115,7 +115,9 @@ export const router = createBrowserRouter([
       {
         path: 'verifikasi',
         element: (
-          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+          // SOD: Super Admin dikecualikan. Hanya pejabat fungsional yang berwenang
+          // melakukan verifikasi administrasi, teknis, dan persetujuan TTE.
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang']}>
             <VerificationPage />
           </ProtectedRoute>
         ),
@@ -123,7 +125,9 @@ export const router = createBrowserRouter([
       {
         path: 'persetujuan',
         element: (
-          <ProtectedRoute allowedRoles={['Kepala Bidang', 'Super Admin']}>
+          // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Bidang PUPR.
+          // Tidak ada peran lain, termasuk Super Admin, yang dapat mengakses halaman ini.
+          <ProtectedRoute allowedRoles={['Kepala Bidang']}>
             <ApprovalQueuePage />
           </ProtectedRoute>
         ),
@@ -146,7 +150,9 @@ export const router = createBrowserRouter([
           {
             path: 'pengguna',
             element: (
-              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+              // SOD: Master Data adalah domain eksklusif Super Admin.
+              // Admin SIPAS mengelola verifikasi, bukan konfigurasi sistem pengguna & role.
+              <ProtectedRoute allowedRoles={['Super Admin']}>
                 <UsersPage />
               </ProtectedRoute>
             ),
@@ -154,7 +160,7 @@ export const router = createBrowserRouter([
           {
             path: 'role',
             element: (
-              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+              <ProtectedRoute allowedRoles={['Super Admin']}>
                 <RolesPage />
               </ProtectedRoute>
             ),
@@ -162,7 +168,7 @@ export const router = createBrowserRouter([
           {
             path: 'referensi',
             element: (
-              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+              <ProtectedRoute allowedRoles={['Super Admin']}>
                 <ReferencesPage />
               </ProtectedRoute>
             ),

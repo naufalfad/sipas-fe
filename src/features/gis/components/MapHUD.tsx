@@ -18,7 +18,7 @@ export default function MapHUD() {
     const {
         activeLayers, mapZoom, mapPitch, mapBearing,
         is3DMode, toggle3DMode, isTerrainActive, toggleTerrain,
-        cursorCoords, setMapPitch
+        cursorCoords
     } = useGisUIStore();
 
     const [isLegendOpen, setIsLegendOpen] = useState(false);

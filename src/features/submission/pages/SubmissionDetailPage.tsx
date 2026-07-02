@@ -173,8 +173,29 @@ export default function SubmissionDetailPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ status, notes, passphrase, signatureBase64 }: { status: SubmissionStatus; notes: string; passphrase?: string; signatureBase64?: string }) => {
-      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes, passphrase, signatureBase64);
+    mutationFn: async ({
+      status,
+      notes,
+      passphrase,
+      signatureBase64,
+      actionTypeOverride
+    }: {
+      status: SubmissionStatus;
+      notes: string;
+      passphrase?: string;
+      signatureBase64?: string;
+      // Override eksplisit untuk jalur revert internal (opsional)
+      actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE';
+    }) => {
+      return SubmissionService.updateStatus(
+        sub?.id || '',
+        status,
+        `${userProfile.name} (${activeRole})`,
+        notes,
+        passphrase,
+        signatureBase64,
+        actionTypeOverride
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submission', id] });
@@ -283,9 +304,10 @@ export default function SubmissionDetailPage() {
   const slaDaysRemaining = sub.remaining_sla_days ?? 0;
 
   // Helper variables for role-based conditional rendering
-  const isAdminActive = activeRole === 'Admin SIPAS' || activeRole === 'Super Admin';
-  const isTechActive = activeRole === 'Tim Teknis' || activeRole === 'Super Admin';
-  const isKabidActive = activeRole === 'Kepala Bidang' || activeRole === 'Super Admin';
+  // SOD: Super Admin tidak boleh melihat panel verifikasi fungsional.
+  const isAdminActive = activeRole === 'Admin SIPAS';
+  const isTechActive = activeRole === 'Tim Teknis';
+  const isKabidActive = activeRole === 'Kepala Bidang';
 
   const showAdminPanel = isAdminActive && (sub.status === 'Menunggu Verifikasi' || sub.status === 'Verifikasi Administrasi');
   const showTechPanel = isTechActive && sub.status === 'Verifikasi Teknis';
@@ -336,6 +358,36 @@ export default function SubmissionDetailPage() {
       notes: notes.trim() || defaultNotes,
       passphrase: approved ? passphrase : undefined,
       signatureBase64: approved ? signature : undefined
+    });
+  };
+
+  // ── HANDLER PENGEMBALIAN INTERNAL: Kabid → Tim Teknis ──────────────────────
+  // Dipanggil saat Kepala Bidang menemukan isu teknis yang perlu diklarifikasi
+  // ulang oleh Tim Teknis SEBELUM TTE diterbitkan. SLA clock tetap berjalan.
+  const handleRevertToTechnical = () => {
+    if (!notes.trim()) {
+      toast.error('Catatan alasan pengembalian wajib diisi sebelum mengembalikan berkas ke Tim Teknis.');
+      return;
+    }
+    mutation.mutate({
+      status: 'Verifikasi Teknis',
+      notes: notes.trim(),
+      actionTypeOverride: 'REVERT_TO_TECHNICAL'
+    });
+  };
+
+  // ── HANDLER PENGEMBALIAN INTERNAL: Tim Teknis → Admin SIPAS ───────────────
+  // Dipanggil saat Tim Teknis menemukan kelengkapan dokumen administratif yang
+  // perlu diperbaiki Admin SEBELUM audit spasial dapat dilanjutkan. SLA tetap berjalan.
+  const handleRevertToAdministrative = () => {
+    if (!notes.trim()) {
+      toast.error('Catatan alasan pengembalian wajib diisi sebelum mengembalikan berkas ke Admin SIPAS.');
+      return;
+    }
+    mutation.mutate({
+      status: 'Verifikasi Administrasi',
+      notes: notes.trim(),
+      actionTypeOverride: 'REVERT_TO_ADMINISTRATIVE'
     });
   };
 
@@ -1169,7 +1221,20 @@ export default function SubmissionDetailPage() {
               </div>
 
               {/* Tindakan */}
-              <div className="pt-2 flex items-center justify-end gap-3">
+              <div className="pt-2 flex items-center justify-end gap-3 flex-wrap">
+                {/* Kembalikan ke Admin — Jalur Revert Internal (amber) */}
+                <button
+                  type="button"
+                  disabled={mutation.isPending}
+                  onClick={handleRevertToAdministrative}
+                  title="Kembalikan ke Admin SIPAS untuk perbaikan dokumen (SLA tetap berjalan)"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                  </svg>
+                  Kembalikan ke Admin
+                </button>
                 <button
                   type="button"
                   disabled={mutation.isPending}
@@ -1286,7 +1351,20 @@ export default function SubmissionDetailPage() {
               </div>
 
               {/* Tindakan */}
-              <div className="pt-2 flex items-center justify-end gap-3">
+              <div className="pt-2 flex items-center justify-end gap-3 flex-wrap">
+                {/* Kembalikan ke Tim Teknis — Jalur Revert Internal (amber) */}
+                <button
+                  type="button"
+                  disabled={mutation.isPending}
+                  onClick={handleRevertToTechnical}
+                  title="Kembalikan ke Tim Teknis untuk klarifikasi teknis (SLA tetap berjalan)"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                  </svg>
+                  Kembalikan ke Tim Teknis
+                </button>
                 <button
                   type="button"
                   disabled={mutation.isPending}

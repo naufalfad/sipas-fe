@@ -28,7 +28,7 @@
  */
 
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Loader2, Crosshair, XCircle, CheckCircle2, HelpCircle, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
+import { Loader2, Crosshair, HelpCircle, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSpatialValidator, type SpatialAuditResult } from '../../hooks/useSpatialValidator';
 import { toast } from 'sonner';

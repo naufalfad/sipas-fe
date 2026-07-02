@@ -706,7 +706,7 @@ export default function SipasMap() {
                     rz: 0,
                 };
 
-                const useFallback = () => {
+                const triggerFallback = () => {
                     if (this.currentModelId !== id || !this.scene) return;
                     if (this.modelMesh) {
                         this.scene.remove(this.modelMesh);
@@ -746,15 +746,15 @@ export default function SipasMap() {
                             undefined,
                             (err) => {
                                 console.warn('[THREE-BIM] Fallback triggered:', err);
-                                useFallback();
+                                triggerFallback();
                             }
                         );
                     }).catch((err) => {
                         console.warn('[THREE-BIM] Fallback triggered:', err);
-                        useFallback();
+                        triggerFallback();
                     });
                 } else {
-                    useFallback();
+                    triggerFallback();
                 }
             },
 
