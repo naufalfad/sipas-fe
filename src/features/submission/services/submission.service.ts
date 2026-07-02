@@ -64,7 +64,7 @@ export const SubmissionService = {
     }
   },
 
-  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string, passphrase?: string): Promise<Submission | undefined> => {
+  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string, passphrase?: string, signatureBase64?: string): Promise<Submission | undefined> => {
     // Parsing data aktor dan role untuk integrasi /verify
     const nameMatch = actor.match(/^([^(]+)/);
     const roleMatch = actor.match(/\(([^)]+)\)/);
@@ -93,6 +93,7 @@ export const SubmissionService = {
         role,
         nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
         passphrase: passphrase || undefined,
+        signature_base64: signatureBase64 || undefined,
         action_type,
         notes,
         is_spatially_compliant: true

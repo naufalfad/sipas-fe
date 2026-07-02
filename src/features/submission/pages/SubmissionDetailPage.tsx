@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
@@ -63,6 +63,90 @@ export default function SubmissionDetailPage() {
 
   const [notes, setNotes] = useState('');
   const [passphrase, setPassphrase] = useState('');
+  const [signature, setSignature] = useState('');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDrawingRef = useRef(false);
+
+  // Canvas drawing handlers for signature pad
+  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    
+    // Get actual display size
+    const displayWidth = rect.width;
+    const displayHeight = rect.height;
+    
+    // Get logical canvas dimensions
+    const logicalWidth = canvas.width;
+    const logicalHeight = canvas.height;
+    
+    // For touch events
+    if ('touches' in e) {
+      if (e.touches.length === 0) return { x: 0, y: 0 };
+      const clientX = e.touches[0].clientX - rect.left;
+      const clientY = e.touches[0].clientY - rect.top;
+      return {
+        x: (clientX / displayWidth) * logicalWidth,
+        y: (clientY / displayHeight) * logicalHeight
+      };
+    }
+    
+    // For mouse events
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+    return {
+      x: (clientX / displayWidth) * logicalWidth,
+      y: (clientY / displayHeight) * logicalHeight
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { x, y } = getCoordinates(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    isDrawingRef.current = true;
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { x, y } = getCoordinates(e);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#0f172a'; // slate-900
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Export signature as base64 png
+    const dataUrl = canvas.toDataURL('image/png');
+    setSignature(dataUrl);
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSignature('');
+  };
   const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto'>('ringkasan');
 
   // Checklist states
@@ -89,14 +173,15 @@ export default function SubmissionDetailPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ status, notes, passphrase }: { status: SubmissionStatus; notes: string; passphrase?: string }) => {
-      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes, passphrase);
+    mutationFn: async ({ status, notes, passphrase, signatureBase64 }: { status: SubmissionStatus; notes: string; passphrase?: string; signatureBase64?: string }) => {
+      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes, passphrase, signatureBase64);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submission', id] });
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
       setNotes('');
       setPassphrase('');
+      setSignature('');
       setAdminChecks({ ktp: false, sertifikat: false, npwp: false, kkpr: false });
       setTechChecks({ polygon: false, rth: false, utilities: false, cad: false });
       setKabidAgreed(false);
@@ -231,20 +316,27 @@ export default function SubmissionDetailPage() {
     const targetStatus = approved ? 'Disetujui' : 'Ditolak';
     const defaultNotes = approved ? 'Dokumen Site Plan disahkan secara hukum menggunakan Tanda Tangan Elektronik (TTE) resmi dinas.' : 'Permohonan pengesahan ditolak oleh Kepala Bidang.';
 
-    if (approved && !passphrase) {
-      toast.error('Passphrase PIN TTE wajib diisi untuk melakukan pengesahan!');
-      return;
-    }
-    if (approved && passphrase.length < 6) {
-      toast.error('Passphrase PIN TTE minimal 6 karakter!');
-      return;
+    if (approved) {
+      if (!passphrase) {
+        toast.error('Passphrase PIN TTE wajib diisi untuk melakukan pengesahan!');
+        return;
+      }
+      if (passphrase.length < 6) {
+        toast.error('Passphrase PIN TTE minimal 6 karakter!');
+        return;
+      }
+      if (!signature) {
+        toast.error('Tanda Tangan Pejabat wajib digambar pada pad drawer!');
+        return;
+      }
     }
 
     mutation.mutate({
       status: targetStatus,
       notes: notes.trim() || defaultNotes,
-      passphrase: approved ? passphrase : undefined
-    } as any);
+      passphrase: approved ? passphrase : undefined,
+      signatureBase64: approved ? signature : undefined
+    });
   };
 
   // Handler Visualisasi Lahan Kompensasi pada Peta Spasial [Purworejo 8]
@@ -1157,6 +1249,40 @@ export default function SubmissionDetailPage() {
                   className={inputClass}
                   required
                 />
+              </div>
+
+              {/* Tanda Tangan Canvas Pad */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className={labelClass}>Tanda Tangan Pejabat (TTD Drawer)</label>
+                  <button
+                    type="button"
+                    onClick={clearSignature}
+                    className="text-[10px] text-rose-500 hover:text-rose-700 font-bold transition-colors cursor-pointer"
+                  >
+                    Hapus TTD
+                  </button>
+                </div>
+                <div className="relative border border-slate-200 rounded-none bg-slate-50 overflow-hidden select-none">
+                  <canvas
+                    ref={canvasRef}
+                    width={380}
+                    height={150}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                    className="w-full h-[150px] cursor-crosshair touch-none bg-slate-50"
+                  />
+                  {!signature && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-[11px] text-slate-400 font-medium">
+                      Goreskan tanda tangan Anda di sini
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Tindakan */}
