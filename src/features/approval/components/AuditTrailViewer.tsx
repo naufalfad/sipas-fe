@@ -12,7 +12,9 @@
  * ============================================================================
  */
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { SubmissionService } from '@/features/submission/services/submission.service';
 import { useUIStore, type AuditTrailEntry } from '@/app/store/useUIStore';
 import {
     ShieldCheck, History, Fingerprint, Globe
@@ -25,14 +27,87 @@ interface AuditTrailViewerProps {
 
 export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps) {
     const auditTrailLogs = useUIStore((s) => s.auditTrailLogs);
+    const setAuditLogs = useUIStore((s) => s.setAuditLogs);
 
-    // ── SINKRONISASI FILTER DATA: Saring log berdasarkan ID Permohonan ──────────
+    // Fetch submission history from server, prefer server history to ensure
+    // `digitalSignatureHash` returned by backend is displayed.
+    const { data: submissionData } = useQuery({
+        queryKey: ['submission', submissionId],
+        queryFn: () => SubmissionService.getById(submissionId),
+        enabled: !!submissionId,
+        staleTime: 5 * 60 * 1000
+    });
+
     const filteredLogs = useMemo(() => {
+        // If server returned history, map it to our AuditTrailEntry-lite shape
+        if (submissionData && Array.isArray(submissionData.history) && submissionData.history.length > 0) {
+            const mapped = submissionData.history.map((h: any, idx: number) => {
+                // h: { date, status, notes, actor, digitalSignatureHash }
+                const actorRaw = h.actor || '';
+                const actorNameMatch = actorRaw.match(/^([^(]+)/);
+                const roleMatch = actorRaw.match(/\(([^)]+)\)/);
+                return {
+                    id: `srv-audit-${idx}-${submissionId}`,
+                    submissionId,
+                    timestamp: h.date || new Date().toISOString(),
+                    actorName: actorNameMatch ? actorNameMatch[1].trim() : actorRaw,
+                    role: roleMatch ? (roleMatch[1] as any) : 'Pemohon',
+                    action: h.action || h.status || 'UNKNOWN',
+                    statusBefore: h.status || '',
+                    statusAfter: h.status || '',
+                    notes: h.notes || '',
+                    ipAddress: h.ipAddress || '-',
+                    digitalSignatureHash: h.digitalSignatureHash || undefined
+                } as AuditTrailEntry;
+            });
+
+            // sort descending by timestamp
+            return mapped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        }
+
+        // Fallback: use local UI store logs
         return auditTrailLogs
             .filter((log) => log.submissionId === submissionId)
-            // Urutkan berdasarkan waktu terbaru (descending)
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    }, [auditTrailLogs, submissionId]);
+    }, [auditTrailLogs, submissionId, submissionData]);
+
+    const { refetch } = useQuery({
+        queryKey: ['submission', submissionId, 'refresh-trigger'],
+        queryFn: () => Promise.resolve(undefined),
+        enabled: false
+    });
+
+    useEffect(() => {
+        if (!(submissionData && Array.isArray(submissionData.history) && submissionData.history.length > 0)) return;
+
+        const mappedForStore: AuditTrailEntry[] = submissionData.history.map((h: any, idx: number) => {
+            const actorRaw = h.actor || '';
+            const actorNameMatch = actorRaw.match(/^([^(]+)/);
+            const roleMatch = actorRaw.match(/\(([^)]+)\)/);
+            return {
+                id: `srv-audit-${idx}-${submissionId}`,
+                submissionId,
+                timestamp: h.date || new Date().toISOString(),
+                actorName: actorNameMatch ? actorNameMatch[1].trim() : actorRaw,
+                role: roleMatch ? (roleMatch[1] as any) : 'Pemohon',
+                action: h.action || h.status || 'UNKNOWN',
+                statusBefore: h.status || '',
+                statusAfter: h.status || '',
+                notes: h.notes || '',
+                ipAddress: h.ipAddress || '-',
+                digitalSignatureHash: h.digitalSignatureHash || undefined
+            } as AuditTrailEntry;
+        }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        try {
+            setAuditLogs(mappedForStore);
+        } catch {
+            // ignore
+        }
+
+        // Trigger a lightweight UI refresh where needed
+        try { refetch(); } catch { /* ignore */ }
+    }, [submissionData, submissionId, setAuditLogs, refetch]);
 
     // Format Helper: Tanggal & Waktu Lokal
     const formatDateTime = (isoString: string) => {

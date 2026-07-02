@@ -4,6 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/app/store/useAuthStore';
+import { useUIStore } from '@/app/store/useUIStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import type { UserRole } from '@/app/store/useUIStore';
 import { Lock, User, Layers, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 
@@ -16,6 +19,7 @@ type LoginSchemaType = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { login } = useAuthStore();
+  const { setActiveRole, setUserProfile } = useUIStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +56,23 @@ export default function LoginPage() {
       const resData = await response.json();
       login(resData.access_token, resData.user);
 
+      // Sync UI simulator role & profile with authenticated user so pages
+      // that read `useUIStore.activeRole` reflect the real login role.
+      try {
+        const displayRole = normalizeRole(resData.user.role) as UserRole;
+        // setActiveRole may perform a demo sync; call it to align UI state.
+        setActiveRole(displayRole);
+        setUserProfile({
+          name: resData.user.full_name,
+          email: resData.user.email,
+          avatar: resData.user.role === 'PEMOHON'
+            ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+            : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces'
+        });
+      } catch {
+        // Non-fatal: continue even if UI sync fails
+      }
+
       toast.success(`Selamat datang kembali, ${resData.user.full_name}!`, { id: toastId });
       navigate(from, { replace: true });
     } catch (err: any) {
@@ -65,7 +86,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#f4f7f4] flex flex-col justify-center items-center p-4 font-sans select-none text-foreground">
       {/* ─── KARTU UTAMA LOGIN ─── */}
       <div className="w-full max-w-md bg-white border border-[#DAE4DB] p-8 shadow-[6px_6px_0px_0px_rgba(65,93,67,0.08)] space-y-6">
-        
+
         {/* Branding & Logo */}
         <div className="text-center space-y-2">
           <div className="inline-flex p-3 bg-[#e8f2ea] text-[#415D43] mb-1">
@@ -81,7 +102,7 @@ export default function LoginPage() {
 
         {/* Formulir Input */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
-          
+
           {/* Input Username */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">

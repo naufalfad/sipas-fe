@@ -2,6 +2,8 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import { useGisUIStore, type LahanKompensasi } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { SubmissionStatus } from '../types';
@@ -55,7 +57,12 @@ const mockKompensasiList: LahanKompensasi[] = [
 export default function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const { activeRole, userProfile } = useUIStore();
+  const { activeRole: uiActiveRole, userProfile: uiUserProfile } = useUIStore();
+  const { user } = useAuthStore();
+
+  // Determine effective role: prefer authenticated user role (normalized),
+  // otherwise fall back to UI simulator role.
+  const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
 
   // Zustand State Binding [sipas-fe.txt, Purworejo 8]
   const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
@@ -72,15 +79,15 @@ export default function SubmissionDetailPage() {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    
+
     // Get actual display size
     const displayWidth = rect.width;
     const displayHeight = rect.height;
-    
+
     // Get logical canvas dimensions
     const logicalWidth = canvas.width;
     const logicalHeight = canvas.height;
-    
+
     // For touch events
     if ('touches' in e) {
       if (e.touches.length === 0) return { x: 0, y: 0 };
@@ -91,7 +98,7 @@ export default function SubmissionDetailPage() {
         y: (clientY / displayHeight) * logicalHeight
       };
     }
-    
+
     // For mouse events
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
@@ -287,6 +294,8 @@ export default function SubmissionDetailPage() {
     );
   }
 
+
+
   // Pengkondisian gaya visual lencana status sesuai standardisasi palet organik baru (WCAG AA Compliant)
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -305,13 +314,20 @@ export default function SubmissionDetailPage() {
 
   // Helper variables for role-based conditional rendering
   // SOD: Super Admin tidak boleh melihat panel verifikasi fungsional.
-  const isAdminActive = activeRole === 'Admin SIPAS';
-  const isTechActive = activeRole === 'Tim Teknis';
-  const isKabidActive = activeRole === 'Kepala Bidang';
+  const isAdminActive = effectiveRole === 'Admin SIPAS';
+  const isTechActive = effectiveRole === 'Tim Teknis';
+  const isKabidActive = effectiveRole === 'Kepala Bidang';
 
   const showAdminPanel = isAdminActive && (sub.status === 'Menunggu Verifikasi' || sub.status === 'Verifikasi Administrasi');
   const showTechPanel = isTechActive && sub.status === 'Verifikasi Teknis';
   const showKabidPanel = isKabidActive && sub.status === 'Menunggu Persetujuan';
+
+  // Debug variables (safe: declared after dependent flags)
+  const debugRole = effectiveRole;
+  const debugUiRole = uiActiveRole;
+  const debugStatus = sub.status;
+  const debugIsKabid = isKabidActive;
+  const debugShowKabid = showKabidPanel;
 
   const allAdminChecked = Object.values(adminChecks).every(Boolean);
   const allTechChecked = Object.values(techChecks).every(Boolean);
@@ -434,6 +450,14 @@ export default function SubmissionDetailPage() {
           <p className="text-xs text-slate-500 mt-2">
             Informasi administrasi, penelusuran riwayat evaluasi, dan lampiran berkas teknis {sub.submissionNo}.
           </p>
+        </div>
+
+        {/* Dev debug: show role/status flags */}
+        <div className="ml-4 p-2 border border-slate-200 bg-yellow-50 text-[11px] text-slate-700 rounded-none select-none">
+          <div className="font-bold">DEBUG</div>
+          <div className="text-[11px]">Effective Role (auth): {debugRole} · UI Simulator Role: {debugUiRole}</div>
+          <div className="text-[11px]">Status: {debugStatus}</div>
+          <div className="text-[11px]">isKabidActive: {debugIsKabid ? 'true' : 'false'} · showKabidPanel: {debugShowKabid ? 'true' : 'false'}</div>
         </div>
 
         {/* ─── DYNAMIC SLA TRACKER HUD [Bogor 16] ─── */}
@@ -1408,6 +1432,14 @@ export default function SubmissionDetailPage() {
                     <span className="text-slate-400 text-[10px]">Belum Ditandatangani Elektronik</span>
                   )}
                 </div>
+                {sub.kabidSignature && (
+                  <div className="mt-3 select-none">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Tanda Tangan Fisik (Coretan Tangan):</span>
+                    <div className="border border-slate-200 bg-white p-2 w-[160px] h-[75px] flex items-center justify-center">
+                      <img src={sub.kabidSignature} alt="Tanda Tangan Kabid" className="max-w-full max-h-full object-contain" />
+                    </div>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => {

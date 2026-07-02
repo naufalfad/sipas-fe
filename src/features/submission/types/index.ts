@@ -145,6 +145,7 @@ export interface Submission {
   remaining_sla_days?: number;
   signatureHash?: string;
   signedPdfUrl?: string;
+  kabidSignature?: string;
   // Penambahan parameter hasil hitung sistem (Slide 6)
   kdbPercent?: number;
   klbValue?: number;

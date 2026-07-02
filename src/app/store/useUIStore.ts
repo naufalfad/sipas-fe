@@ -52,6 +52,7 @@ interface UIState {
 
   // ── Actions: Audit Trail Logging [Bogor 7] ────────────────────────────────
   addAuditLog: (entry: Omit<AuditTrailEntry, 'id' | 'timestamp' | 'ipAddress' | 'digitalSignatureHash'>) => void;
+  setAuditLogs: (entries: AuditTrailEntry[]) => void;
   clearAuditLogs: () => void;
 }
 
@@ -128,12 +129,12 @@ export const useUIStore = create<UIState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
   setActiveRole: async (role) => {
-    let username = 'hendra_wijaya';
-    if (role === 'Pemohon') username = 'ahmad_fauzi';
-    else if (role === 'Admin SIPAS') username = 'siti_rahma';
-    else if (role === 'Tim Teknis') username = 'budi_santoso';
-    else if (role === 'Kepala Bidang') username = 'hendra_wijaya';
-    else if (role === 'Super Admin') username = 'superadmin';
+    let username = 'kabid@geocitra.com';
+    if (role === 'Pemohon') username = 'pemohon@geocitra.com';
+    else if (role === 'Admin SIPAS') username = 'admin@geocitra.com';
+    else if (role === 'Tim Teknis') username = 'tim_teknis@geocitra.com';
+    else if (role === 'Kepala Bidang') username = 'kabid@geocitra.com';
+    else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
 
     try {
       const response = await fetch('http://localhost:8000/api/v1/auth/token', {
@@ -190,6 +191,17 @@ export const useUIStore = create<UIState>((set) => ({
       // Tempatkan entri log audit terbaru di bagian teratas array (descending order)
       auditTrailLogs: [newLogEntry, ...state.auditTrailLogs]
     };
+  }),
+
+  // Replace/merge audit logs from server into local store (avoid duplicates)
+  setAuditLogs: (entries) => set((state) => {
+    const existingByKey = new Map(state.auditTrailLogs.map(l => [l.id, l]));
+    entries.forEach((e) => {
+      existingByKey.set(e.id, e);
+    });
+    // Keep descending order by timestamp (newest first)
+    const merged = Array.from(existingByKey.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return { auditTrailLogs: merged };
   }),
 
   clearAuditLogs: () => set({ auditTrailLogs: [] })
