@@ -717,7 +717,9 @@ export const router = createBrowserRouter([
       {
         path: 'verifikasi',
         element: (
-          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+          // SOD: Super Admin dikecualikan. Hanya pejabat fungsional yang berwenang
+          // melakukan verifikasi administrasi, teknis, dan persetujuan TTE.
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang']}>
             <VerificationPage />
           </ProtectedRoute>
         ),
@@ -725,7 +727,9 @@ export const router = createBrowserRouter([
       {
         path: 'persetujuan',
         element: (
-          <ProtectedRoute allowedRoles={['Kepala Bidang', 'Super Admin']}>
+          // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Bidang PUPR.
+          // Tidak ada peran lain, termasuk Super Admin, yang dapat mengakses halaman ini.
+          <ProtectedRoute allowedRoles={['Kepala Bidang']}>
             <ApprovalQueuePage />
           </ProtectedRoute>
         ),
@@ -748,7 +752,9 @@ export const router = createBrowserRouter([
           {
             path: 'pengguna',
             element: (
-              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+              // SOD: Master Data adalah domain eksklusif Super Admin.
+              // Admin SIPAS mengelola verifikasi, bukan konfigurasi sistem pengguna & role.
+              <ProtectedRoute allowedRoles={['Super Admin']}>
                 <UsersPage />
               </ProtectedRoute>
             ),
@@ -756,7 +762,7 @@ export const router = createBrowserRouter([
           {
             path: 'role',
             element: (
-              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+              <ProtectedRoute allowedRoles={['Super Admin']}>
                 <RolesPage />
               </ProtectedRoute>
             ),
@@ -764,7 +770,7 @@ export const router = createBrowserRouter([
           {
             path: 'referensi',
             element: (
-              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+              <ProtectedRoute allowedRoles={['Super Admin']}>
                 <ReferencesPage />
               </ProtectedRoute>
             ),
@@ -1187,6 +1193,7 @@ interface UIState {
 
   // ── Actions: Audit Trail Logging [Bogor 7] ────────────────────────────────
   addAuditLog: (entry: Omit<AuditTrailEntry, 'id' | 'timestamp' | 'ipAddress' | 'digitalSignatureHash'>) => void;
+  setAuditLogs: (entries: AuditTrailEntry[]) => void;
   clearAuditLogs: () => void;
 }
 
@@ -1263,12 +1270,12 @@ export const useUIStore = create<UIState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
   setActiveRole: async (role) => {
-    let username = 'hendra_wijaya';
-    if (role === 'Pemohon') username = 'ahmad_fauzi';
-    else if (role === 'Admin SIPAS') username = 'siti_rahma';
-    else if (role === 'Tim Teknis') username = 'budi_santoso';
-    else if (role === 'Kepala Bidang') username = 'hendra_wijaya';
-    else if (role === 'Super Admin') username = 'superadmin';
+    let username = 'kabid@geocitra.com';
+    if (role === 'Pemohon') username = 'pemohon@geocitra.com';
+    else if (role === 'Admin SIPAS') username = 'admin@geocitra.com';
+    else if (role === 'Tim Teknis') username = 'tim_teknis@geocitra.com';
+    else if (role === 'Kepala Bidang') username = 'kabid@geocitra.com';
+    else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
 
     try {
       const response = await fetch('http://localhost:8000/api/v1/auth/token', {
@@ -1327,6 +1334,17 @@ export const useUIStore = create<UIState>((set) => ({
     };
   }),
 
+  // Replace/merge audit logs from server into local store (avoid duplicates)
+  setAuditLogs: (entries) => set((state) => {
+    const existingByKey = new Map(state.auditTrailLogs.map(l => [l.id, l]));
+    entries.forEach((e) => {
+      existingByKey.set(e.id, e);
+    });
+    // Keep descending order by timestamp (newest first)
+    const merged = Array.from(existingByKey.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return { auditTrailLogs: merged };
+  }),
+
   clearAuditLogs: () => set({ auditTrailLogs: [] })
 }));
 
@@ -1341,6 +1359,23 @@ interface ProtectedRouteProps {
   allowedRoles?: string[];
 }
 
+/**
+ * normalizeRole — Pemetaan Kanonik Peran (SoD-Safe Role Normalization)
+ *
+ * KEBIJAKAN SOD:
+ *   Fungsi ini memetakan nama peran dari format database (snake_case/UPPER_CASE)
+ *   ke nama tampilan frontend secara BIJEKTIF (satu-ke-satu, tidak ada overlap).
+ *   Setiap peran harus dipetakan secara eksplisit; tidak ada fallthrough yang
+ *   memungkinkan satu peran menyamar sebagai peran lain.
+ *
+ *   Pemetaan kanonik:
+ *     DB role         → Frontend display role
+ *     PEMOHON         → 'Pemohon'
+ *     ADMIN / ADMIN SIPAS → 'Admin SIPAS'
+ *     TIM_TEKNIS      → 'Tim Teknis'
+ *     KABID_PUPR / KEPALA BIDANG → 'Kepala Bidang'
+ *     SUPER_ADMIN     → 'Super Admin'
+ */
 export const normalizeRole = (role: string): string => {
   const r = role.toUpperCase();
   if (r === 'PEMOHON') return 'Pemohon';
@@ -2424,7 +2459,9 @@ export { Badge, badgeVariants };
  * ============================================================================
  */
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { SubmissionService } from '@/features/submission/services/submission.service';
 import { useUIStore, type AuditTrailEntry } from '@/app/store/useUIStore';
 import {
     ShieldCheck, History, Fingerprint, Globe
@@ -2437,14 +2474,87 @@ interface AuditTrailViewerProps {
 
 export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps) {
     const auditTrailLogs = useUIStore((s) => s.auditTrailLogs);
+    const setAuditLogs = useUIStore((s) => s.setAuditLogs);
 
-    // ── SINKRONISASI FILTER DATA: Saring log berdasarkan ID Permohonan ──────────
+    // Fetch submission history from server, prefer server history to ensure
+    // `digitalSignatureHash` returned by backend is displayed.
+    const { data: submissionData } = useQuery({
+        queryKey: ['submission', submissionId],
+        queryFn: () => SubmissionService.getById(submissionId),
+        enabled: !!submissionId,
+        staleTime: 5 * 60 * 1000
+    });
+
     const filteredLogs = useMemo(() => {
+        // If server returned history, map it to our AuditTrailEntry-lite shape
+        if (submissionData && Array.isArray(submissionData.history) && submissionData.history.length > 0) {
+            const mapped = submissionData.history.map((h: any, idx: number) => {
+                // h: { date, status, notes, actor, digitalSignatureHash }
+                const actorRaw = h.actor || '';
+                const actorNameMatch = actorRaw.match(/^([^(]+)/);
+                const roleMatch = actorRaw.match(/\(([^)]+)\)/);
+                return {
+                    id: `srv-audit-${idx}-${submissionId}`,
+                    submissionId,
+                    timestamp: h.date || new Date().toISOString(),
+                    actorName: actorNameMatch ? actorNameMatch[1].trim() : actorRaw,
+                    role: roleMatch ? (roleMatch[1] as any) : 'Pemohon',
+                    action: h.action || h.status || 'UNKNOWN',
+                    statusBefore: h.status || '',
+                    statusAfter: h.status || '',
+                    notes: h.notes || '',
+                    ipAddress: h.ipAddress || '-',
+                    digitalSignatureHash: h.digitalSignatureHash || undefined
+                } as AuditTrailEntry;
+            });
+
+            // sort descending by timestamp
+            return mapped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        }
+
+        // Fallback: use local UI store logs
         return auditTrailLogs
             .filter((log) => log.submissionId === submissionId)
-            // Urutkan berdasarkan waktu terbaru (descending)
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    }, [auditTrailLogs, submissionId]);
+    }, [auditTrailLogs, submissionId, submissionData]);
+
+    const { refetch } = useQuery({
+        queryKey: ['submission', submissionId, 'refresh-trigger'],
+        queryFn: () => Promise.resolve(undefined),
+        enabled: false
+    });
+
+    useEffect(() => {
+        if (!(submissionData && Array.isArray(submissionData.history) && submissionData.history.length > 0)) return;
+
+        const mappedForStore: AuditTrailEntry[] = submissionData.history.map((h: any, idx: number) => {
+            const actorRaw = h.actor || '';
+            const actorNameMatch = actorRaw.match(/^([^(]+)/);
+            const roleMatch = actorRaw.match(/\(([^)]+)\)/);
+            return {
+                id: `srv-audit-${idx}-${submissionId}`,
+                submissionId,
+                timestamp: h.date || new Date().toISOString(),
+                actorName: actorNameMatch ? actorNameMatch[1].trim() : actorRaw,
+                role: roleMatch ? (roleMatch[1] as any) : 'Pemohon',
+                action: h.action || h.status || 'UNKNOWN',
+                statusBefore: h.status || '',
+                statusAfter: h.status || '',
+                notes: h.notes || '',
+                ipAddress: h.ipAddress || '-',
+                digitalSignatureHash: h.digitalSignatureHash || undefined
+            } as AuditTrailEntry;
+        }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        try {
+            setAuditLogs(mappedForStore);
+        } catch {
+            // ignore
+        }
+
+        // Trigger a lightweight UI refresh where needed
+        try { refetch(); } catch { /* ignore */ }
+    }, [submissionData, submissionId, setAuditLogs, refetch]);
 
     // Format Helper: Tanggal & Waktu Lokal
     const formatDateTime = (isoString: string) => {
@@ -3016,6 +3126,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/app/store/useAuthStore';
+import { useUIStore } from '@/app/store/useUIStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import type { UserRole } from '@/app/store/useUIStore';
 import { Lock, User, Layers, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 
@@ -3028,6 +3141,7 @@ type LoginSchemaType = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { login } = useAuthStore();
+  const { setActiveRole, setUserProfile } = useUIStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
@@ -3063,6 +3177,23 @@ export default function LoginPage() {
 
       const resData = await response.json();
       login(resData.access_token, resData.user);
+
+      // Sync UI simulator role & profile with authenticated user so pages
+      // that read `useUIStore.activeRole` reflect the real login role.
+      try {
+        const displayRole = normalizeRole(resData.user.role) as UserRole;
+        // setActiveRole may perform a demo sync; call it to align UI state.
+        setActiveRole(displayRole);
+        setUserProfile({
+          name: resData.user.full_name,
+          email: resData.user.email,
+          avatar: resData.user.role === 'PEMOHON'
+            ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+            : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces'
+        });
+      } catch {
+        // Non-fatal: continue even if UI sync fails
+      }
 
       toast.success(`Selamat datang kembali, ${resData.user.full_name}!`, { id: toastId });
       navigate(from, { replace: true });
@@ -4249,7 +4380,7 @@ export default function MapHUD() {
     const {
         activeLayers, mapZoom, mapPitch, mapBearing,
         is3DMode, toggle3DMode, isTerrainActive, toggleTerrain,
-        cursorCoords, setMapPitch
+        cursorCoords
     } = useGisUIStore();
 
     const [isLegendOpen, setIsLegendOpen] = useState(false);
@@ -5434,7 +5565,7 @@ export default function SipasMap() {
                     rz: 0,
                 };
 
-                const useFallback = () => {
+                const triggerFallback = () => {
                     if (this.currentModelId !== id || !this.scene) return;
                     if (this.modelMesh) {
                         this.scene.remove(this.modelMesh);
@@ -5474,15 +5605,15 @@ export default function SipasMap() {
                             undefined,
                             (err) => {
                                 console.warn('[THREE-BIM] Fallback triggered:', err);
-                                useFallback();
+                                triggerFallback();
                             }
                         );
                     }).catch((err) => {
                         console.warn('[THREE-BIM] Fallback triggered:', err);
-                        useFallback();
+                        triggerFallback();
                     });
                 } else {
-                    useFallback();
+                    triggerFallback();
                 }
             },
 
@@ -6591,7 +6722,7 @@ export default function SipasMap() {
 
 --- FILE: src\features\gis\components\ZoningHorizontalLegend.tsx ---
 import { useState, useEffect } from "react";
-import { Plus, Minus, Maximize2, Mountain, ChevronDown, ChevronUp, Navigation } from "lucide-react";
+import { Plus, Minus, Maximize2, Mountain, ChevronDown, ChevronUp } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 
@@ -7045,7 +7176,7 @@ export default function BasemapPanel() {
  * ============================================================================
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGisUIStore } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
@@ -7318,7 +7449,7 @@ import { useMemo, useState, useEffect } from 'react';
 import {
     MapPin, CheckCircle2,
     AlertTriangle, Calculator, Percent, Ruler, RotateCw,
-    Globe, Crosshair, Loader2, XCircle, ShieldAlert, ShieldCheck, ShieldX
+    Globe, Crosshair, Loader2
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
@@ -8019,7 +8150,7 @@ export default function LayerPanel() {
  */
 
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Loader2, Crosshair, XCircle, CheckCircle2, HelpCircle, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
+import { Loader2, Crosshair, HelpCircle, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSpatialValidator, type SpatialAuditResult } from '../../hooks/useSpatialValidator';
 import { toast } from 'sonner';
@@ -8591,8 +8722,7 @@ export interface SpatialAuditResult {
 // ──────────────────────────────────────────────────────────────────────────────
 
 type ZonaType = 'sawah' | 'pasir' | 'kebun' | 'ladang' | 'pemukiman' | 'sungai';
-type KategoriType = 'PERUMAHAN' | 'INDUSTRI' | 'KOMERSIAL' | 'FASILITAS' | string;
-type SeverityLevel = 'danger' | 'warning' | 'info' | 'ok';
+type SeverityLevel = 'danger' | 'warning' | 'info';
 
 interface ZoningRule {
     severity: SeverityLevel;
@@ -8790,8 +8920,7 @@ export function useSpatialValidator() {
                 let combinedClashGeometry: any = null;
                 let totalDangerWarningArea = 0;
 
-                const mergeGeometry = (intersection: any, severity: SeverityLevel) => {
-                    if (severity === 'ok') return; // 'ok' tidak divisualisasikan sebagai clash
+                const mergeGeometry = (intersection: any) => {
                     if (!combinedClashGeometry) {
                         combinedClashGeometry = intersection;
                     } else {
@@ -8827,8 +8956,7 @@ export function useSpatialValidator() {
                                 if (intersection) {
                                     const areaSqm = turf.area(intersection);
                                     clashArea += areaSqm;
-                                    const rule = getZoningRule(zona, category);
-                                    mergeGeometry(intersection, rule.severity);
+                                    mergeGeometry(intersection);
                                 }
                             } catch { /* skip malformed feature */ }
                         }
@@ -9511,6 +9639,28 @@ import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+const uploadFileToBackend = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = localStorage.getItem('token');
+  const response = await fetch('http://localhost:8000/api/v1/submissions/upload', {
+    method: 'POST',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(errText || 'Gagal mengunggah berkas ke server');
+  }
+
+  const data = await response.json();
+  return data; // { file_name, file_path, file_url }
+};
 
 /**
  * ============================================================================
@@ -10412,7 +10562,7 @@ export const ConsultantSection = () => {
 
 // ─── SECTION 8: LAMPIRAN DOKUMEN ──────────────────────────────────────────────
 export const DocumentSection = () => {
-  const { watch } = useFormContext<FullSubmissionFormValues>();
+  const { watch, setValue } = useFormContext<FullSubmissionFormValues>();
   const category = watch('submission.category');
 
   // Menentukan dokumen dinamis berdasarkan kategori site plan
@@ -10449,6 +10599,42 @@ export const DocumentSection = () => {
   const conditionalDocs = getConditionalDocs();
   const allDocs = [...defaultDocs, ...conditionalDocs];
 
+  const getFieldKey = (docName: string) => {
+    if (docName.includes('Legalitas') || docName.includes('KTP')) return 'document.legalDoc';
+    if (docName.includes('Gambar Teknis') || docName.includes('CAD') || docName.includes('DWG')) return 'document.technicalDoc';
+    if (docName.includes('Instansi') || docName.includes('Air Limbah')) return 'document.supportDoc2';
+    return 'document.supportDoc';
+  };
+
+  const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: true }));
+        const uploadResult = await uploadFileToBackend(file);
+        setValue(fieldKey, uploadResult.file_url);
+        toast.success(`Berhasil mengunggah: ${file.name}`);
+      } catch (err) {
+        toast.error('Gagal mengunggah berkas ke server');
+      } finally {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: false }));
+      }
+    }
+  };
+
+  const handleClearFile = (fieldKey: any) => {
+    setValue(fieldKey, undefined);
+  };
+
+  const triggerFileInput = (idx: number) => {
+    const input = document.getElementById(`doc-upload-${idx}`) as HTMLInputElement;
+    if (input) {
+      input.click();
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
@@ -10467,14 +10653,54 @@ export const DocumentSection = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
-        {allDocs.map((doc, idx) => (
-          <div key={idx} className="p-6 flex flex-col items-center justify-center text-center bg-white border border-dashed border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none relative group min-h-[160px] animate-in zoom-in-95 duration-200">
-            <UploadCloud className="h-7 w-7 text-secondary-foreground/60 mb-2.5 group-hover:text-primary transition-colors" />
-            <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
-            <p className="text-[9px] text-slate-400 mb-2">{doc.desc}</p>
-            <p className="text-[10px] text-slate-400">PDF, JPG, PNG atau zip hingga 15MB</p>
-          </div>
-        ))}
+        {allDocs.map((doc, idx) => {
+          const fieldKey = getFieldKey(doc.name);
+          const fileValue = watch(fieldKey as any);
+
+          return (
+            <div key={idx} className="relative group min-h-[160px]">
+              <input
+                type="file"
+                id={`doc-upload-${idx}`}
+                className="hidden"
+                onChange={(e) => handleFileChange(e, fieldKey)}
+                accept=".pdf,.jpg,.jpeg,.png,.zip"
+              />
+
+              {isUploading[fieldKey] ? (
+                <div className="p-6 flex flex-col items-center justify-center text-center bg-slate-50 border border-dashed border-border h-full min-h-[160px] rounded-none">
+                  <Loader2 className="h-7 w-7 text-primary mb-2.5 animate-spin" />
+                  <p className="text-xs text-slate-500 font-semibold uppercase">Mengunggah...</p>
+                </div>
+              ) : fileValue ? (
+                <div className="p-6 flex flex-col items-center justify-center text-center bg-[#e8f2ea]/20 border border-primary/45 h-full min-h-[160px] rounded-none">
+                  <CheckCircle2 className="h-7 w-7 text-primary mb-2.5" />
+                  <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
+                  <p className="text-[10px] text-primary font-mono max-w-full truncate px-2 mb-3">
+                    {fileValue instanceof File ? fileValue.name : typeof fileValue === 'string' ? fileValue : 'File terunggah'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleClearFile(fieldKey)}
+                    className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 text-[10px] font-bold rounded-none transition-colors cursor-pointer outline-none"
+                  >
+                    Hapus Berkas
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => triggerFileInput(idx)}
+                  className="p-6 flex flex-col items-center justify-center text-center bg-white border border-dashed border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none h-full min-h-[160px] rounded-none"
+                >
+                  <UploadCloud className="h-7 w-7 text-secondary-foreground/60 mb-2.5 group-hover:text-primary transition-colors" />
+                  <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
+                  <p className="text-[9px] text-slate-400 mb-2">{doc.desc}</p>
+                  <p className="text-[10px] text-slate-400">PDF, JPG, PNG or zip hingga 15MB</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -10482,6 +10708,45 @@ export const DocumentSection = () => {
 
 // ─── SECTION 9: FOTO LOKASI ───────────────────────────────────────────────────
 export const PhotoSection = () => {
+  const { watch, setValue } = useFormContext<FullSubmissionFormValues>();
+
+  const getPhotoFieldKey = (dir: string) => {
+    if (dir.includes('Utara')) return 'photo.photoNorth';
+    if (dir.includes('Selatan')) return 'photo.photoSouth';
+    if (dir.includes('Timur')) return 'photo.photoEast';
+    if (dir.includes('Barat')) return 'photo.photoWest';
+    return 'photo.photoAccess';
+  };
+
+  const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: true }));
+        const uploadResult = await uploadFileToBackend(file);
+        setValue(fieldKey, uploadResult.file_url);
+        toast.success(`Berhasil mengunggah foto: ${file.name}`);
+      } catch (err) {
+        toast.error('Gagal mengunggah foto ke server');
+      } finally {
+        setIsUploading(prev => ({ ...prev, [fieldKey]: false }));
+      }
+    }
+  };
+
+  const handleClearPhoto = (fieldKey: any) => {
+    setValue(fieldKey, undefined);
+  };
+
+  const triggerPhotoInput = (idx: number) => {
+    const input = document.getElementById(`photo-upload-${idx}`) as HTMLInputElement;
+    if (input) {
+      input.click();
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
@@ -10493,12 +10758,56 @@ export const PhotoSection = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-left">
-        {['Sisi Utara', 'Sisi Selatan', 'Sisi Timur', 'Sisi Barat', 'Akses Jalan Utama'].map((dir, idx) => (
-          <div key={idx} className="p-4 flex flex-col items-center justify-center text-center aspect-square bg-white border border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none">
-            <UploadCloud className="h-5 w-5 text-secondary-foreground/60 mb-2" />
-            <p className="text-[11px] font-bold text-slate-700">{dir}</p>
-          </div>
-        ))}
+        {['Sisi Utara', 'Sisi Selatan', 'Sisi Timur', 'Sisi Barat', 'Akses Jalan Utama'].map((dir, idx) => {
+          const fieldKey = getPhotoFieldKey(dir);
+          const fileValue = watch(fieldKey as any);
+
+          return (
+            <div key={idx} className="relative group aspect-square border border-border bg-white overflow-hidden select-none rounded-none">
+              <input
+                type="file"
+                id={`photo-upload-${idx}`}
+                className="hidden"
+                onChange={(e) => handlePhotoChange(e, fieldKey)}
+                accept="image/*"
+              />
+
+              {isUploading[fieldKey] ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 bg-slate-50">
+                  <Loader2 className="h-5 w-5 text-primary mb-2 animate-spin" />
+                  <p className="text-[8px] text-slate-400 uppercase tracking-wider">Mengunggah...</p>
+                </div>
+              ) : fileValue ? (
+                <div className="relative w-full h-full flex flex-col items-center justify-center p-1.5 animate-in zoom-in-95 duration-200">
+                  <img
+                    src={fileValue instanceof File ? URL.createObjectURL(fileValue) : fileValue}
+                    alt={dir}
+                    className="object-cover w-full h-full border border-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearPhoto(fieldKey);
+                    }}
+                    className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-none text-[8px] font-black uppercase tracking-wider border-none cursor-pointer shadow-md transition-colors outline-none"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => triggerPhotoInput(idx)}
+                  className="w-full h-full flex flex-col items-center justify-center text-center p-4 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                >
+                  <UploadCloud className="h-5 w-5 text-secondary-foreground/60 mb-2 group-hover:text-primary transition-colors" />
+                  <p className="text-[10px] font-bold text-slate-700 leading-snug">{dir}</p>
+                  <p className="text-[8px] text-slate-400 mt-1 uppercase tracking-wider">Pilih Foto</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -10666,11 +10975,24 @@ export default function SubmissionCreatePage() {
         },
         consultant: {
           consultantName: existingSub.consultant?.consultantName || '',
-          companyName: existingSub.consultant?.consultantCompanyName || '',
-          picName: existingSub.consultant?.consultantPicName || '',
+          companyName: existingSub.consultant?.companyName || '',
+          picName: existingSub.consultant?.picName || '',
         },
         statement: {
           agreed: existingSub.statement?.agreed || false,
+        },
+        document: {
+          legalDoc: existingSub.document?.legalDoc || undefined,
+          technicalDoc: existingSub.document?.technicalDoc || undefined,
+          supportDoc: existingSub.document?.supportDoc || undefined,
+          supportDoc2: existingSub.document?.supportDoc2 || undefined,
+        },
+        photo: {
+          photoNorth: existingSub.photo?.photoNorth || undefined,
+          photoSouth: existingSub.photo?.photoSouth || undefined,
+          photoEast: existingSub.photo?.photoEast || undefined,
+          photoWest: existingSub.photo?.photoWest || undefined,
+          photoAccess: existingSub.photo?.photoAccess || undefined,
         }
       });
     }
@@ -10919,6 +11241,8 @@ import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import { useGisUIStore, type LahanKompensasi } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { SubmissionStatus } from '../types';
@@ -10934,6 +11258,7 @@ import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import AuditTrailViewer from '@/features/approval/components/AuditTrailViewer';
 
 // ─── MOCK DATA LAHAN KOMPENSASI DAERAH [Purworejo 8, Bogor 11] ────────────────
 const mockKompensasiList: LahanKompensasi[] = [
@@ -10972,7 +11297,12 @@ const mockKompensasiList: LahanKompensasi[] = [
 export default function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const { activeRole, userProfile } = useUIStore();
+  const { activeRole: uiActiveRole, userProfile: uiUserProfile } = useUIStore();
+  const { user } = useAuthStore();
+
+  // Determine effective role: prefer authenticated user role (normalized),
+  // otherwise fall back to UI simulator role.
+  const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
 
   // Zustand State Binding [sipas-fe.txt, Purworejo 8]
   const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
@@ -11064,7 +11394,7 @@ export default function SubmissionDetailPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setSignature('');
   };
-  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto'>('ringkasan');
+  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'audit'>('ringkasan');
 
   // Checklist states
   const [adminChecks, setAdminChecks] = useState({
@@ -11090,12 +11420,35 @@ export default function SubmissionDetailPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ status, notes, passphrase, signatureBase64 }: { status: SubmissionStatus; notes: string; passphrase?: string; signatureBase64?: string }) => {
-      return SubmissionService.updateStatus(sub?.id || '', status, `${userProfile.name} (${activeRole})`, notes, passphrase, signatureBase64);
+    mutationFn: async ({
+      status,
+      notes,
+      passphrase,
+      signatureBase64,
+      actionTypeOverride
+    }: {
+      status: SubmissionStatus;
+      notes: string;
+      passphrase?: string;
+      signatureBase64?: string;
+      // Override eksplisit untuk jalur revert internal (opsional)
+      actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE';
+    }) => {
+      return SubmissionService.updateStatus(
+        sub?.id || '',
+        status,
+        `${userProfile.name} (${activeRole})`,
+        notes,
+        passphrase,
+        signatureBase64,
+        actionTypeOverride
+      );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['submission', id] });
-      queryClient.invalidateQueries({ queryKey: ['submissions'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['submission', id] }),
+        queryClient.invalidateQueries({ queryKey: ['submissions'] })
+      ]);
       setNotes('');
       setPassphrase('');
       setSignature('');
@@ -11200,13 +11553,21 @@ export default function SubmissionDetailPage() {
   const slaDaysRemaining = sub.remaining_sla_days ?? 0;
 
   // Helper variables for role-based conditional rendering
-  const isAdminActive = activeRole === 'Admin SIPAS' || activeRole === 'Super Admin';
-  const isTechActive = activeRole === 'Tim Teknis' || activeRole === 'Super Admin';
-  const isKabidActive = activeRole === 'Kepala Bidang' || activeRole === 'Super Admin';
+  // SOD: Super Admin tidak boleh melihat panel verifikasi fungsional.
+  const isAdminActive = effectiveRole === 'Admin SIPAS';
+  const isTechActive = effectiveRole === 'Tim Teknis';
+  const isKabidActive = effectiveRole === 'Kepala Bidang';
 
   const showAdminPanel = isAdminActive && (sub.status === 'Menunggu Verifikasi' || sub.status === 'Verifikasi Administrasi');
   const showTechPanel = isTechActive && sub.status === 'Verifikasi Teknis';
   const showKabidPanel = isKabidActive && sub.status === 'Menunggu Persetujuan';
+
+  // Debug variables (safe: declared after dependent flags)
+  const debugRole = effectiveRole;
+  const debugUiRole = uiActiveRole;
+  const debugStatus = sub.status;
+  const debugIsKabid = isKabidActive;
+  const debugShowKabid = showKabidPanel;
 
   const allAdminChecked = Object.values(adminChecks).every(Boolean);
   const allTechChecked = Object.values(techChecks).every(Boolean);
@@ -11256,6 +11617,36 @@ export default function SubmissionDetailPage() {
     });
   };
 
+  // ── HANDLER PENGEMBALIAN INTERNAL: Kabid → Tim Teknis ──────────────────────
+  // Dipanggil saat Kepala Bidang menemukan isu teknis yang perlu diklarifikasi
+  // ulang oleh Tim Teknis SEBELUM TTE diterbitkan. SLA clock tetap berjalan.
+  const handleRevertToTechnical = () => {
+    if (!notes.trim()) {
+      toast.error('Catatan alasan pengembalian wajib diisi sebelum mengembalikan berkas ke Tim Teknis.');
+      return;
+    }
+    mutation.mutate({
+      status: 'Verifikasi Teknis',
+      notes: notes.trim(),
+      actionTypeOverride: 'REVERT_TO_TECHNICAL'
+    });
+  };
+
+  // ── HANDLER PENGEMBALIAN INTERNAL: Tim Teknis → Admin SIPAS ───────────────
+  // Dipanggil saat Tim Teknis menemukan kelengkapan dokumen administratif yang
+  // perlu diperbaiki Admin SEBELUM audit spasial dapat dilanjutkan. SLA tetap berjalan.
+  const handleRevertToAdministrative = () => {
+    if (!notes.trim()) {
+      toast.error('Catatan alasan pengembalian wajib diisi sebelum mengembalikan berkas ke Admin SIPAS.');
+      return;
+    }
+    mutation.mutate({
+      status: 'Verifikasi Administrasi',
+      notes: notes.trim(),
+      actionTypeOverride: 'REVERT_TO_ADMINISTRATIVE'
+    });
+  };
+
   // Handler Visualisasi Lahan Kompensasi pada Peta Spasial [Purworejo 8]
   const handleShowCompensationOnMap = (komp: LahanKompensasi) => {
     setActiveKompensasi(komp);
@@ -11301,6 +11692,14 @@ export default function SubmissionDetailPage() {
           </p>
         </div>
 
+        {/* Dev debug: show role/status flags */}
+        <div className="ml-4 p-2 border border-slate-200 bg-yellow-50 text-[11px] text-slate-700 rounded-none select-none">
+          <div className="font-bold">DEBUG</div>
+          <div className="text-[11px]">Effective Role (auth): {debugRole} · UI Simulator Role: {debugUiRole}</div>
+          <div className="text-[11px]">Status: {debugStatus}</div>
+          <div className="text-[11px]">isKabidActive: {debugIsKabid ? 'true' : 'false'} · showKabidPanel: {debugShowKabid ? 'true' : 'false'}</div>
+        </div>
+
         {/* ─── DYNAMIC SLA TRACKER HUD [Bogor 16] ─── */}
         <div className="shrink-0 select-none flex items-center gap-3">
           {isSlaPaused ? (
@@ -11336,7 +11735,8 @@ export default function SubmissionDetailPage() {
               { id: 'lokasi', label: 'Lokasi & Tata Ruang' },
               { id: 'teknis', label: 'Parameter Teknis' },
               { id: 'kompensasi', label: 'Kompensasi & Mitigasi' }, // Tab Baru [Purworejo 8]
-              { id: 'foto', label: 'Dokumentasi Foto' }
+              { id: 'foto', label: 'Dokumentasi Foto' },
+              { id: 'audit', label: 'Jejak Audit' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -11932,6 +12332,12 @@ export default function SubmissionDetailPage() {
                 </div>
               </div>
             )}
+
+            {activeTab === 'audit' && (
+              <div className="animate-in fade-in duration-200">
+                <AuditTrailViewer submissionId={sub.id} />
+              </div>
+            )}
           </div>
 
           {/* ─── KANVAS TINDAKAN EVALUASI (Dinamis Berdasarkan Hak Akses) ─── */}
@@ -12086,7 +12492,20 @@ export default function SubmissionDetailPage() {
               </div>
 
               {/* Tindakan */}
-              <div className="pt-2 flex items-center justify-end gap-3">
+              <div className="pt-2 flex items-center justify-end gap-3 flex-wrap">
+                {/* Kembalikan ke Admin — Jalur Revert Internal (amber) */}
+                <button
+                  type="button"
+                  disabled={mutation.isPending}
+                  onClick={handleRevertToAdministrative}
+                  title="Kembalikan ke Admin SIPAS untuk perbaikan dokumen (SLA tetap berjalan)"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                  </svg>
+                  Kembalikan ke Admin
+                </button>
                 <button
                   type="button"
                   disabled={mutation.isPending}
@@ -12203,7 +12622,20 @@ export default function SubmissionDetailPage() {
               </div>
 
               {/* Tindakan */}
-              <div className="pt-2 flex items-center justify-end gap-3">
+              <div className="pt-2 flex items-center justify-end gap-3 flex-wrap">
+                {/* Kembalikan ke Tim Teknis — Jalur Revert Internal (amber) */}
+                <button
+                  type="button"
+                  disabled={mutation.isPending}
+                  onClick={handleRevertToTechnical}
+                  title="Kembalikan ke Tim Teknis untuk klarifikasi teknis (SLA tetap berjalan)"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                  </svg>
+                  Kembalikan ke Tim Teknis
+                </button>
                 <button
                   type="button"
                   disabled={mutation.isPending}
@@ -12247,6 +12679,14 @@ export default function SubmissionDetailPage() {
                     <span className="text-slate-400 text-[10px]">Belum Ditandatangani Elektronik</span>
                   )}
                 </div>
+                {sub.kabidSignature && (
+                  <div className="mt-3 select-none">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Tanda Tangan Fisik (Coretan Tangan):</span>
+                    <div className="border border-slate-200 bg-white p-2 w-[160px] h-[75px] flex items-center justify-center">
+                      <img src={sub.kabidSignature} alt="Tanda Tangan Kabid" className="max-w-full max-h-full object-contain" />
+                    </div>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => {
@@ -12685,6 +13125,7 @@ export const documentSchema = z.object({
   legalDoc: z.any().optional(),
   technicalDoc: z.any().optional(),
   supportDoc: z.any().optional(),
+  supportDoc2: z.any().optional(),
 });
 
 export const photoSchema = z.object({
@@ -12784,7 +13225,19 @@ export const SubmissionService = {
     }
   },
 
-  updateStatus: async (id: string, status: SubmissionStatus, actor: string, notes: string, passphrase?: string, signatureBase64?: string): Promise<Submission | undefined> => {
+  updateStatus: async (
+    id: string,
+    status: SubmissionStatus,
+    actor: string,
+    notes: string,
+    passphrase?: string,
+    signatureBase64?: string,
+    // Opsional: override eksplisit action_type untuk jalur mundur internal.
+    // Jika tidak disediakan, akan disimpulkan dari parameter `status`:
+    //   status === 'Ditolak'  → 'REJECT'
+    //   status !== 'Ditolak'  → 'APPROVE'
+    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE'
+  ): Promise<Submission | undefined> => {
     // Parsing data aktor dan role untuk integrasi /verify
     const nameMatch = actor.match(/^([^(]+)/);
     const roleMatch = actor.match(/\(([^)]+)\)/);
@@ -12801,8 +13254,9 @@ export const SubmissionService = {
       role = 'PEMOHON';
     }
 
-    // Tentukan action_type berdasarkan status target
-    const action_type = status === 'Ditolak' ? 'REJECT' : 'APPROVE';
+    // Tentukan action_type: gunakan override eksplisit jika ada,
+    // jika tidak, simpulkan dari parameter status target.
+    const action_type: string = actionTypeOverride ?? (status === 'Ditolak' ? 'REJECT' : 'APPROVE');
 
     // ── FASE 1: Kirim keputusan verifikasi ke API Backend ──────────────────
     const verifyResponse = await fetch(`${API_BASE_URL}/${id}/verify`, {
@@ -12984,6 +13438,21 @@ export interface PhotoDetails {
   photoAccess?: string;
 }
 
+export interface CoordinateDetails {
+  polygon?: [number, number][];
+  cadFileName?: string;
+  cadParamA?: number;
+  cadParamB?: number;
+  cadParamTx?: number;
+  cadParamTy?: number;
+  cadScale?: number;
+  cadRotation?: number;
+}
+
+export interface StatementDetails {
+  agreed: boolean;
+}
+
 export interface Submission {
   id: string;
   submissionNo: string;
@@ -12996,6 +13465,7 @@ export interface Submission {
   remaining_sla_days?: number;
   signatureHash?: string;
   signedPdfUrl?: string;
+  kabidSignature?: string;
   // Penambahan parameter hasil hitung sistem (Slide 6)
   kdbPercent?: number;
   klbValue?: number;
@@ -13017,11 +13487,14 @@ export interface Submission {
   applicant?: ApplicantDetails;
   submissionDetails?: SubmissionDetails;
   locationDetails?: LocationDetails;
+  coordinate?: CoordinateDetails;
   spatial?: SpatialDetails;
   technical?: TechnicalDetails;
   consultant?: ConsultantDetails;
   photos?: PhotoDetails;
+  statement?: StatementDetails;
 }
+
 
 --- FILE: src\features\users\pages\ProfilePage.tsx ---
 import { useForm } from 'react-hook-form';
@@ -14155,13 +14628,16 @@ const menuItems: MenuItem[] = [
     title: 'Verifikasi',
     path: '/verifikasi',
     icon: ShieldAlert,
-    roles: ['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
+    // SOD: Super Admin tidak boleh mengakses panel verifikasi fungsional.
+    // Hanya pejabat operasional (Admin SIPAS, Tim Teknis, Kepala Bidang) yang berwenang.
+    roles: ['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang'],
   },
   {
     title: 'Persetujuan TTE',
     path: '/persetujuan',
     icon: ShieldCheck,
-    roles: ['Kepala Bidang', 'Super Admin'],
+    // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Bidang PUPR.
+    roles: ['Kepala Bidang'],
   },
   {
     title: 'GIS Viewer',
@@ -14178,32 +14654,33 @@ const menuItems: MenuItem[] = [
   {
     title: 'Master Data',
     icon: Database,
-    roles: ['Admin SIPAS', 'Super Admin'],
+    // SOD: Master Data (User, Role, Referensi) adalah domain eksklusif Super Admin.
+    roles: ['Super Admin'],
     submenu: [
       {
         title: 'User',
         path: '/master/pengguna',
         icon: Users,
-        roles: ['Admin SIPAS', 'Super Admin'],
+        roles: ['Super Admin'],
       },
       {
         title: 'Role',
         path: '/master/role',
         icon: ShieldCheck,
-        roles: ['Admin SIPAS', 'Super Admin'],
+        roles: ['Super Admin'],
       },
       {
         title: 'Referensi',
         path: '/master/referensi',
         icon: Bookmark,
-        roles: ['Admin SIPAS', 'Super Admin'],
+        roles: ['Super Admin'],
       },
     ],
   },
 ];
 
 export default function DashboardLayout() {
-  const { sidebarOpen, activeRole: uiActiveRole, userProfile: uiUserProfile, toggleSidebar, setActiveRole } = useUIStore();
+  const { sidebarOpen, activeRole: uiActiveRole, userProfile: uiUserProfile, toggleSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
 
   const activeRole = user ? (normalizeRole(user.role) as UserRole) : uiActiveRole;
@@ -14216,28 +14693,25 @@ export default function DashboardLayout() {
   } : uiUserProfile;
 
   const location = useLocation();
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Filter menu secara dinamis berdasarkan wewenang peran aktif
+  // Filter menu secara dinamis berdasarkan wewenang peran aktif.
+  // KEBIJAKAN SOD: Tidak ada peran yang mendapat bypass universal — setiap item
+  // menu HARUS mendaftarkan peran yang diizinkan secara eksplisit pada array `roles`-nya.
   const filteredMenu = menuItems.filter(item => {
-    if (activeRole === 'Super Admin') return true;
     return item.roles.includes(activeRole);
   }).map(item => {
     if (item.submenu) {
       return {
         ...item,
         submenu: item.submenu.filter(sub => {
-          if (activeRole === 'Super Admin') return true;
           return sub.roles.includes(activeRole);
         })
       };
     }
     return item;
   });
-
-  const rolesList: UserRole[] = ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'];
 
   const mockNotifs = [
     { id: 1, title: 'Pengajuan Baru', desc: 'Berkas SIPAS-2026-001 butuh verifikasi.', type: 'info', time: '10 m yang lalu' },

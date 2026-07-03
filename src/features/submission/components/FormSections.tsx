@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useFormContext } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useFormContext, Controller } from 'react-hook-form';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
+import bogorRegions from '../data/bogorRegions.json';
 import {
   UploadCloud, CheckCircle2, Loader2, FileUp, Info,
   Settings2, Compass, RefreshCw
@@ -43,7 +44,103 @@ const uploadFileToBackend = async (file: File) => {
  */
 const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
 
-const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
+const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 tracking-wide";
+
+const LabelWithInfo = ({ label, helpText }: { label: string; helpText?: string }) => {
+  return (
+    <label className={labelClass}>
+      {label}
+      {helpText && (
+        <span className="relative group inline-block ml-1.5 align-middle select-none normal-case tracking-normal">
+          <span className="cursor-pointer text-slate-400 hover:text-primary transition-colors">
+            <Info size={13} className="inline-block" />
+          </span>
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 hidden group-hover:block w-[260px] bg-[#111D13] text-white text-[10px] font-semibold p-2.5 pointer-events-none z-50 rounded-none shadow-md border border-[#709775]/25 leading-normal text-left">
+            {helpText}
+            <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#111D13]" />
+          </span>
+        </span>
+      )}
+    </label>
+  );
+};
+
+const FormattedInput = ({
+  name,
+  placeholder,
+  unit = 'm²',
+  min = 0,
+  isDecimal = false,
+  onChangeCustom,
+}: {
+  name: string;
+  placeholder?: string;
+  unit?: string;
+  min?: number;
+  isDecimal?: boolean;
+  onChangeCustom?: (val: number | undefined) => void;
+}) => {
+  const { control } = useFormContext<FullSubmissionFormValues>();
+  const [isFocused, setIsFocused] = useState(false);
+
+  return (
+    <Controller
+      control={control}
+      name={name as any}
+      render={({ field: { value, onChange, onBlur } }) => {
+        const numVal = value !== undefined && value !== null && !isNaN(Number(value)) ? Number(value) : undefined;
+        
+        let displayVal = '';
+        if (isFocused) {
+          displayVal = numVal !== undefined ? String(numVal) : '';
+        } else {
+          displayVal = numVal !== undefined 
+            ? `${numVal.toLocaleString('id-ID', { maximumFractionDigits: isDecimal ? 2 : 0 })} ${unit}`.trim()
+            : '';
+        }
+
+        const handleFocus = () => {
+          setIsFocused(true);
+        };
+
+        const handleBlur = () => {
+          setIsFocused(false);
+          onBlur();
+        };
+
+        const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const cleanText = e.target.value.replace(/[^0-9.-]/g, '');
+          const num = Number(cleanText);
+          if (cleanText === '' || isNaN(num)) {
+            onChange(undefined);
+            if (onChangeCustom) onChangeCustom(undefined);
+          } else {
+            const finalNum = Math.max(min, num);
+            onChange(finalNum);
+            if (onChangeCustom) onChangeCustom(finalNum);
+          }
+        };
+
+        const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
+          (e.target as HTMLInputElement).blur();
+        };
+
+        return (
+          <input
+            type="text"
+            value={displayVal}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onChange={handleChange}
+            onWheel={handleWheel}
+            placeholder={placeholder}
+            className={inputClass}
+          />
+        );
+      }}
+    />
+  );
+};
 
 // ─── SUB-KOMPONEN: CAD GEOREFERENCE WIZARD (MODULAR SPATIAL ALIGNER) ──────────
 export const CADGeoreferenceWizard = ({
@@ -351,7 +448,7 @@ export const ApplicantSection = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
         <div className="md:col-span-2">
-          <label className={labelClass}>Jenis Pemohon</label>
+          <LabelWithInfo label="Jenis Pemohon" helpText="Pilih klasifikasi pemohon, apakah mengajukan atas nama perorangan atau badan hukum/perusahaan." />
           <select {...register('applicant.type')} className={inputClass}>
             <option value="PERORANGAN">Perorangan (Individu)</option>
             <option value="BADAN_USAHA">Badan Usaha / Perusahaan</option>
@@ -359,53 +456,78 @@ export const ApplicantSection = () => {
         </div>
 
         <div>
-          <label className={labelClass}>
-            {applicantType === 'BADAN_USAHA' ? 'Nama Perusahaan' : 'Nama Lengkap'}
-          </label>
+          <LabelWithInfo
+            label={applicantType === 'BADAN_USAHA' ? 'Nama Perusahaan' : 'Nama Lengkap'}
+            helpText="Nama lengkap perorangan sesuai KTP, atau nama resmi badan hukum/PT/CV yang terdaftar."
+          />
           <input {...register('applicant.name')} type="text" className={inputClass} placeholder="Masukkan nama..." />
           {errors.applicant?.name && <p className="text-xs text-rose-500 mt-1">{errors.applicant.name.message}</p>}
         </div>
 
         {applicantType === 'PERORANGAN' && (
           <div>
-            <label className={labelClass}>NIK (Nomor Induk Kependudukan)</label>
-            <input {...register('applicant.nik')} type="text" className={inputClass} placeholder="32xxxxxxxxxxxxxx" />
+            <LabelWithInfo label="NIK (Nomor Induk Kependudukan)" helpText="Nomor Induk Kependudukan (16 digit) sesuai KTP pemohon aktif." />
+            <input
+              {...register('applicant.nik', {
+                onChange: (e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); }
+              })}
+              type="text"
+              className={inputClass}
+              placeholder="32xxxxxxxxxxxxxx"
+            />
+            {errors.applicant?.nik && <p className="text-xs text-rose-500 mt-1">{errors.applicant.nik.message}</p>}
           </div>
         )}
 
         {applicantType === 'BADAN_USAHA' && (
           <>
             <div>
-              <label className={labelClass}>NIB (Nomor Induk Berusaha)</label>
-              <input {...register('applicant.nib')} type="text" className={inputClass} placeholder="Masukkan NIB perusahaan..." />
+              <LabelWithInfo label="NIB (Nomor Induk Berusaha)" helpText="Nomor Induk Berusaha resmi dari Lembaga OSS Republik Indonesia." />
+              <input
+                {...register('applicant.nib', {
+                  onChange: (e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); }
+                })}
+                type="text"
+                className={inputClass}
+                placeholder="Masukkan NIB perusahaan..."
+              />
+              {errors.applicant?.nib && <p className="text-xs text-rose-500 mt-1">{errors.applicant.nib.message}</p>}
             </div>
             <div>
-              <label className={labelClass}>Nama Direktur / Penanggung Jawab</label>
+              <LabelWithInfo label="Nama Direktur / Penanggung Jawab" helpText="Nama lengkap Direktur Utama atau penanggung jawab resmi perusahaan." />
               <input {...register('applicant.directorName')} type="text" className={inputClass} placeholder="Nama penanggung jawab..." />
+              {errors.applicant?.directorName && <p className="text-xs text-rose-500 mt-1">{errors.applicant.directorName.message}</p>}
             </div>
           </>
         )}
 
         <div>
-          <label className={labelClass}>NPWP (Nomor Pokok Wajib Pajak)</label>
+          <LabelWithInfo label="NPWP (Nomor Pokok Wajib Pajak)" helpText="Nomor Pokok Wajib Pajak (pribadi atau perusahaan) yang masih aktif terdaftar." />
           <input {...register('applicant.npwp')} type="text" className={inputClass} placeholder="00.000.000.0-000.000" />
           {errors.applicant?.npwp && <p className="text-xs text-rose-500 mt-1">{errors.applicant.npwp.message}</p>}
         </div>
 
         <div>
-          <label className={labelClass}>Nomor Telepon aktif</label>
-          <input {...register('applicant.phone')} type="text" className={inputClass} placeholder="08xxxxxxxxxx" />
+          <LabelWithInfo label="Nomor Telepon aktif" helpText="Nomor WhatsApp/telepon aktif untuk koordinasi dinas dan verifikasi lapangan." />
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="08xxxxxxxxxx"
+            {...register('applicant.phone', {
+              onChange: (e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); }
+            })}
+          />
           {errors.applicant?.phone && <p className="text-xs text-rose-500 mt-1">{errors.applicant.phone.message}</p>}
         </div>
 
         <div className="md:col-span-2">
-          <label className={labelClass}>Alamat Surat Elektronik (Email)</label>
+          <LabelWithInfo label="Alamat Surat Elektronik (Email)" helpText="Alamat email resmi pemohon guna pengiriman dokumen digital SK resmi." />
           <input {...register('applicant.email')} type="email" className={inputClass} placeholder="contoh@perusahaan.com" />
           {errors.applicant?.email && <p className="text-xs text-rose-500 mt-1">{errors.applicant.email.message}</p>}
         </div>
 
         <div className="md:col-span-2">
-          <label className={labelClass}>Alamat Lengkap Pemohon</label>
+          <LabelWithInfo label="Alamat Lengkap Pemohon" helpText="Alamat lengkap domisili pemohon atau alamat kantor pusat terdaftar badan usaha." />
           <textarea {...register('applicant.address')} rows={3} className={inputClass} placeholder="Tulis alamat korespondensi lengkap..." />
           {errors.applicant?.address && <p className="text-xs text-rose-500 mt-1">{errors.applicant.address.message}</p>}
         </div>
@@ -430,7 +552,7 @@ export const SubmissionSection = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
         <div>
-          <label className={labelClass}>Jenis Permohonan Site Plan</label>
+          <LabelWithInfo label="Jenis Permohonan Site Plan" helpText="Jenis permohonan yang diajukan: pengesahan baru, revisi site plan terbit terdahulu, atau perpanjangan SK." />
           <select {...register('submission.submissionType')} className={inputClass}>
             <option value="BARU">Site Plan Baru (Lahan Bersih)</option>
             <option value="REVISI">Revisi Pengesahan Site Plan</option>
@@ -439,17 +561,17 @@ export const SubmissionSection = () => {
         </div>
 
         <div>
-          <label className={labelClass}>Kategori Rencana Tapak</label>
+          <LabelWithInfo label="Kategori Rencana Tapak" helpText="Kategori pemanfaatan lahan (misal: perumahan subsidi/komersil, gedung komersil, fasilitas umum/TPU, atau kawasan industri)." />
           <select {...register('submission.category')} className={inputClass}>
-            <option value="PERUMAHAN">PERUMAHAN</option>
-            <option value="NON_PERUMAHAN">NON_PERUMAHAN</option>
-            <option value="FASUM">FASUM</option>
-            <option value="INDUSTRI">INDUSTRI</option>
+            <option value="PERUMAHAN">Perumahan</option>
+            <option value="NON_PERUMAHAN">Non-Perumahan / Komersil</option>
+            <option value="FASUM">Fasilitas Umum (Fasum)</option>
+            <option value="INDUSTRI">Kawasan Industri</option>
           </select>
         </div>
 
         <div className="md:col-span-2">
-          <label className={labelClass}>Nama Kegiatan / Pembangunan</label>
+          <LabelWithInfo label="Nama Kegiatan / Pembangunan" helpText="Nama komersial pembangunan yang direncanakan untuk dicantumkan dalam SK resmi pengesahan rencana tapak." />
           <input {...register('submission.activityName')} type="text" placeholder="Contoh: Perumahan Pakuan Green Regency" className={inputClass} />
           {errors.submission?.activityName && <p className="text-xs text-rose-500 mt-1">{errors.submission.activityName.message}</p>}
         </div>
@@ -460,7 +582,37 @@ export const SubmissionSection = () => {
 
 // ─── SECTION 3: DATA LOKASI ──────────────────────────────────────────────────
 export const LocationSection = () => {
-  const { register, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const selectedDistrict = watch('location.district');
+
+  // Cari desa/kelurahan yang sesuai dari kecamatan terpilih di bogorRegions.json
+  const activeDistrictObj = bogorRegions.find((r) => r.nama_kecamatan === selectedDistrict);
+  const villagesList = activeDistrictObj ? activeDistrictObj.desa_kelurahan.map((d) => d.nama) : [];
+
+  // Saat Kecamatan berubah, kosongkan Desa/Kelurahan jika tidak berada di daftar yang sesuai
+  useEffect(() => {
+    if (selectedDistrict) {
+      const currentVillage = watch('location.village');
+      if (currentVillage && !villagesList.includes(currentVillage)) {
+        setValue('location.village', '');
+      }
+    } else {
+      setValue('location.village', '');
+    }
+  }, [selectedDistrict, setValue, villagesList]);
+
+  // Pastikan Provinsi dan Kabupaten/Kota selalu terisi default-nya (karena dibatasi readOnly)
+  const province = watch('location.province');
+  const city = watch('location.city');
+
+  useEffect(() => {
+    if (!province) {
+      setValue('location.province', 'Jawa Barat');
+    }
+    if (!city) {
+      setValue('location.city', 'Kabupaten Bogor');
+    }
+  }, [province, city, setValue]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -474,39 +626,90 @@ export const LocationSection = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
         <div className="md:col-span-2">
-          <label className={labelClass}>Nama Lokasi Tapak</label>
+          <LabelWithInfo label="Nama Lokasi Tapak" helpText="Identitas khusus lokasi tapak pembangunan (misalnya: Sektor 3, Blok C, dsb)." />
           <input {...register('location.locationName')} type="text" placeholder="Contoh: Blok A Sektor III" className={inputClass} />
           {errors.location?.locationName && <p className="text-xs text-rose-500 mt-1">{errors.location.locationName.message}</p>}
         </div>
 
-        <div><label className={labelClass}>Desa / Kelurahan</label><input {...register('location.village')} type="text" className={inputClass} placeholder="Nama Kelurahan..." /></div>
-        <div><label className={labelClass}>Kecamatan</label><input {...register('location.district')} type="text" className={inputClass} placeholder="Nama Kecamatan..." /></div>
-        <div><label className={labelClass}>Kabupaten / Kota</label><input {...register('location.city')} type="text" className={inputClass} placeholder="Kabupaten Bogor" /></div>
-        <div><label className={labelClass}>Provinsi</label><input {...register('location.province')} type="text" className={inputClass} placeholder="Jawa Barat" /></div>
-
-        <div className="md:col-span-2">
-          <label className={labelClass}>Alamat Lengkap Lokasi Proyek</label>
-          <textarea {...register('location.fullAddress')} rows={2} className={inputClass} placeholder="Tulis alamat lokasi fisik tapak secara rinci..." />
+        <div>
+          <LabelWithInfo label="Provinsi" helpText="Provinsi wilayah proyek (Jawa Barat - Terkunci)." />
+          <input
+            {...register('location.province')}
+            type="text"
+            className="w-full px-3.5 py-2 bg-slate-50 border border-border text-slate-500 font-sans text-xs rounded-none cursor-not-allowed select-none bg-slate-50/50"
+            readOnly
+          />
+          {errors.location?.province && <p className="text-xs text-rose-500 mt-1">{errors.location.province.message}</p>}
+        </div>
+        <div>
+          <LabelWithInfo label="Kabupaten / Kota" helpText="Kabupaten atau Kota wilayah proyek (Kabupaten Bogor - Terkunci)." />
+          <input
+            {...register('location.city')}
+            type="text"
+            className="w-full px-3.5 py-2 bg-slate-50 border border-border text-slate-500 font-sans text-xs rounded-none cursor-not-allowed select-none bg-slate-50/50"
+            readOnly
+          />
+          {errors.location?.city && <p className="text-xs text-rose-500 mt-1">{errors.location.city.message}</p>}
         </div>
 
         <div>
-          <label className={labelClass}>Luas Lahan Bersih (m²)</label>
-          <input {...register('location.landArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 15000" />
+          <LabelWithInfo label="Kecamatan" helpText="Nama Kecamatan tempat lokasi proyek di Kabupaten Bogor." />
+          <select {...register('location.district')} className={inputClass}>
+            <option value="">-- Pilih Kecamatan --</option>
+            {bogorRegions.map((region) => (
+              <option key={region.id_kecamatan} value={region.nama_kecamatan}>
+                {region.nama_kecamatan}
+              </option>
+            ))}
+          </select>
+          {errors.location?.district && <p className="text-xs text-rose-500 mt-1">{errors.location.district.message}</p>}
+        </div>
+        <div>
+          <LabelWithInfo label="Desa / Kelurahan" helpText="Desa atau Kelurahan lokasi geografis lahan proyek berada." />
+          <select {...register('location.village')} className={inputClass} disabled={!selectedDistrict}>
+            <option value="">-- Pilih Desa / Kelurahan --</option>
+            {villagesList.map((villageName) => (
+              <option key={villageName} value={villageName}>
+                {villageName}
+              </option>
+            ))}
+          </select>
+          {errors.location?.village && <p className="text-xs text-rose-500 mt-1">{errors.location.village.message}</p>}
+        </div>
+
+        <div className="md:col-span-2">
+          <LabelWithInfo label="Alamat Lengkap Lokasi Proyek" helpText="Alamat fisik lengkap (Nama Jalan, RT/RW, Dusun) guna keperluan peninjauan lapangan (ground-truthing)." />
+          <textarea {...register('location.fullAddress')} rows={2} className={inputClass} placeholder="Tulis alamat lokasi fisik tapak secara rinci..." />
+          {errors.location?.fullAddress && <p className="text-xs text-rose-500 mt-1">{errors.location.fullAddress.message}</p>}
+        </div>
+
+        <div>
+          <LabelWithInfo label="Luas Lahan Bersih (m²)" helpText="Total luas bersih kepemilikan lahan yang akan diproses perizinan site plan-nya." />
+          <FormattedInput name="location.landArea" placeholder="Contoh: 15000" unit="m²" />
           {errors.location?.landArea && <p className="text-xs text-rose-500 mt-1">{errors.location.landArea.message}</p>}
         </div>
 
         <div>
-          <label className={labelClass}>Status Kepemilikan Hak Atas Tanah</label>
+          <LabelWithInfo label="Status Kepemilikan Hak Atas Tanah" helpText="Jenis hak atas tanah yang dimiliki secara sah menurut hukum." />
           <select {...register('location.ownershipStatus')} className={inputClass}>
             <option value="SHM">SHM (Sertifikat Hak Milik)</option>
             <option value="HGB">HGB (Hak Guna Bangunan)</option>
             <option value="HAK_PAKAI">Hak Pakai Dinas</option>
             <option value="LAINNYA">Lainnya / Surat Adat</option>
           </select>
+          {errors.location?.ownershipStatus && <p className="text-xs text-rose-500 mt-1">{errors.location.ownershipStatus.message}</p>}
         </div>
 
-        <div><label className={labelClass}>Nomor Sertifikat Tanah</label><input {...register('location.certificateNumber')} type="text" className={inputClass} placeholder="No. Sertifikat Hak..." /></div>
-        <div><label className={labelClass}>Nama Pemilik Sertifikat Resmi</label><input {...register('location.certificateOwner')} type="text" className={inputClass} placeholder="Nama pemegang hak..." /></div>
+        <div>
+          <LabelWithInfo label="Nomor Sertifikat Tanah" helpText="Nomor sertifikat tanah resmi terdaftar dari Badan Pertanahan Nasional (BPN)." />
+          <input {...register('location.certificateNumber')} type="text" className={inputClass} placeholder="No. Sertifikat Hak..." />
+          {errors.location?.certificateNumber && <p className="text-xs text-rose-500 mt-1">{errors.location.certificateNumber.message}</p>}
+        </div>
+        <div>
+          <LabelWithInfo label="Nama Pemilik Sertifikat Resmi" helpText="Nama lengkap pemegang hak atas tanah yang tercantum pada dokumen sertifikat BPN." />
+          <input {...register('location.certificateOwner')} type="text" className={inputClass} placeholder="Nama pemegang hak..." />
+          {errors.location?.certificateOwner && <p className="text-xs text-rose-500 mt-1">{errors.location.certificateOwner.message}</p>}
+        </div>
       </div>
     </div>
   );
@@ -616,14 +819,77 @@ export const CoordinateSection = () => {
     setValue('coordinate.polygon', params.polygon);
     setValue('coordinate.coordinatesText', JSON.stringify([params.polygon], null, 2));
 
-    // Update GIS container render
+    // Update GIS container render dengan overlapping site plan layout ar-ar polygon
+    const boundaryFeature = {
+      type: 'Feature',
+      properties: { label: 'Batas Lahan BPN' },
+      geometry: { type: 'Polygon', coordinates: [params.polygon] }
+    };
+    
+    // Blok A Kaveling (dikalkulasi secara relatif dalam koordinat terkalibrasi)
+    const lotAFeature = {
+      type: 'Feature',
+      properties: { label: 'Blok Kaveling A' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.5, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.5, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1]
+        ]]
+      }
+    };
+
+    const lotBFeature = {
+      type: 'Feature',
+      properties: { label: 'Blok Kaveling B' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.6, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.6, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.6, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1]
+        ]]
+      }
+    };
+
+    const roadFeature = {
+      type: 'Feature',
+      properties: { label: 'Lebar Jalan Utama' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.05, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.52],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.95, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.52],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.95, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.58],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.05, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.58],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.05, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.52]
+        ]]
+      }
+    };
+
+    const rthFeature = {
+      type: 'Feature',
+      properties: { label: 'Rencana Fasum & RTH' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.6],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.6],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.9],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.9],
+          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.6]
+        ]]
+      }
+    };
+
     setUploadedGeoJson({
       type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [params.polygon] }
-      }]
+      features: [boundaryFeature, lotAFeature, lotBFeature, roadFeature, rthFeature]
     });
   };
 
@@ -633,20 +899,52 @@ export const CoordinateSection = () => {
     setValue('coordinate.polygon', coords[0]);
   };
 
+  const handleResetCoordinates = () => {
+    const spatialInput = document.getElementById('spatial-file-input') as HTMLInputElement;
+    const cadInput = document.getElementById('cad-file-input') as HTMLInputElement;
+    if (spatialInput) spatialInput.value = '';
+    if (cadInput) cadInput.value = '';
+
+    setUploadedGeoJson(null);
+    setCadFileName('');
+
+    setValue('coordinate.polygon', undefined);
+    setValue('coordinate.coordinatesText', '');
+    setValue('coordinate.cadFileName', undefined);
+    setValue('coordinate.cadParamA', undefined);
+    setValue('coordinate.cadParamB', undefined);
+    setValue('coordinate.cadParamTx', undefined);
+    setValue('coordinate.cadParamTy', undefined);
+    setValue('coordinate.cadScale', undefined);
+    setValue('coordinate.cadRotation', undefined);
+
+    toast.info('Data koordinat dan file terunggah telah di-reset.');
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-          <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          4. Data Koordinat Batas Lahan
-        </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Gunakan alat gambar poligon di sisi kiri peta atau unggah file spasial BPN resmi.</p>
+      <div className="border-b border-border pb-3 flex justify-between items-center">
+        <div>
+          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+            <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
+            4. Data Koordinat Batas Lahan
+          </h3>
+          <p className="text-[10px] text-slate-400 mt-1">Unggah file spasial BPN resmi atau gambar rencana CAD untuk menyelaraskan koordinat tapak.</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleResetCoordinates}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 text-xs font-bold rounded-none transition-colors cursor-pointer outline-none"
+        >
+          <RefreshCw className="h-3.5 w-3.5 animate-spin-hover" />
+          Reset Spasial / Ulangi
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Input 1: Berkas Spasial Batas Lahan BPN */}
         <div className="bg-slate-50 border border-slate-200 p-4 transition-all duration-300 text-left">
-          <label className={labelClass}>Unggah File Spasial BPN (.shp.zip / .geojson)</label>
+          <LabelWithInfo label="Unggah File Spasial BPN (.shp.zip / .geojson)" helpText="Unggah file koordinat poligon batas lahan resmi dari BPN untuk proses sinkronisasi spasial otomatis." />
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 mt-2">
             <input
               type="file"
@@ -670,7 +968,7 @@ export const CoordinateSection = () => {
 
         {/* Input 2: Berkas Gambar Kerja CAD Site Plan [Jakarta 5] */}
         <div className="bg-slate-50 border border-slate-200 p-4 transition-all duration-300 text-left">
-          <label className={labelClass}>Unggah Gambar Rencana CAD (.dwg / .dxf)</label>
+          <LabelWithInfo label="Unggah Gambar Rencana CAD (.dwg / .dxf)" helpText="Unggah berkas gambar tapak AutoCAD. Sistem akan memandu Anda melakukan transformasi Helmert untuk georeferensi denah." />
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 mt-2">
             <input
               type="file"
@@ -709,7 +1007,7 @@ export const CoordinateSection = () => {
       </div>
 
       <div className="text-left">
-        <label className={labelClass}>Data Koordinat Spasial GeoJSON (Terekam Otomatis)</label>
+        <LabelWithInfo label="Data Koordinat Spasial GeoJSON (Terekam Otomatis)" helpText="Koordinat poligon spasial akan terisi secara otomatis di sini saat Anda menyelesaikan gambar bidang tanah di atas peta..." />
         <textarea
           {...register('coordinate.coordinatesText')}
           rows={5}
@@ -732,7 +1030,33 @@ export const CoordinateSection = () => {
 
 // ─── SECTION 5: INFORMASI TATA RUANG ─────────────────────────────────────────
 export const SpatialSection = () => {
-  const { register, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const landArea = watch('location.landArea') || 0;
+  const greenAreaVal = watch('spatial.greenArea');
+  const [greenAreaPercent, setGreenAreaPercent] = useState<string>('');
+
+  const handleLuasChangeVal = (val: number | undefined) => {
+    if (landArea > 0 && val !== undefined && !isNaN(val)) {
+      setGreenAreaPercent(((val / landArea) * 100).toFixed(1));
+    } else {
+      setGreenAreaPercent('');
+    }
+  };
+
+  const handlePercentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const percent = Math.max(0, Number(e.target.value));
+    setGreenAreaPercent(e.target.value === '' ? '' : String(percent));
+    if (landArea > 0 && !isNaN(percent)) {
+      setValue('spatial.greenArea', Math.round((percent / 100) * landArea));
+    }
+  };
+
+  useEffect(() => {
+    if (landArea > 0 && greenAreaVal) {
+      setGreenAreaPercent(((greenAreaVal / landArea) * 100).toFixed(1));
+    }
+  }, [landArea, greenAreaVal]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
@@ -744,9 +1068,51 @@ export const SpatialSection = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
-        <div><label className={labelClass}>Nomor SK KKPR / IPPT</label><input {...register('spatial.kkprNumber')} type="text" className={inputClass} placeholder="No. SK KKPR Dinas..." />{errors.spatial?.kkprNumber && <p className="text-xs text-rose-500 mt-1">{errors.spatial.kkprNumber.message}</p>}</div>
-        <div><label className={labelClass}>Kriteria Peruntukan Lahan (Zonasi Perda)</label><input {...register('spatial.landUse')} type="text" className={inputClass} placeholder="Contoh: Kawasan Hunian Kepadatan Sedang" />{errors.spatial?.landUse && <p className="text-xs text-rose-500 mt-1">{errors.spatial.landUse.message}</p>}</div>
-        <div><label className={labelClass}>Luas Rencana Fasum / RTH Lahan (m²)</label><input {...register('spatial.greenArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Minimal 20% dari total luas" />{errors.spatial?.greenArea && <p className="text-xs text-rose-500 mt-1">{errors.spatial.greenArea.message}</p>}</div>
+        <div>
+          <LabelWithInfo label="Nomor SK KKPR / IPPT" helpText="Nomor Surat Keputusan Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) atau Izin Peruntukan Penggunaan Tanah (IPPT)." />
+          <input {...register('spatial.kkprNumber')} type="text" className={inputClass} placeholder="No. SK KKPR Dinas..." />
+          {errors.spatial?.kkprNumber && <p className="text-xs text-rose-500 mt-1">{errors.spatial.kkprNumber.message}</p>}
+        </div>
+
+        <div>
+          <LabelWithInfo label="Kriteria Peruntukan Lahan (Zonasi Perda)" helpText="Kriteria rencana peruntukan zonasi perumahan atau komersial sesuai Perda Rencana Tata Ruang Wilayah (RTRW)." />
+          <input {...register('spatial.landUse')} type="text" className={inputClass} placeholder="Contoh: Kawasan Hunian Kepadatan Sedang" />
+          {errors.spatial?.landUse && <p className="text-xs text-rose-500 mt-1">{errors.spatial.landUse.message}</p>}
+        </div>
+
+        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border border-[#DAE4DB] bg-[#f4f7f4]/20 p-4">
+          <div>
+            <LabelWithInfo label="Luas Rencana Fasum / RTH Lahan (m²)" helpText={`Luas area untuk Fasilitas Umum (Fasum) dan Ruang Terbuka Hijau (RTH) minimal 20% dari total luas lahan (${landArea > 0 ? (landArea * 0.2).toLocaleString('id-ID') : '0'} m²).`} />
+            <FormattedInput name="spatial.greenArea" placeholder="Minimal 20% dari total luas" unit="m²" onChangeCustom={handleLuasChangeVal} />
+            {errors.spatial?.greenArea && <p className="text-xs text-rose-500 mt-1">{errors.spatial.greenArea.message}</p>}
+          </div>
+
+          <div>
+            <LabelWithInfo label="Kalkulator Persentase RTH (%)" helpText={`Masukkan target persentase atau hitung otomatis. Luas Lahan Aktif: ${landArea.toLocaleString('id-ID')} m².`} />
+            <div className="relative">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={greenAreaPercent}
+                onChange={handlePercentChange}
+                onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                className={inputClass}
+                placeholder="Contoh: 20"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 select-none">%</span>
+            </div>
+            {greenAreaPercent && !isNaN(Number(greenAreaPercent)) && (
+              <span className={cn(
+                "text-[10px] font-bold mt-1 block",
+                Number(greenAreaPercent) >= 20 ? "text-primary" : "text-rose-600"
+              )}>
+                {Number(greenAreaPercent) >= 20 ? "✓ Memenuhi standar minimal 20%" : "⚠ Kurang dari standar minimal 20%"}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -754,8 +1120,35 @@ export const SpatialSection = () => {
 
 // ─── SECTION 6: DATA TEKNIS SITE PLAN ─────────────────────────────────────────
 export const TechnicalSection = () => {
-  const { register, watch, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   const category = watch('submission.category') || 'PERUMAHAN';
+  const landArea = watch('location.landArea') || 0;
+  const cemeteryAreaVal = watch('technical.cemeteryArea');
+  const [cemeteryPercent, setCemeteryPercent] = useState<string>('');
+
+  const handleCemeteryLuasChangeVal = (val: number | undefined) => {
+    if (landArea > 0 && val !== undefined && !isNaN(val)) {
+      setCemeteryPercent(((val / landArea) * 100).toFixed(1));
+    } else {
+      setCemeteryPercent('');
+    }
+  };
+
+  const handleCemeteryPercentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const percent = Math.max(0, Number(e.target.value));
+    setCemeteryPercent(e.target.value === '' ? '' : String(percent));
+    if (landArea > 0 && !isNaN(percent)) {
+      setValue('technical.cemeteryArea', Math.round((percent / 100) * landArea));
+    }
+  };
+
+  useEffect(() => {
+    if (landArea > 0 && cemeteryAreaVal) {
+      setCemeteryPercent(((cemeteryAreaVal / landArea) * 100).toFixed(1));
+    }
+  }, [landArea, cemeteryAreaVal]);
+
+  const greenBufferAreaVal = watch('technical.greenBufferArea');
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -770,33 +1163,63 @@ export const TechnicalSection = () => {
       {category === 'PERUMAHAN' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
           <div>
-            <label className={labelClass}>Jumlah Kaveling Efektif</label>
-            <input {...register('technical.lotCount', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 150" />
+            <LabelWithInfo label="Jumlah Kaveling Efektif" helpText="Jumlah total unit kaveling hunian efektif yang akan dibangun pada rencana tapak." />
+            <FormattedInput name="technical.lotCount" placeholder="Contoh: 150" unit="Kaveling" />
             {errors.technical?.lotCount && <p className="text-xs text-rose-500 mt-1">{errors.technical.lotCount.message}</p>}
           </div>
           <div>
-            <label className={labelClass}>Tipe Perumahan</label>
+            <LabelWithInfo label="Tipe Perumahan" helpText="Klasifikasi jenis pembangunan perumahan (Komersil, MBR/Subsidi, atau Campuran)." />
             <select {...register('technical.housingType')} className={inputClass}>
               <option value="NON_SUBSIDI">Komersil / Non-Subsidi</option>
               <option value="SUBSIDI">Masyarakat Berpenghasilan Rendah / Subsidi</option>
               <option value="CAMPURAN">Campuran</option>
             </select>
           </div>
-          <div>
-            <label className={labelClass}>Luas Kaveling Makam / TPU Rencana (m²)</label>
-            <input {...register('technical.cemeteryArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Penyediaan 2% dari luas total" />
-            {errors.technical?.cemeteryArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.cemeteryArea.message}</p>}
+
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border border-[#DAE4DB] bg-[#f4f7f4]/20 p-4">
+            <div>
+              <LabelWithInfo label="Luas Kaveling Makam / TPU Rencana (m²)" helpText={`Penyediaan area makam fisik / TPU rencana (wajib minimal 2% dari total luas lahan perumahan: ${landArea > 0 ? (landArea * 0.02).toLocaleString('id-ID') : '0'} m²).`} />
+              <FormattedInput name="technical.cemeteryArea" placeholder="Penyediaan 2% dari luas total" unit="m²" onChangeCustom={handleCemeteryLuasChangeVal} />
+              {errors.technical?.cemeteryArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.cemeteryArea.message}</p>}
+            </div>
+
+            <div>
+              <LabelWithInfo label="Kalkulator Persentase TPU (%)" helpText={`Masukkan target persentase atau hitung otomatis. Luas Lahan Aktif: ${landArea.toLocaleString('id-ID')} m².`} />
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={cemeteryPercent}
+                  onChange={handleCemeteryPercentChange}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  className={inputClass}
+                  placeholder="Contoh: 2"
+                />
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 select-none">%</span>
+              </div>
+              {cemeteryPercent && !isNaN(Number(cemeteryPercent)) && (
+                <span className={cn(
+                  "text-[10px] font-bold mt-1 block",
+                  Number(cemeteryPercent) >= 2 ? "text-primary" : "text-rose-600"
+                )}>
+                  {Number(cemeteryPercent) >= 2 ? "✓ Memenuhi standar minimal 2%" : "⚠ Kurang dari standar minimal 2%"}
+                </span>
+              )}
+            </div>
           </div>
+
           <div>
-            <label className={labelClass}>Lebar ROW Jalan Utama (m)</label>
+            <LabelWithInfo label="Lebar ROW Jalan Utama (m)" helpText="Lebar ruang milik jalan utama kawasan tapak perumahan (misal: ROW 8 Meter)." />
             <input {...register('technical.roadRowMain')} type="text" className={inputClass} placeholder="Contoh: ROW 8 Meter" />
           </div>
           <div>
-            <label className={labelClass}>Lebar ROW Jalan Lingkungan (m)</label>
+            <LabelWithInfo label="Lebar ROW Jalan Lingkungan (m)" helpText="Lebar ruang milik jalan penghubung antar kaveling hunian (misal: ROW 6 Meter)." />
             <input {...register('technical.roadRowLocal')} type="text" className={inputClass} placeholder="Contoh: ROW 6 Meter" />
           </div>
           <div>
-            <label className={labelClass}>Sistem Distribusi Air Bersih</label>
+            <LabelWithInfo label="Sistem Distribusi Air Bersih" helpText="Sistem penyediaan air minum bagi warga kawasan tapak perumahan." />
             <input {...register('technical.waterSystem')} type="text" className={inputClass} placeholder="Contoh: PDAM / Sumur Bor Komunal" />
           </div>
         </div>
@@ -805,33 +1228,33 @@ export const TechnicalSection = () => {
       {category === 'NON_PERUMAHAN' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
           <div>
-            <label className={labelClass}>Jumlah Blok / Unit Gedung</label>
-            <input {...register('technical.buildingBlocks', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 5 Blok" />
+            <LabelWithInfo label="Jumlah Blok / Unit Gedung" helpText="Jumlah total unit blok gedung utama atau ruko komersial yang direncanakan." />
+            <FormattedInput name="technical.buildingBlocks" placeholder="Contoh: 5 Blok" unit="Blok" />
           </div>
           <div>
-            <label className={labelClass}>Koefisien Dasar Bangunan (KDB - %)</label>
-            <input {...register('technical.kdb', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 60" />
+            <LabelWithInfo label="Koefisien Dasar Bangunan (KDB - %)" helpText="Persentase luas lantai dasar bangunan terhadap total luas lahan." />
+            <FormattedInput name="technical.kdb" placeholder="Contoh: 60" unit="%" />
             {errors.technical?.kdb && <p className="text-xs text-rose-500 mt-1">{errors.technical.kdb.message}</p>}
           </div>
           <div>
-            <label className={labelClass}>Koefisien Lantai Bangunan (KLB)</label>
-            <input {...register('technical.klb', { valueAsNumber: true })} type="number" step="0.1" className={inputClass} placeholder="Contoh: 2.4" />
+            <LabelWithInfo label="Koefisien Lantai Bangunan (KLB)" helpText="Angka perbandingan luas seluruh lantai bangunan terhadap total luas lahan." />
+            <FormattedInput name="technical.klb" placeholder="Contoh: 2.4" unit="" isDecimal={true} />
           </div>
           <div>
-            <label className={labelClass}>Koefisien Dasar Hijau (KDH - %)</label>
-            <input {...register('technical.kdh', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 20" />
+            <LabelWithInfo label="Koefisien Dasar Hijau (KDH - %)" helpText="Persentase ruang terbuka luar bangunan yang ditumbuhi tanaman/hijau minimal." />
+            <FormattedInput name="technical.kdh" placeholder="Contoh: 20" unit="%" />
           </div>
           <div>
-            <label className={labelClass}>Kapasitas Satuan Ruang Parkir (SRP)</label>
-            <input {...register('technical.parkingCapacity', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 50 Mobil" />
+            <LabelWithInfo label="Kapasitas Satuan Ruang Parkir (SRP)" helpText="Kapasitas total Satuan Ruang Parkir (SRP) kendaraan yang disediakan di dalam area tapak." />
+            <FormattedInput name="technical.parkingCapacity" placeholder="Contoh: 50 Mobil" unit="SRP" />
           </div>
           <div>
-            <label className={labelClass}>Jumlah Lantai Bangunan Maksimum</label>
-            <input {...register('technical.maxFloors', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 4 Lantai" />
+            <LabelWithInfo label="Jumlah Lantai Bangunan Maksimum" helpText="Jumlah lantai gedung maksimum yang direncanakan." />
+            <FormattedInput name="technical.maxFloors" placeholder="Contoh: 4 Lantai" unit="Lantai" />
           </div>
           <div className="md:col-span-2">
-            <label className={labelClass}>Total Luas Lantai Bangunan (m²)</label>
-            <input {...register('technical.totalFloorArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 4500" />
+            <LabelWithInfo label="Total Luas Lantai Bangunan (m²)" helpText="Akumulasi luas seluruh lantai bangunan yang direncanakan (m²)." />
+            <FormattedInput name="technical.totalFloorArea" placeholder="Contoh: 4500" unit="m²" />
           </div>
         </div>
       )}
@@ -839,7 +1262,7 @@ export const TechnicalSection = () => {
       {category === 'FASUM' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
           <div>
-            <label className={labelClass}>Jenis Layanan Fasilitas</label>
+            <LabelWithInfo label="Jenis Layanan Fasilitas" helpText="Fokus utama fungsi pelayanan publik yang akan diselenggarakan." />
             <select {...register('technical.facilityType')} className={inputClass}>
               <option value="PERIBADATAN">Fasilitas Peribadatan (Masjid/Gereja)</option>
               <option value="KESEHATAN">Fasilitas Kesehatan (Rumah Sakit/Klinik)</option>
@@ -848,11 +1271,11 @@ export const TechnicalSection = () => {
             </select>
           </div>
           <div>
-            <label className={labelClass}>Kapasitas Daya Tampung (Pengunjung/Siswa/Jemaah)</label>
-            <input {...register('technical.capacity', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 300 Jiwa" />
+            <LabelWithInfo label="Kapasitas Daya Tampung (Pengunjung/Siswa/Jemaah)" helpText="Kapasitas daya tampung maksimum dalam sekali pelayanan." />
+            <FormattedInput name="technical.capacity" placeholder="Contoh: 300 Jiwa" unit="Jiwa" />
           </div>
           <div>
-            <label className={labelClass}>Aksesibilitas Difabel (Ramp/Guiding Block)</label>
+            <LabelWithInfo label="Aksesibilitas Difabel (Ramp/Guiding Block)" helpText="Penyediaan infrastruktur ramah penyandang disabilitas (tata jalan pemandu/ramp kursi roda)." />
             <select {...register('technical.disabledAccess')} className={inputClass}>
               <option value="LENGKAP">Tersedia Lengkap</option>
               <option value="PARSIAL">Tersedia Sebagian</option>
@@ -860,14 +1283,14 @@ export const TechnicalSection = () => {
             </select>
           </div>
           <div>
-            <label className={labelClass}>Ketersediaan Parkir Khusus (Ambulans/Bus)</label>
+            <LabelWithInfo label="Ketersediaan Parkir Khusus (Ambulans/Bus)" helpText="Akses parkir/tunggu khusus kendaraan darurat pelayanan umum." />
             <select {...register('technical.specialParking')} className={inputClass}>
               <option value="ADA">Tersedia Drop-off Khusus</option>
               <option value="TIDAK_ADA">Tidak Tersedia</option>
             </select>
           </div>
           <div className="md:col-span-2">
-            <label className={labelClass}>Rencana Sistem Proteksi Kebakaran Aktif</label>
+            <LabelWithInfo label="Rencana Sistem Proteksi Kebakaran Aktif" helpText="Infrastruktur pemadam kebakaran mandiri yang terpasang di area tapak pelayanan." />
             <input {...register('technical.fireProtection')} type="text" className={inputClass} placeholder="Contoh: Pemasangan Hydrant Mandiri, APAR di setiap koridor" />
           </div>
         </div>
@@ -876,27 +1299,27 @@ export const TechnicalSection = () => {
       {category === 'INDUSTRI' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
           <div>
-            <label className={labelClass}>Jumlah Unit Gudang / Pabrik</label>
-            <input {...register('technical.warehouseCount', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 12 Unit" />
+            <LabelWithInfo label="Jumlah Unit Gudang / Pabrik" helpText="Jumlah total bangunan unit pabrik atau gudang logistik penyimpanan." />
+            <FormattedInput name="technical.warehouseCount" placeholder="Contoh: 12 Unit" unit="Unit" />
           </div>
           <div>
-            <label className={labelClass}>Muatan Sumbu Terberat Kelas Jalan (MST - Ton)</label>
+            <LabelWithInfo label="Muatan Sumbu Terberat Kelas Jalan (MST - Ton)" helpText="Kekuatan muatan maksimal jalan masuk ke kawasan industri untuk truk logistik." />
             <input {...register('technical.roadLoadMst')} type="text" className={inputClass} placeholder="Contoh: MST 8 Ton / Kelas III-A" />
           </div>
           <div>
-            <label className={labelClass}>Daya Listrik Industri Terpasang</label>
+            <LabelWithInfo label="Daya Listrik Industri Terpasang" helpText="Total suplai daya listrik dari PLN yang dialokasikan bagi aktivitas industri." />
             <input {...register('technical.electricityPower')} type="text" className={inputClass} placeholder="Contoh: 150 kVA" />
           </div>
           <div>
-            <label className={labelClass}>Kapasitas Pengolahan IPAL Terencana (m³/hari)</label>
+            <LabelWithInfo label="Kapasitas Pengolahan IPAL Terencana (m³/hari)" helpText="Daya pengolahan air limbah kawasan industri per hari sebelum dibuang ke saluran kota." />
             <input {...register('technical.ipalCapacity')} type="text" className={inputClass} placeholder="Contoh: 50 m3/hari" />
           </div>
           <div>
-            <label className={labelClass}>Luas Sabuk Penyangga Hijau (Green Buffer - m²)</label>
-            <input {...register('technical.greenBufferArea', { valueAsNumber: true })} type="number" className={inputClass} placeholder="Contoh: 2500" />
+            <LabelWithInfo label="Luas Sabuk Penyangga Hijau (Green Buffer - m²)" helpText="Luas area hijau penyangga pembatas aktivitas polusi industri dengan kawasan pemukiman." />
+            <FormattedInput name="technical.greenBufferArea" placeholder="Contoh: 2500" unit="m²" />
           </div>
           <div>
-            <label className={labelClass}>Penyediaan Tempat Pembuangan Sementara B3</label>
+            <LabelWithInfo label="Penyediaan Tempat Pembuangan Sementara B3" helpText="Ketersediaan tempat penyimpanan sementara khusus untuk limbah Bahan Berbahaya dan Beracun (B3)." />
             <select {...register('technical.tpsB3Provision')} className={inputClass}>
               <option value="YA">Ya, Disediakan TPS Khusus B3 Berizin</option>
               <option value="TIDAK">Tidak Disediakan (Kerjasama Pihak Ketiga)</option>
@@ -922,9 +1345,28 @@ export const ConsultantSection = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
-        <div className="md:col-span-2"><label className={labelClass}>Nama Biro / Perusahaan Konsultan Perencana</label><input {...register('consultant.companyName')} type="text" className={inputClass} placeholder="PT / CV Biro Rekayasa Geospasial..." />{errors.consultant?.companyName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.companyName.message}</p>}</div>
-        <div><label className={labelClass}>Nama Arsitek / Praktisi (Sertifikasi SKEA)</label><input {...register('consultant.consultantName')} type="text" className={inputClass} placeholder="Ar. Nama Lengkap, IAI" />{errors.consultant?.consultantName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.consultantName.message}</p>}</div>
-        <div><label className={labelClass}>Nomor Kontak PIC Konsultan</label><input {...register('consultant.picName')} type="text" className={inputClass} placeholder="Nomor telepon penanggung jawab..." />{errors.consultant?.picName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.picName.message}</p>}</div>
+        <div className="md:col-span-2">
+          <LabelWithInfo label="Nama Biro / Perusahaan Konsultan Perencana" helpText="Nama resmi badan hukum biro konsultan tata ruang/arsitektur yang ditunjuk pemohon." />
+          <input {...register('consultant.companyName')} type="text" className={inputClass} placeholder="PT / CV Biro Rekayasa Geospasial..." />
+          {errors.consultant?.companyName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.companyName.message}</p>}
+        </div>
+        <div>
+          <LabelWithInfo label="Nama Arsitek / Praktisi (Sertifikasi SKEA)" helpText="Nama penanggung jawab gambar arsitek bersertifikat keahlian resmi (IAI/SKEA)." />
+          <input {...register('consultant.consultantName')} type="text" className={inputClass} placeholder="Ar. Nama Lengkap, IAI" />
+          {errors.consultant?.consultantName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.consultantName.message}</p>}
+        </div>
+        <div>
+          <LabelWithInfo label="Nomor Kontak PIC Konsultan" helpText="Nomor HP/WhatsApp penanggung jawab lapangan dari pihak biro perencana." />
+          <input
+            type="text"
+            className={inputClass}
+            placeholder="Nomor telepon penanggung jawab..."
+            {...register('consultant.picName', {
+              onChange: (e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); }
+            })}
+          />
+          {errors.consultant?.picName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.picName.message}</p>}
+        </div>
       </div>
     </div>
   );

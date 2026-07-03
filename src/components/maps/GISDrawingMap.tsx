@@ -152,8 +152,8 @@ export default function GISDrawingMap({
         const draw = new MapboxDraw({
             displayControlsDefault: false,
             controls: {
-                polygon:   true,
-                trash:     true,
+                polygon:   false,
+                trash:     false,
             },
             styles: DRAW_STYLES,
             // Batasi ke satu poligon jika allowMultiple = false

@@ -65,6 +65,12 @@ export default function SubmissionDetailPage() {
   // otherwise fall back to UI simulator role.
   const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
 
+  const activeRole = effectiveRole;
+  const userProfile = user ? {
+    name: user.full_name || user.username,
+    email: user.email,
+  } : uiUserProfile;
+
   // Zustand State Binding [sipas-fe.txt, Purworejo 8]
   const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
   const flyTo = useGisUIStore((s) => s.flyTo);
@@ -207,7 +213,7 @@ export default function SubmissionDetailPage() {
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['submission', id] }),
+        queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true }),
         queryClient.invalidateQueries({ queryKey: ['submissions'] })
       ]);
       setNotes('');
@@ -455,13 +461,7 @@ export default function SubmissionDetailPage() {
           </p>
         </div>
 
-        {/* Dev debug: show role/status flags */}
-        <div className="ml-4 p-2 border border-slate-200 bg-yellow-50 text-[11px] text-slate-700 rounded-none select-none">
-          <div className="font-bold">DEBUG</div>
-          <div className="text-[11px]">Effective Role (auth): {debugRole} · UI Simulator Role: {debugUiRole}</div>
-          <div className="text-[11px]">Status: {debugStatus}</div>
-          <div className="text-[11px]">isKabidActive: {debugIsKabid ? 'true' : 'false'} · showKabidPanel: {debugShowKabid ? 'true' : 'false'}</div>
-        </div>
+
 
         {/* ─── DYNAMIC SLA TRACKER HUD [Bogor 16] ─── */}
         <div className="shrink-0 select-none flex items-center gap-3">
@@ -483,6 +483,38 @@ export default function SubmissionDetailPage() {
           )}
         </div>
       </div>
+
+      {/* ─── AMARAN REVISI / PENOLAKAN UNTUK PEMOHON ─── */}
+      {sub.status === 'Ditolak' && (
+        <div className="bg-rose-50 border border-rose-200 p-5 text-left font-sans flex items-start gap-4 shadow-[3px_3px_0px_0px_rgba(239,68,68,0.08)]">
+          <div className="p-2 bg-rose-100 text-rose-700 shrink-0">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <h4 className="text-xs font-black text-rose-950 uppercase tracking-wide">Permohonan Membutuhkan Revisi</h4>
+            <p className="text-xs text-rose-800 leading-relaxed">
+              Berkas pengajuan Anda telah ditolak/dikembalikan oleh petugas dengan catatan berikut:
+            </p>
+            {/* Tampilkan catatan penolakan terakhir dari history jika ada */}
+            {sub.history && sub.history.length > 0 && (
+              <div className="mt-2 p-3 bg-white border border-rose-100 text-xs text-slate-700 font-mono italic leading-relaxed">
+                "{sub.history.find((h: any) => h.status === 'Ditolak' || h.action === 'REJECT')?.notes || sub.history[0]?.notes || 'Tidak ada catatan khusus.'}"
+              </div>
+            )}
+            {effectiveRole === 'Pemohon' && (
+              <div className="pt-3">
+                <Link
+                  to={`/pengajuan/edit/${sub.id}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all uppercase tracking-wider rounded-none decoration-none"
+                >
+                  <FileSignature className="h-3.5 w-3.5" />
+                  Mulai Revisi & Ajukan Kembali
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ─── SEKSI 2: CORE WORKSPACE GRID (SPLIT 2/3 DAN 1/3) ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1485,7 +1517,7 @@ export default function SubmissionDetailPage() {
           <div className="space-y-4">
             <h4 className="font-bold text-xs text-slate-400 uppercase tracking-wide">Riwayat Proses Pelacakan</h4>
 
-            <div className="relative border-l border-border/80 ml-3 pl-6 space-y-6 py-1">
+            <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-6 py-1">
               {sub.history.map((hist, i) => {
                 const isApproved = hist.status === 'Disetujui';
                 const isRejected = hist.status === 'Ditolak';
@@ -1493,7 +1525,7 @@ export default function SubmissionDetailPage() {
                 return (
                   <div key={i} className="relative">
                     {/* Circle timeline nodes (bulat sempurna terlindung di index.css) */}
-                    <div className={`absolute -left-9 mt-0.5 rounded-full p-1 border-4 border-white text-white ${isApproved ? 'bg-emerald-600' : isRejected ? 'bg-rose-600' : 'bg-amber-500'
+                    <div className={`absolute -left-[35px] top-0 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center text-white ${isApproved ? 'bg-emerald-600' : isRejected ? 'bg-rose-600' : 'bg-amber-500'
                       }`}>
                       {isApproved ? <CheckCircle2 className="h-3.5 w-3.5 text-white" /> :
                         isRejected ? <XCircle className="h-3.5 w-3.5 text-white" /> : <Clock className="h-3.5 w-3.5 text-white" />}

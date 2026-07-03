@@ -1,0 +1,677 @@
+[
+  {
+    "id_kecamatan": "32.01.05",
+    "nama_kecamatan": "Babakan Madang",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.05.2001", "nama": "Babakan Madang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2002", "nama": "Cadas Ngampar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2003", "nama": "Cijayanti", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2004", "nama": "Cipambuan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2005", "nama": "Citaringgul", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2006", "nama": "Kadumanggu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2007", "nama": "Karang Tengah", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2008", "nama": "Sentul", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.05.2009", "nama": "Bo Jong Koneng", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.02",
+    "nama_kecamatan": "Bojonggede",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.02.2001", "nama": "Bojong Baru", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.2002", "nama": "Bojonggede", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.2003", "nama": "Cimanggis", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.2004", "nama": "Kedung Waringin", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.2005", "nama": "Ragajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.2006", "nama": "Rawa Panjang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.2007", "nama": "Susukan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.2008", "nama": "Waringin Jaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.02.1009", "nama": "Pabuaran", "status": "Kelurahan" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.19",
+    "nama_kecamatan": "Caringin",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.19.2001", "nama": "Basirih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2002", "nama": "Caringin", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2003", "nama": "Cidahu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2004", "nama": "Ciherang Pondok", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2005", "nama": "Cijengkol", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2006", "nama": "Cinagara", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2007", "nama": "Lemah Duhur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2008", "nama": "Muara Jaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2009", "nama": "Pancawati", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2010", "nama": "Pasir Buncir", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2011", "nama": "Pasir Muncang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.19.2012", "nama": "Tangkil", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.09",
+    "nama_kecamatan": "Cariu",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.09.2001", "nama": "Babakan Raden", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2002", "nama": "Bantar Kuning", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2003", "nama": "Cariu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2004", "nama": "Cibatutiga", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2005", "nama": "Cikutamahi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2006", "nama": "Karyamekar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2007", "nama": "Kutamekar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2008", "nama": "Mekarlaksana", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2009", "nama": "Pacing", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.09.2010", "nama": "Tegal Panjang", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.15",
+    "nama_kecamatan": "Ciampea",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.15.2001", "nama": "Bo Jong Rangkas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2002", "nama": "Ciampea", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2003", "nama": "Ciampea Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2004", "nama": "Cibadak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2005", "nama": "Cibanteng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2006", "nama": "Cibuntu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2007", "nama": "Cicadas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2008", "nama": "Cihideung Ilir", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2009", "nama": "Cihideung Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2010", "nama": "Cinangka", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2011", "nama": "Benteng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2012", "nama": "Pondok Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.15.2013", "nama": "Tegal Waru", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.18",
+    "nama_kecamatan": "Ciawi",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.18.2001", "nama": "Banjar Wangi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2002", "nama": "Banjar Waru", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2003", "nama": "Bo Jong Murni", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2004", "nama": "Ciawi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2005", "nama": "Cibedug", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2006", "nama": "Cileungsi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2007", "nama": "Citapen", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2008", "nama": "Jambu Luwuk", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2009", "nama": "Bitung Sari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2010", "nama": "Pandansari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2011", "nama": "Teluk Pinang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2012", "nama": "Banjarsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.18.2013", "nama": "Cadas Ngampar", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.01",
+    "nama_kecamatan": "Cibinong",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.01.1001", "nama": "Cibinong", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1002", "nama": "Cirimekar", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1003", "nama": "Ciriung", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1004", "nama": "Harapan Jaya", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1005", "nama": "Karadenan", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1006", "nama": "Nanggewer", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1007", "nama": "Nanggewer Mekar", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1008", "nama": "Pabuaran", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1009", "nama": "Pabuaran Mekar", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1010", "nama": "Pakansari", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1011", "nama": "Pondok Rajeg", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1012", "nama": "Sukahati", "status": "Kelurahan" },
+      { "id_desa_kelurahan": "32.01.01.1013", "nama": "Tengah", "status": "Kelurahan" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.16",
+    "nama_kecamatan": "Cibungbulang",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.16.2001", "nama": "Cemplang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2002", "nama": "Ciaruteun Ilir", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2003", "nama": "Ciaruteun Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2004", "nama": "Cibatok I", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2005", "nama": "Cibatok II", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2006", "nama": "Cijujung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2007", "nama": "Cimanggu I", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2008", "nama": "Cimanggu II", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2009", "nama": "Dukuh", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2010", "nama": "Galuga", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2011", "nama": "Girijaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2012", "nama": "Leuweung Kolot", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2013", "nama": "Situ Ilir", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2014", "nama": "Situ Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.16.2015", "nama": "Sukamaju", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.29",
+    "nama_kecamatan": "Cigombong",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.29.2001", "nama": "Ciburayut", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2002", "nama": "Ciburuy", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2003", "nama": "Cigombong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2004", "nama": "Cisalada", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2005", "nama": "Pasirjaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2006", "nama": "Srogol", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2007", "nama": "Tugujaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2008", "nama": "Watesjaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.29.2009", "nama": "Ciadeg", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.22",
+    "nama_kecamatan": "Cigudeg",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.22.2001", "nama": "Argapura", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2002", "nama": "Banyu Asin", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2003", "nama": "Banyu Resmi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2004", "nama": "Banyu Wangi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2005", "nama": "Batu Jajar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2006", "nama": "Bunisari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2007", "nama": "Cigudeg", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2008", "nama": "Cintamanik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2009", "nama": "Cintamulya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2010", "nama": "Mekar Jaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2011", "nama": "Rengasjajar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2012", "nama": "Sukageser", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2013", "nama": "Sukamaju", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2014", "nama": "Wargajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.22.2015", "nama": "Bangunjaya", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.20",
+    "nama_kecamatan": "Cijeruk",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.20.2001", "nama": "Cibalung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2002", "nama": "Cijeruk", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2003", "nama": "Cipelang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2004", "nama": "Cipicung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2005", "nama": "Palasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2006", "nama": "Purasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2007", "nama": "Tajur Halang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2008", "nama": "Tanjungsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.20.2009", "nama": "Warung Menteng", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.07",
+    "nama_kecamatan": "Cileungsi",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.07.2001", "nama": "Cileungsi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2002", "nama": "Cileungsi Kidul", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2003", "nama": "Cipenjo", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2004", "nama": "Cipeucang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2005", "nama": "Dayeuh", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2006", "nama": "Gandoang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2007", "nama": "Jatisari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2008", "nama": "Limus Nunggal", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2009", "nama": "Mampir", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2010", "nama": "Mekarsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2011", "nama": "Pasir Angin", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.07.2012", "nama": "Setu Sari", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.14",
+    "nama_kecamatan": "Ciomas",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.14.2001", "nama": "Ciomas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2002", "nama": "Ciomas Rahayu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2003", "nama": "Kota Batu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2004", "nama": "Laladon", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2005", "nama": "Mekarjaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2006", "nama": "Padasuka", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2007", "nama": "Pagelaran", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2008", "nama": "Parakan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2009", "nama": "Sukaharja", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.2010", "nama": "Sukamakmur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.14.1011", "nama": "Pabuaran", "status": "Kelurahan" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.25",
+    "nama_kecamatan": "Cisarua",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.25.2001", "nama": "Batu Layang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2002", "nama": "Cibeureum", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2003", "nama": "Cilember", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2004", "nama": "Cisarua", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2005", "nama": "Citeko", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2006", "nama": "Jogjogan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2007", "nama": "Kopo", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2008", "nama": "Leuwimalang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2009", "nama": "Tugu Selatan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.2010", "nama": "Tugu Utara", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.25.1011", "nama": "Cisarua", "status": "Kelurahan" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.27",
+    "nama_kecamatan": "Ciseeng",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.27.2001", "nama": "Babakan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2002", "nama": "Cibeuteung Muara", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2003", "nama": "Cibeuteung Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2004", "nama": "Cibentang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2005", "nama": "Ciheulet", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2006", "nama": "Ciseeng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2007", "nama": "Kuripan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2008", "nama": "Karihkil", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2009", "nama": "Putat Nutug", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.27.2010", "nama": "Parigi Mekar", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.04",
+    "nama_kecamatan": "Citeureup",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.04.2001", "nama": "Cibinong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2002", "nama": "Gunung Sari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2003", "nama": "Hambalang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2004", "nama": "Karang Asem Barat", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2005", "nama": "Karang Asem Timur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2006", "nama": "Leuwinutug", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2007", "nama": "Pasir Mukti", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2008", "nama": "Puspasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2009", "nama": "Sanja", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2010", "nama": "Sukahati", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2011", "nama": "Tajur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.2012", "nama": "Tangkil", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.04.1013", "nama": "Citeureup", "status": "Kelurahan" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.30",
+    "nama_kecamatan": "Dramaga",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.30.2001", "nama": "Babakan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2002", "nama": "Ciherang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2003", "nama": "Cikarwang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2004", "nama": "Dramaga", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2005", "nama": "Neglasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2006", "nama": "Petir", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2007", "nama": "Purwasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2008", "nama": "Sinar Sari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2009", "nama": "Sukadamai", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.30.2010", "nama": "Sukawening", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.06",
+    "nama_kecamatan": "Gunung Putri",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.06.2001", "nama": "Bo Jong Kulur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2002", "nama": "Bo Jong Nangka", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2003", "nama": "Ciangsana", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2004", "nama": "Cicadas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2005", "nama": "Cikeas Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2006", "nama": "Gunung Putri", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2007", "nama": "Karang Ganri", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2008", "nama": "Nagrak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2009", "nama": "Tlajung Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.06.2010", "nama": "Wanaherang", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.26",
+    "nama_kecamatan": "Gunung Sindur",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.26.2001", "nama": "Cibinong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2002", "nama": "Cidokom", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2003", "nama": "Curug", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2004", "nama": "Gunung Sindur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2005", "nama": "Jampang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2006", "nama": "Pabuaran", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2007", "nama": "Padurenan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2008", "nama": "Pengasinan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2009", "nama": "Rawakalong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.26.2010", "nama": "Cibadung", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.21",
+    "nama_kecamatan": "Jasinga",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.21.2001", "nama": "Bagoang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2002", "nama": "Barengkok", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2003", "nama": "Cikopomayak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2004", "nama": "Curug", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2005", "nama": "Jasinga", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2006", "nama": "Jugala Jaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2007", "nama": "Kalongsawah", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2008", "nama": "Koleang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2009", "nama": "Pamagersari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2010", "nama": "Pangaur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2011", "nama": "Pangradin", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2012", "nama": "Sipak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2013", "nama": "Setu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2014", "nama": "Neglasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2015", "nama": "Wirajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.21.2016", "nama": "Tegal Wangi", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.08",
+    "nama_kecamatan": "Jonggol",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.08.2001", "nama": "Bendungan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2002", "nama": "Cibodas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2003", "nama": "Singajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2004", "nama": "Sirnagalih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2005", "nama": "Sukamaju", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2006", "nama": "Sukamanah", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2007", "nama": "Sukanegara", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2008", "nama": "Sukagalih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2009", "nama": "Sukajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2010", "nama": "Singasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2011", "nama": "Jonggol", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2012", "nama": "Weninggalih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2013", "nama": "Balekambang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.08.2014", "nama": "Sukawangi", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.12",
+    "nama_kecamatan": "Kemang",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.12.2001", "nama": "Jampang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.2002", "nama": "Kemang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.2003", "nama": "Pabuaran", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.2004", "nama": "Parakan Jaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.2005", "nama": "Pondok Udik", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.2006", "nama": "Semplak Barat", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.2007", "nama": "Tegal", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.2008", "nama": "Bo Jong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.12.1009", "nama": "Atang Senjaya", "status": "Kelurahan" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.38",
+    "nama_kecamatan": "Klapanunggal",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.38.2001", "nama": "Bantar Jati", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2002", "nama": "Bo Jong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2003", "nama": "Cikahuripan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2004", "nama": "Klapanunggal", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2005", "nama": "Lulut", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2006", "nama": "Leuwikaret", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2007", "nama": "Nambo", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2008", "nama": "Ligarmukti", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.38.2009", "nama": "Kembang Kuning", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.17",
+    "nama_kecamatan": "Leuwiliang",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.17.2001", "nama": "Barengkok", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2002", "nama": "Cibeber I", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2003", "nama": "Cibeber II", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2004", "nama": "Karacak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2005", "nama": "Karet", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2006", "nama": "Leuwiliang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2007", "nama": "Leuwimekar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2008", "nama": "Pabuarang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2009", "nama": "Puraseda", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2010", "nama": "Purasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.17.2011", "nama": "Sibanteng", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.37",
+    "nama_kecamatan": "Leuwisadeng",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.37.2001", "nama": "Babakan Sadeng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.37.2002", "nama": "Kalong I", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.37.2003", "nama": "Kalong II", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.37.2004", "nama": "Leuwisadeng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.37.2005", "nama": "Sadeng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.37.2006", "nama": "Sadengkolot", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.37.2007", "nama": "Sibanteng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.37.2008", "nama": "Wangun Jaya", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.24",
+    "nama_kecamatan": "Megamendung",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.24.2001", "nama": "Cipayung Girang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2002", "nama": "Cipayung Datar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2003", "nama": "Gadog", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2004", "nama": "Kuta", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2005", "nama": "Megamendung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2006", "nama": "Sukagalih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2007", "nama": "Sukakarya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2008", "nama": "Sukamahi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2009", "nama": "Sukamaju", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2010", "nama": "Sukaresmi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2011", "nama": "Pasir Angin", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.24.2012", "nama": "Sukamanah", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.23",
+    "nama_kecamatan": "Nanggung",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.23.2001", "nama": "Bantar Karet", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2002", "nama": "Cisarua", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2003", "nama": "Curug Bitung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2004", "nama": "Hambaro", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2005", "nama": "Kalong Liud", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2006", "nama": "Malasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2007", "nama": "Nanggung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2008", "nama": "Pangkal Jaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2009", "nama": "Parakan Muncang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2010", "nama": "Sukaluyu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.23.2011", "nama": "Batu Tulis", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.31",
+    "nama_kecamatan": "Pamijahan",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.31.2001", "nama": "Ciasihan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2002", "nama": "Ciasmara", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2003", "nama": "Cibening", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2004", "nama": "Cibitung Kulon", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2005", "nama": "Cibitung Wetan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2006", "nama": "Cimayang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2007", "nama": "Gunung Bunder I", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2008", "nama": "Gunung Bunder II", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2009", "nama": "Gunung Menyan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2010", "nama": "Pamijahan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2011", "nama": "Pasir Muncang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2012", "nama": "Purwabakti", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2013", "nama": "Cibunian", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2014", "nama": "Gunung Picung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.31.2015", "nama": "Pasir Reungit", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.11",
+    "nama_kecamatan": "Parung",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.11.2001", "nama": "Bo Jong Indah", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2002", "nama": "Bo Jong Sempu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2003", "nama": "Cibentang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2004", "nama": "Cogreg", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2005", "nama": "Iwul", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2006", "nama": "Jabon Mekar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2007", "nama": "Pamagarsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2008", "nama": "Parung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.11.2009", "nama": "Warung Menteng", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.10",
+    "nama_kecamatan": "Parung Panjang",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.10.2001", "nama": "Cikuda", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2002", "nama": "Dago", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2003", "nama": "Gintung Cilejet", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2004", "nama": "Gorowong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2005", "nama": "Jagabita", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2006", "nama": "Jagabaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2007", "nama": "Kabasan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2008", "nama": "Lumpang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2009", "nama": "Parung Panjang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2010", "nama": "Pingku", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.10.2011", "nama": "Cibunar", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.36",
+    "nama_kecamatan": "Rancabungur",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.36.2001", "nama": "Bantarjaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.36.2002", "nama": "Bantarsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.36.2003", "nama": "Candali", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.36.2004", "nama": "Mekarsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.36.2005", "nama": "Pasirgaok", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.36.2006", "nama": "Rancabungur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.36.2007", "nama": "Cimulang", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.13",
+    "nama_kecamatan": "Rumpin",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.13.2001", "nama": "Cibodas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2002", "nama": "Cipinang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2003", "nama": "Gobang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2004", "nama": "Kampung Sawah", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2005", "nama": "Kertajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2006", "nama": "Leuwibatu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2007", "nama": "Mekarsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2008", "nama": "Rabak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2010", "nama": "Sukamanah", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2011", "nama": "Sukamulya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2012", "nama": "Cariang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2013", "nama": "Tamansari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2014", "nama": "Mekarjaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.13.2009", "nama": "Rumpin", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.35",
+    "nama_kecamatan": "Sukajaya",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.35.2001", "nama": "Cileuksa", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2002", "nama": "Cisarua", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2003", "nama": "Kiarapandak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2004", "nama": "Kiarasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2005", "nama": "Pasir Madang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2006", "nama": "Sarkanjut", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2007", "nama": "Sipajang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2008", "nama": "Sukajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2009", "nama": "Sukakarya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2010", "nama": "Sukamulih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.35.2011", "nama": "Jayaraharja", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.39",
+    "nama_kecamatan": "Sukamakmur",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.39.2001", "nama": "Cibadak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2002", "nama": "Pabuaran", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2003", "nama": "Sirnajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2004", "nama": "Sukadamai", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2005", "nama": "Sukaharja", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2006", "nama": "Sukamakmur", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2007", "nama": "Sukamulya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2008", "nama": "Wargajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2009", "nama": "Sukawangi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.39.2010", "nama": "Chana", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.03",
+    "nama_kecamatan": "Sukaraja",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.03.2001", "nama": "Cadas Ngampar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2002", "nama": "Cibanon", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2003", "nama": "Cikeas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2004", "nama": "Ciluwar", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2005", "nama": "Nagrak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2006", "nama": "Pasir Jambu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2007", "nama": "Pasirlaja", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2008", "nama": "Sukaraja", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2009", "nama": "Sukatani", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2010", "nama": "Cimandala", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2011", "nama": "Gunung Geulis", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.2012", "nama": "Cijujung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.03.1013", "nama": "Sukaraja", "status": "Kelurahan" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.34",
+    "nama_kecamatan": "Tajurhalang",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.34.2001", "nama": "Cibinong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.34.2002", "nama": "Citayam", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.34.2003", "nama": "Kalisuren", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.34.2004", "nama": "Nanggerang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.34.2005", "nama": "Sasak Panjang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.34.2006", "nama": "Sukmajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.34.2007", "nama": "Tajurhalang", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.33",
+    "nama_kecamatan": "Tamansari",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.33.2001", "nama": "Calobak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.33.2002", "nama": "Pasireurih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.33.2003", "nama": "Sirnagalih", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.33.2004", "nama": "Sukajadi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.33.2005", "nama": "Sukajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.33.2006", "nama": "Sukaluyu", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.33.2007", "nama": "Sukamantri", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.33.2008", "nama": "Tamansari", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.40",
+    "nama_kecamatan": "Tanjungsari",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.40.2001", "nama": "Antajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2002", "nama": "Buanajaya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2003", "nama": "Cibadak", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2004", "nama": "Pasir Tanjung", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2005", "nama": "Selawangi", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2006", "nama": "Sukamanah", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2007", "nama": "Sinar Rasa", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2008", "nama": "Tanjungsari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2009", "nama": "Sirnasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.40.2010", "nama": "Tanjungrasa", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.28",
+    "nama_kecamatan": "Tenjo",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.28.2001", "nama": "Babakan", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2002", "nama": "Bojong", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2003", "nama": "Cilaku", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2004", "nama": "Ciomas", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2005", "nama": "Singabangsa", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2006", "nama": "Singasari", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2007", "nama": "Tenjo", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2008", "nama": "Batok", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.28.2009", "nama": "Tapos", "status": "Desa" }
+    ]
+  },
+  {
+    "id_kecamatan": "32.01.32",
+    "nama_kecamatan": "Tenjolaya",
+    "desa_kelurahan": [
+      { "id_desa_kelurahan": "32.01.32.2001", "nama": "Cinangneng", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.32.2002", "nama": "Gunung Malang", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.32.2003", "nama": "Gunung Mulya", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.32.2004", "nama": "Situ Daun", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.32.2005", "nama": "Tapos I", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.32.2006", "nama": "Tapos II", "status": "Desa" },
+      { "id_desa_kelurahan": "32.01.32.2007", "nama": "Tenggeringgi", "status": "Desa" }
+    ]
+  }
+]

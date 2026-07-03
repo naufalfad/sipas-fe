@@ -6,9 +6,15 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 
 export default function SubmissionListPage() {
-  const { activeRole } = useUIStore();
+  const { activeRole: uiActiveRole } = useUIStore();
+  const { user } = useAuthStore();
+  const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
+  const activeRole = effectiveRole;
+  const isPemohon = activeRole === 'Pemohon';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('Semua');
 
@@ -177,9 +183,9 @@ export default function SubmissionListPage() {
                       </span>
                     </td>
 
-                    {/* Kolom 6: Aksi (Ikon Mata Tunggal + CSS Group-Hover Tooltip) */}
+                    {/* Kolom 6: Aksi (Ikon Mata/Pensil + CSS Group-Hover Tooltip) */}
                     <td className="px-6 py-4 text-right">
-                      {sub.status === 'Draft' ? (
+                      {sub.status === 'Draft' && isPemohon ? (
                         <div className="relative group inline-block">
                           <Link
                             to={`/pengajuan/edit/${sub.id}`}
@@ -193,6 +199,39 @@ export default function SubmissionListPage() {
                             Lanjutkan Pengisian Draf
                             {/* Segitiga Penunjuk (Arrow) */}
                             <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-[#111D13]" />
+                          </div>
+                        </div>
+                      ) : (sub.status === 'Ditolak' && isPemohon) ? (
+                        <div className="flex items-center justify-end space-x-1">
+                          <div className="relative group inline-block">
+                            <Link
+                              to={`/pengajuan/edit/${sub.id}`}
+                              className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors rounded-none outline-none"
+                            >
+                              <Pencil className="h-4.5 w-4.5" />
+                            </Link>
+
+                            {/* ─── DYNAMIC CSS-ONLY HOVER TOOLTIP ─── */}
+                            <div className="absolute bottom-full right-0 mb-2.5 hidden group-hover:block bg-[#111D13] text-white text-[10px] font-medium px-2.5 py-1 pointer-events-none z-50 whitespace-nowrap rounded-none shadow-md border border-[#709775]/25">
+                              Revisi Pengajuan
+                              {/* Segitiga Penunjuk (Arrow) */}
+                              <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-[#111D13]" />
+                            </div>
+                          </div>
+                          <div className="relative group inline-block">
+                            <Link
+                              to={`/pengajuan/detail/${sub.id}`}
+                              className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-primary hover:bg-[#e8f2ea]/50 transition-colors rounded-none outline-none"
+                            >
+                              <Eye className="h-4.5 w-4.5" />
+                            </Link>
+
+                            {/* ─── DYNAMIC CSS-ONLY HOVER TOOLTIP ─── */}
+                            <div className="absolute bottom-full right-0 mb-2.5 hidden group-hover:block bg-[#111D13] text-white text-[10px] font-medium px-2.5 py-1 pointer-events-none z-50 whitespace-nowrap rounded-none shadow-md border border-[#709775]/25">
+                              Tinjau Berkas Detail
+                              {/* Segitiga Penunjuk (Arrow) */}
+                              <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-[#111D13]" />
+                            </div>
                           </div>
                         </div>
                       ) : (

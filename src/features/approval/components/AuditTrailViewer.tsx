@@ -73,7 +73,7 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
 
     const { refetch } = useQuery({
         queryKey: ['submission', submissionId, 'refresh-trigger'],
-        queryFn: () => Promise.resolve(undefined),
+        queryFn: () => Promise.resolve(true),
         enabled: false
     });
 
