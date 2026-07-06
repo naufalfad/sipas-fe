@@ -192,9 +192,10 @@ export interface Submission {
   documents: {
     id: string;
     name: string;
-    type: 'pdf' | 'cad' | 'image';
+    type: string;
     url: string;
     uploadedAt: string;
+    key?: string;
   }[];
   history: StatusHistory[];
   location: ProjectLocation;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useUIStore } from '@/app/store/useUIStore';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import type { UserRole } from '@/app/store/useUIStore';
 import {
     ChevronLeft, Globe, LogOut, ChevronDown,
@@ -10,8 +11,19 @@ import { toast } from 'sonner';
 
 export default function GisNavbar() {
     const navigate = useNavigate();
-    const { activeRole, userProfile, setActiveRole } = useUIStore();
-    const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+    const { user } = useAuthStore();
+    const activeRole = user ? (normalizeRole(user.role) as UserRole) : 'Super Admin';
+    const userProfile = user ? {
+        name: user.full_name,
+        email: user.email,
+        avatar: user.role === 'PEMOHON'
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+          : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces'
+    } : {
+        name: 'Admin Utama (Super Admin)',
+        email: 'superadmin@sipas.go.id',
+        avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&h=100&fit=crop&crop=faces'
+    };
     const [profileOpen, setProfileOpen] = useState(false);
 
     // Inisial Nama (Fase 4 - Security Audit Trail)
@@ -25,8 +37,6 @@ export default function GisNavbar() {
         navigate('/dashboard');
         toast.info('Keluar dari kanvas spasial imersif.');
     };
-
-    const rolesList: UserRole[] = ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'];
 
     return (
         <nav className="absolute top-0 left-0 right-0 h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 z-50 pointer-events-auto select-none rounded-none shadow-sm">
@@ -83,43 +93,6 @@ export default function GisNavbar() {
                 >
                     <Share2 size={14} />
                 </button>
-
-                <div className="h-6 w-px bg-slate-200 mx-2 hidden sm:block"></div>
-
-                {/* SIMULATOR SWITCHER ROLE WIDGET (Sesuai Kebutuhan Demo SIPAS) */}
-                <div className="relative">
-                    <button
-                        onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 rounded-none text-[10px] font-black uppercase tracking-wider hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors border-none outline-none cursor-pointer shadow-sm"
-                    >
-                        <span>Simulasi: {activeRole}</span>
-                        <ChevronDown className="h-3 w-3" />
-                    </button>
-
-                    {roleMenuOpen && (
-                        <>
-                            <div className="fixed inset-0 z-10" onClick={() => setRoleMenuOpen(false)} />
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-none shadow-lg border border-slate-100 z-20 overflow-hidden text-xs py-1">
-                                <div className="px-3 py-2 text-[9px] font-black text-slate-400 bg-slate-50 border-b uppercase tracking-widest leading-none">
-                                    Ganti Hak Akses
-                                </div>
-                                {rolesList.map((role) => (
-                                    <button
-                                        key={role}
-                                        onClick={() => {
-                                            setActiveRole(role);
-                                            setRoleMenuOpen(false);
-                                        }}
-                                        className={`w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors block border-none bg-transparent font-semibold text-slate-700 cursor-pointer ${activeRole === role ? 'font-black text-teal-600 bg-teal-50/30' : ''
-                                            }`}
-                                    >
-                                        {role}
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    )}
-                </div>
 
                 {/* PROFIL AKUN SESI AKTIF */}
                 <div className="relative">

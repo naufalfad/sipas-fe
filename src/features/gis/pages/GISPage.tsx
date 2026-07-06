@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { useUIStore } from '@/app/store/useUIStore';
 import { useGisUIStore } from '@/app/store/useGisUIStore';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import type { UserRole } from '@/app/store/useUIStore';
 import { Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -15,7 +18,8 @@ import ZoningHorizontalLegend from '../components/ZoningHorizontalLegend';
 // --- (3D BIM ENGINE DIPINDAHKAN KE HALAMAN TERSENDIRI) ---
 
 export default function GISPage() {
-  const { activeRole } = useUIStore();
+  const { user } = useAuthStore();
+  const activeRole = user ? (normalizeRole(user.role) as UserRole) : 'Super Admin';
 
   // Tarik ID perumahan terpilih dari store spasial
   useGisUIStore();

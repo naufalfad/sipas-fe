@@ -14,6 +14,9 @@
 
 import { useState, useEffect } from 'react';
 import { useUIStore } from '../../../app/store/useUIStore';
+import { useAuthStore } from '../../../app/store/useAuthStore';
+import { normalizeRole } from '../../../components/auth/ProtectedRoute';
+import type { UserRole } from '../../../app/store/useUIStore';
 import { useGisUIStore, type SpatialConflict } from '../../../app/store/useGisUIStore';
 import {
     AlertTriangle, Crosshair, MapPin, Camera, X, Loader2
@@ -28,7 +31,8 @@ const labelClass = "block text-[9px] font-black text-slate-400 uppercase trackin
 // ─── KOMPONEN UTAMA ────────────────────────────────────────────────────────────
 
 export default function ConflictPinControl() {
-    const activeRole = useUIStore((s) => s.activeRole);
+    const { user } = useAuthStore();
+    const activeRole = user ? (normalizeRole(user.role) as UserRole) : 'Super Admin';
     const selectedCompanyId = useGisUIStore((s) => s.selectedCompanyId);
     const addSpatialConflict = useGisUIStore((s) => s.addSpatialConflict);
 

@@ -96,7 +96,7 @@ const menuItems: MenuItem[] = [
     title: 'GIS Viewer',
     path: '/gis',
     icon: Map,
-    roles: ['Pemohon', 'Tim Teknis', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
   },
   {
     title: 'Laporan',

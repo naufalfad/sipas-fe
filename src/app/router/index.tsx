@@ -6,6 +6,7 @@ import DashboardPage from '@/features/dashboard/pages/DashboardPage';
 import SubmissionListPage from '@/features/submission/pages/SubmissionListPage';
 import SubmissionCreatePage from '@/features/submission/pages/SubmissionCreatePage';
 import SubmissionDetailPage from '@/features/submission/pages/SubmissionDetailPage';
+import SubmissionVerificationPage from '@/features/submission/pages/SubmissionVerificationPage';
 import SitePlanListPage from '@/features/siteplan/pages/SitePlanListPage';
 import SitePlanDetailPage from '@/features/siteplan/pages/SitePlanDetailPage';
 import VerificationPage from '@/features/verification/pages/VerificationPage';
@@ -92,6 +93,14 @@ export const router = createBrowserRouter([
           {
             path: 'detail/:id',
             element: <SubmissionDetailPage />,
+          },
+          {
+            path: 'verifikasi/:id',
+            element: (
+              <ProtectedRoute allowedRoles={['Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+                <SubmissionVerificationPage />
+              </ProtectedRoute>
+            ),
           },
         ],
       },
@@ -182,7 +191,7 @@ export const router = createBrowserRouter([
   {
     path: '/gis',
     element: (
-      <ProtectedRoute allowedRoles={['Pemohon', 'Tim Teknis', 'Super Admin']}>
+      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
         <GISPage />
       </ProtectedRoute>
     ),
@@ -190,7 +199,7 @@ export const router = createBrowserRouter([
   {
     path: '/gis/bim/:id',
     element: (
-      <ProtectedRoute allowedRoles={['Pemohon', 'Tim Teknis', 'Super Admin']}>
+      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
         <BimViewerPage />
       </ProtectedRoute>
     ),

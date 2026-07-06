@@ -147,15 +147,15 @@ export const technicalSchema = z.object({
   // ─── BARU (REVISI): METRIK USULAN PEMOHON (PROPOSED METRICS) ───
   applicantBuildingArea: z.preprocess(
     numericPreprocess,
-    z.number().positive('Luas bangunan harus berupa angka positif').optional()
+    z.number().positive("Luas bangunan wajib diisi")
   ),
   applicantGsb: z.preprocess(
     numericPreprocess,
-    z.number().min(0, 'GSB tidak boleh bernilai negatif').optional()
+    z.number().min(0, "GSB tidak boleh negatif")
   ),
   applicantRthArea: z.preprocess(
     numericPreprocess,
-    z.number().min(0, 'Luas RTH tidak boleh bernilai negatif').optional()
+    z.number().min(0, "Luas RTH tidak boleh negatif")
   )
 });
 
@@ -171,6 +171,8 @@ export const documentSchema = z.object({
   technicalDoc: z.union([z.string().min(1, 'Dokumen wajib dilampirkan'), z.any()]).optional(),
   supportDoc: z.union([z.string(), z.any()]).optional(),
   supportDoc2: z.union([z.string(), z.any()]).optional(),
+  skaDoc: z.union([z.string(), z.any()]).optional(),
+  cadDoc: z.union([z.string(), z.any()]).optional(),
 });
 
 export const photoSchema = z.object({

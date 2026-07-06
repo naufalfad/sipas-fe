@@ -14,7 +14,7 @@ import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 import bogorRegions from '../data/bogorRegions.json';
 import {
   UploadCloud, CheckCircle2, Loader2, FileUp, Info,
-  Settings2, Compass, RefreshCw, Layers, FileCheck, CheckCircle
+  Settings2, Compass, RefreshCw, Layers, CheckCircle
 } from 'lucide-react';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
@@ -174,7 +174,7 @@ export const ContextualUploadBox = ({
       try {
         setLoading(true);
         const res = await uploadFileToBackend(file);
-        setValue(fieldKey as any, res.file_url);
+        setValue(fieldKey as any, `${res.file_url}?name=${encodeURIComponent(file.name)}`);
         toast.success(`Berhasil mengunggah: ${file.name}`);
       } catch (err) {
         toast.error('Gagal mengunggah berkas ke server');
@@ -814,7 +814,7 @@ export const LocationSection = () => {
 
 // ─── SECTION 4: DATA KOORDINAT AREA & VALIDASI CAD WIZARD [Jakarta 5] ─────────
 export const CoordinateSection = () => {
-  const { register, setValue, watch } = useFormContext<FullSubmissionFormValues>();
+  const { register, setValue } = useFormContext<FullSubmissionFormValues>();
   const [spatialLoading, setSpatialLoading] = useState(false);
   const [uploadedGeoJson, setUploadedGeoJson] = useState<any>(null);
 
@@ -889,7 +889,7 @@ export const CoordinateSection = () => {
   };
 
   // Handler Unggah CAD Kerja (.dwg/.dxf) -> Triggers Aligner Wizard [Jakarta 5]
-  const handleCadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCadFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -897,6 +897,17 @@ export const CoordinateSection = () => {
       setCadFileName(file.name);
       setValue('coordinate.cadFileName', file.name);
       setIsCadWizardOpen(true);
+      
+      try {
+        setSpatialLoading(true);
+        const res = await uploadFileToBackend(file);
+        setValue('document.cadDoc', `${res.file_url}?name=${encodeURIComponent(file.name)}`);
+        toast.success(`Berkas CAD berhasil diunggah ke server: ${file.name}`);
+      } catch (err) {
+        toast.error('Gagal mengunggah berkas CAD ke server.');
+      } finally {
+        setSpatialLoading(false);
+      }
     } else {
       toast.error('Format file salah! Harap pilih gambar kerja CAD berformat .dwg atau .dxf');
     }
@@ -1257,7 +1268,11 @@ export const TechnicalSection = () => {
 
   // ─── REVISI: KALKULATOR KDB MANDIRI LIVE UNTUK PEMOHON ───
   const applicantBuildingAreaVal = watch('technical.applicantBuildingArea');
+  const applicantGsbVal = watch('technical.applicantGsb');
+  const applicantRthAreaVal = watch('technical.applicantRthArea') || 0;
   const [computedKdbPercent, setComputedKdbPercent] = useState<string>('');
+
+  const computedRthPercent = landArea > 0 ? ((applicantRthAreaVal / landArea) * 100).toFixed(1) : '';
 
   const handleBuildingAreaChange = (val: number | undefined) => {
     if (landArea > 0 && val !== undefined && !isNaN(val)) {
@@ -1314,20 +1329,71 @@ export const TechnicalSection = () => {
           </div>
         </div>
 
-        {/* Real-time calculated proposed KDB Indicator */}
-        {computedKdbPercent && (
-          <div className="pt-2 border-t border-primary/10 flex items-center gap-2 text-xs font-semibold text-slate-700">
-            <span>Estimasi KDB Usulan:</span>
-            <span className={cn(
-              "font-bold font-mono px-2 py-0.5 rounded-none border text-[11px]",
-              Number(computedKdbPercent) <= 60.0
-                ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
-                : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
-            )}>
-              {computedKdbPercent}% {Number(computedKdbPercent) <= 60.0 ? " (Memenuhi Batas Maks 60%)" : " (Melanggar Batas Maks 60%!)"}
-            </span>
+        {/* Real-time calculated proposed indicators with Perda references */}
+        <div className="pt-3.5 border-t border-primary/10 space-y-2.5">
+          <div className="text-[9px] font-black text-primary uppercase tracking-widest leading-none mb-1">
+            Uji Mandiri Parameter Kepatuhan Perda (Standard Acuan Kab. Bogor)
           </div>
-        )}
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-semibold text-slate-700">
+            {/* Reference Land Area */}
+            <div className="p-2.5 bg-white border border-slate-200">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Luas Lahan Acuan (Langkah 3)</span>
+              <span className="font-bold font-mono text-slate-800 text-[11px]">{landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : '-'}</span>
+            </div>
+
+            {/* KDB Proposed */}
+            <div className="p-2.5 bg-white border border-slate-200">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Estimasi KDB Usulan (Maks 60%)</span>
+              {computedKdbPercent ? (
+                <span className={cn(
+                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                  Number(computedKdbPercent) <= 60.0
+                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                )}>
+                  {computedKdbPercent}% {Number(computedKdbPercent) <= 60.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                </span>
+              ) : (
+                <span className="text-slate-400 font-medium text-[11px]">-</span>
+              )}
+            </div>
+
+            {/* GSB Proposed */}
+            <div className="p-2.5 bg-white border border-slate-200">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Garis Sempadan (Min 5m)</span>
+              {applicantGsbVal !== undefined && applicantGsbVal > 0 ? (
+                <span className={cn(
+                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                  Number(applicantGsbVal) >= 5.0
+                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                )}>
+                  {applicantGsbVal} meter {Number(applicantGsbVal) >= 5.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                </span>
+              ) : (
+                <span className="text-slate-400 font-medium text-[11px]">-</span>
+              )}
+            </div>
+
+            {/* RTH Proposed */}
+            <div className="p-2.5 bg-white border border-slate-200">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Porsi RTH Usulan (Min 10%)</span>
+              {computedRthPercent ? (
+                <span className={cn(
+                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                  Number(computedRthPercent) >= 10.0
+                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                )}>
+                  {computedRthPercent}% {Number(computedRthPercent) >= 10.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                </span>
+              ) : (
+                <span className="text-slate-400 font-medium text-[11px]">-</span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {category === 'PERUMAHAN' && (
@@ -1583,7 +1649,7 @@ export const ConsultantSection = () => {
         <div className="md:col-span-2 pt-2 border-t border-slate-100">
           <ContextualUploadBox
             label="Unggah Scan Sertifikat Keahlian (SKA / SKEA) Arsitek"
-            fieldKey="document.supportDoc"
+            fieldKey="document.skaDoc"
             helpText="Unggah bukti sertifikat lisensi arsitek aktif (IAI) guna jaminan tanggung jawab teknis gambar."
           />
         </div>
@@ -1601,12 +1667,16 @@ export const DocumentSection = () => {
   const technicalDoc = watch('document.technicalDoc');
   const supportDoc = watch('document.supportDoc');
   const supportDoc2 = watch('document.supportDoc2');
+  const skaDoc = watch('document.skaDoc');
+  const cadDoc = watch('document.cadDoc');
 
   const docSummary = [
     { name: 'Sertifikat Tanah & KTP (Langkah 3)', value: legalDoc, mandatory: true },
-    { name: 'Gambar Rencana Teknis CAD / Amdal (Langkah 4/6)', value: technicalDoc, mandatory: true },
-    { name: 'SK KKPR Awal / SKA Arsitek (Langkah 5/7)', value: supportDoc, mandatory: true },
+    { name: 'File Peta Koordinat CAD (Langkah 4)', value: cadDoc, mandatory: true },
+    { name: 'Gambar Rencana Teknis CAD (Langkah 6)', value: technicalDoc, mandatory: true },
+    { name: 'SK KKPR Awal / IPPT (Langkah 5)', value: supportDoc, mandatory: true },
     { name: 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)', value: supportDoc2, mandatory: false },
+    { name: 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)', value: skaDoc, mandatory: true },
   ];
 
   return (
@@ -1697,7 +1767,7 @@ export const PhotoSection = () => {
       try {
         setIsUploading(prev => ({ ...prev, [fieldKey]: true }));
         const uploadResult = await uploadFileToBackend(file);
-        setValue(fieldKey, uploadResult.file_url);
+        setValue(fieldKey, `${uploadResult.file_url}?name=${encodeURIComponent(file.name)}`);
         toast.success(`Berhasil mengunggah foto: ${file.name}`);
       } catch (err) {
         toast.error('Gagal mengunggah foto ke server');

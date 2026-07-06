@@ -19,10 +19,10 @@ import { SubmissionService } from '@/features/submission/services/submission.ser
 import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, Clock, CheckCircle2,
-  MapPin, File, Loader2, UploadCloud,
-  XCircle, CheckCircle, FileSignature, AlertTriangle, ShieldCheck,
+  MapPin, File, Loader2,
+  XCircle, CheckCircle, FileSignature, AlertTriangle,
   User, Phone, Mail, Award, HardHat, Camera, Landmark,
-  Scale, Globe, Fingerprint, RefreshCw, Layers
+  Scale, Globe
 } from 'lucide-react';
 import { Source, Layer } from 'react-map-gl/maplibre';
 import GISMapContainer from '@/components/maps/GISMapContainer';
@@ -31,26 +31,15 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import AuditTrailViewer from '@/features/approval/components/AuditTrailViewer';
 
-const uploadFileToBackend = async (file: File) => {
-  const formData = new FormData();
-  formData.append('file', file);
 
-  const token = localStorage.getItem('token');
-  const response = await fetch('http://localhost:8000/api/v1/submissions/upload', {
-    method: 'POST',
-    headers: {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
-    body: formData
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(errText || 'Gagal mengunggah berkas ke server');
-  }
-
-  const data = await response.json();
-  return data;
+const getDocCategoryLabel = (key?: string) => {
+  if (key === 'legalDoc') return 'Sertifikat Tanah & KTP (Langkah 3)';
+  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD (Langkah 6)';
+  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT (Langkah 5)';
+  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)';
+  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf) (Langkah 4)';
+  return 'Dokumen Lampiran Pendukung';
 };
 
 // ─── STYLING CONSTANTS (PROTECTED VARIATIONS) ──────────────────────────────────
@@ -220,22 +209,9 @@ export default function SubmissionDetailPage() {
     kkpr: false
   });
 
-  const [techChecks, setTechChecks] = useState({
-    polygon: false,
-    rth: false,
-    utilities: false,
-    cad: false
-  });
 
   const [kabidAgreed, setKabidAgreed] = useState(false);
 
-  // ─── REVISI: STATE UNTUK PENILAIAN DYNAMIC CHECKLIST & SANDING ANGKA VERIFIKATOR ───
-  const [kkprVerdict, setKkprVerdict] = useState<string>('Sesuai');
-  const [verifiedKdb, setVerifiedKdb] = useState<number | ''>('');
-  const [verifiedKlb, setVerifiedKlb] = useState<number | ''>('');
-  const [verifiedKdh, setVerifiedKdh] = useState<number | ''>('');
-  const [verifiedGsb, setVerifiedGsb] = useState<number | ''>('');
-  const [verifiedRthArea, setVerifiedRthArea] = useState<number | ''>('');
 
   // State dictionary untuk mumpung 13-aspek pemeriksaan dinas
   const [checklistStates, setChecklistStates] = useState<Record<string, {
@@ -245,22 +221,18 @@ export default function SubmissionDetailPage() {
     isUploading?: boolean;
   }>>({});
 
+  const [isVerificationConsentOpen, setIsVerificationConsentOpen] = useState(false);
+  const [hasReviewedDocs, setHasReviewedDocs] = useState(false);
+
   const { data: sub, isLoading } = useQuery({
     queryKey: ['submission', id],
     queryFn: () => SubmissionService.getById(id || ''),
     enabled: !!id,
   });
 
-  // Pre-populate input verifikasi dinas jika sudah ada evaluasi sebelumnya di DB
+  // Pre-populate evaluasi checklist jika sudah ada di DB
   useEffect(() => {
     if (sub) {
-      if (sub.kkprVerdict) setKkprVerdict(sub.kkprVerdict);
-      if (sub.verifiedKdb !== undefined && sub.verifiedKdb !== null) setVerifiedKdb(sub.verifiedKdb);
-      if (sub.verifiedKlb !== undefined && sub.verifiedKlb !== null) setVerifiedKlb(sub.verifiedKlb);
-      if (sub.verifiedKdh !== undefined && sub.verifiedKdh !== null) setVerifiedKdh(sub.verifiedKdh);
-      if (sub.verifiedGsb !== undefined && sub.verifiedGsb !== null) setVerifiedGsb(sub.verifiedGsb);
-      if (sub.verifiedRthArea !== undefined && sub.verifiedRthArea !== null) setVerifiedRthArea(sub.verifiedRthArea);
-
       if (sub.evaluationChecklist && sub.evaluationChecklist.length > 0) {
         const mappedStates: typeof checklistStates = {};
         sub.evaluationChecklist.forEach((item) => {
@@ -272,7 +244,6 @@ export default function SubmissionDetailPage() {
         });
         setChecklistStates(mappedStates);
       } else {
-        // Inisialisasi awal default state checklist
         const defaultStates: typeof checklistStates = {};
         VERIFICATION_ASPECTS.forEach((aspect) => {
           defaultStates[aspect.code] = {
@@ -299,30 +270,14 @@ export default function SubmissionDetailPage() {
       signatureBase64?: string;
       actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE';
     }) => {
-      // Map checklist items dari state lokal ke format yang diharapkan backend
-      const checklistItemsPayload = Object.entries(checklistStatesMapped).map(([code, item]) => ({
-        aspekCode: code,
-        aspekLabel: item.aspekLabel,
-        statusKelayakan: item.statusKelayakan,
-        catatanVerifikator: item.catatanVerifikator,
-        attachmentUrl: item.attachmentUrl
-      }));
-
       return SubmissionService.updateStatus(
         sub?.id || '',
         status,
-        `${userProfile.name} (${activeRole})`,
+        `${userProfile?.name || activeRole}`,
         notes,
         passphrase,
         signatureBase64,
-        actionTypeOverride,
-        kkpr_verdict_final,
-        verified_kdb_final,
-        verified_klb_final,
-        verified_kdh_final,
-        verified_gsb_final,
-        verified_rth_area_final,
-        checklistItemsPayload
+        actionTypeOverride
       );
     },
     onSuccess: async () => {
@@ -334,7 +289,6 @@ export default function SubmissionDetailPage() {
       setPassphrase('');
       setSignature('');
       setAdminChecks({ ktp: false, sertifikat: false, npwp: false, kkpr: false });
-      setTechChecks({ polygon: false, rth: false, utilities: false, cad: false });
       setKabidAgreed(false);
       toast.success('Status berkas berhasil diperbarui!');
     },
@@ -439,9 +393,6 @@ export default function SubmissionDetailPage() {
     setSignature('');
   };
 
-  const getCoordinatesLocal = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    return getCoordinates(e, canvasRef.current);
-  };
   const startDrawingLocal = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => startDrawing(e);
   const drawLocal = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => draw(e);
   const stopDrawingLocal = () => stopDrawing();
@@ -456,7 +407,6 @@ export default function SubmissionDetailPage() {
   const showKabidPanel = sub && isKabidActive && sub.status === 'Menunggu Persetujuan';
 
   const allAdminChecked = Object.values(adminChecks).every(Boolean);
-  const allTechChecked = Object.values(techChecks).every(Boolean);
 
   const handleAdminAction = (approved: boolean) => {
     const targetStatus = approved ? 'Verifikasi Teknis' : 'Ditolak';
@@ -467,14 +417,6 @@ export default function SubmissionDetailPage() {
     });
   };
 
-  const handleTechAction = (approved: boolean) => {
-    const targetStatus = approved ? 'Menunggu Persetujuan' : 'Ditolak';
-    const defaultNotes = approved ? 'Hasil audit spasial & teknis dinyatakan LOLOS. Rekomendasi pengesahan dikirim ke Kepala Bidang.' : 'Berkas dikembalikan karena ketidaksesuaian teknis/spasial.';
-    mutation.mutate({
-      status: targetStatus,
-      notes: notes.trim() || defaultNotes
-    });
-  };
 
   const handleKabidAction = (approved: boolean) => {
     const targetStatus = approved ? 'Disetujui' : 'Ditolak';
@@ -515,27 +457,12 @@ export default function SubmissionDetailPage() {
     });
   };
 
-  const handleRevertToAdministrative = () => {
-    if (!notes.trim()) {
-      toast.error('Catatan alasan pengembalian wajib diisi sebelum mengembalikan berkas ke Admin SIPAS.');
-      return;
-    }
-    mutation.mutate({
-      status: 'Verifikasi Administrasi',
-      notes: notes.trim(),
-      actionTypeOverride: 'REVERT_TO_ADMINISTRATIVE'
-    });
-  };
 
   const handleAdminActionLocal = (approved: boolean) => handleAdminAction(approved);
-  const handleTechActionLocal = (approved: boolean) => handleTechAction(approved);
   const handleKabidActionLocal = (approved: boolean) => handleKabidAction(approved);
 
   // ── HANDLER PENGEMBALIAN INTERNAL: Kabid → Tim Teknis ──────────────────────
   const handleRevertToTechnicalLocal = () => handleRevertToTechnical();
-
-  // ── HANDLER PENGEMBALIAN INTERNAL: Tim Teknis → Admin SIPAS ───────────────
-  const handleRevertToAdministrativeLocal = () => handleRevertToAdministrative();
 
   // Handler Visualisasi Lahan Kompensasi pada Peta Spasial [Purworejo 8]
   const handleShowCompensationOnMap = (komp: LahanKompensasi) => {
@@ -551,105 +478,7 @@ export default function SubmissionDetailPage() {
     toast.info('GIS Engine memfokuskan kamera ke poligon lahan pengganti!');
   };
 
-  // ─── REVISI: DYNAMIC CHECKLIST ACTIONS HANDLER (YES/NO/CONDITIONAL TOGGLE) ──
-  const handleToggleAspect = (code: string, statusVal: 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai') => {
-    setChecklistStates((prev) => ({
-      ...prev,
-      [code]: {
-        ...prev[code],
-        status: statusVal
-      }
-    }));
-  };
 
-  const handleAspectNoteChange = (code: string, noteVal: string) => {
-    setChecklistStates((prev) => ({
-      ...prev,
-      [code]: {
-        ...prev[code],
-        catatan: noteVal
-      }
-    }));
-  };
-
-  const handleAspectAttachmentUpload = async (code: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setChecklistStates((prev) => ({
-        ...prev,
-        [code]: { ...prev[code], isUploading: true }
-      }));
-
-      const res = await uploadFileToBackend(file);
-      setChecklistStates((prev) => ({
-        ...prev,
-        [code]: {
-          ...prev[code],
-          attachmentUrl: res.file_url,
-          isUploading: false
-        }
-      }));
-      toast.success(`Berhasil mengunggah dokumen pendukung aspek: ${file.name}`);
-    } catch {
-      setChecklistStates((prev) => ({
-        ...prev,
-        [code]: { ...prev[code], isUploading: false }
-      }));
-      toast.error('Gagal mengunggah berkas peninjauan teknis ke server.');
-    }
-  };
-
-  // ─── PREPARE DTO SINKRONISASI MUTATION ───
-  // Menyusun struktur checklist penampung state data form
-  const checklistItemsForPayload = useMemo(() => {
-    return VERIFICATION_ASPECTS.map((aspect) => {
-      const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
-      return {
-        aspek_code: aspect.code,
-        aspek_label: aspect.label,
-        status_kelayakan: state.status,
-        catatan_verifikator: state.catatan || null,
-        attachment_url: state.attachmentUrl || null
-      };
-    });
-  }, [checklistStates]);
-
-  const handleTriggerSubmissionVerification = () => {
-    if (kkprVerdict === 'Sesuai Bersyarat' && !notes.trim()) {
-      toast.error('Catatan teknis bersyarat wajib dicantumkan pada kolom justifikasi global pimpinan.');
-      return;
-    }
-
-    mutation.mutate({
-      status: kkprVerdict === 'Sesuai' || kkprVerdict === 'Sesuai Bersyarat' ? 'Menunggu Persetujuan' : 'Ditolak',
-      notes: notes.trim() || `Verifikasi spasial diselesaikan dengan keputusan final: ${kkprVerdict}.`
-    });
-  };
-
-  // Bind values for mutation referencing
-  const checklistStatesMapped = useMemo(() => {
-    const map: Record<string, any> = {};
-    VERIFICATION_ASPECTS.forEach((aspect) => {
-      const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
-      map[aspect.code] = {
-        aspekLabel: aspect.label,
-        statusModel: state.status,
-        statusKelayakan: state.status,
-        catatanVerifikator: state.catatan || null,
-        attachmentUrl: state.attachmentUrl || null
-      };
-    });
-    return map;
-  }, [checklistStates]);
-
-  const kkpr_verdict_final = kkprVerdict;
-  const verified_kdb_final = verifiedKdb === '' ? undefined : Number(verifiedKdb);
-  const verified_klb_final = verifiedKlb === '' ? undefined : Number(verifiedKlb);
-  const verified_kdh_final = verifiedKdh === '' ? undefined : Number(verifiedKdh);
-  const verified_gsb_final = verifiedGsb === '' ? undefined : Number(verifiedGsb);
-  const verified_rth_area_final = verifiedRthArea === '' ? undefined : Number(verifiedRthArea);
 
   if (isLoading) {
     return (
@@ -805,6 +634,37 @@ export default function SubmissionDetailPage() {
         {/* Kolom Kiri (2/3): Informasi Proyek & Berkas Laporan */}
         <div className="lg:col-span-2 space-y-6">
 
+          {/* Tab Navigation Menu */}
+          <div className="flex border-b border-border overflow-x-auto select-none bg-slate-50 p-1 gap-1">
+            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', 'audit'] as const).map((tab) => {
+              const isActive = activeTab === tab;
+              const labels: Record<string, string> = {
+                ringkasan: 'Ringkasan',
+                pemohon: 'Pemohon & Konsultan',
+                lokasi: 'Lokasi & Tata Ruang',
+                teknis: 'Data Teknis',
+                kompensasi: 'Kompensasi Lahan',
+                foto: 'Foto Lapangan',
+                audit: 'Audit Trail'
+              };
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={cn(
+                    "px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-none cursor-pointer outline-none border-none whitespace-nowrap",
+                    isActive
+                      ? "bg-white text-primary border-t-2 border-primary shadow-sm font-black"
+                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                  )}
+                >
+                  {labels[tab]}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="bg-white border border-border p-6 shadow-[1px_1px_4px_rgba(0,0,0,0.015)] rounded-none text-left min-h-[350px]">
             {activeTab === 'ringkasan' && (
               <div className="space-y-6 animate-in fade-in duration-200">
@@ -859,13 +719,17 @@ export default function SubmissionDetailPage() {
                             <File className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
-                            <h5 className="font-bold text-xs text-[#111D13] truncate">{doc.name}</h5>
+                            <span className="text-[8px] font-black uppercase tracking-wider text-teal-600 block mb-0.5">
+                              {getDocCategoryLabel(doc.key)}
+                            </span>
+                            <h5 className="font-bold text-xs text-[#111D13] truncate" title={doc.name}>{doc.name}</h5>
                             <span className="text-[10px] text-slate-400 block mt-1">Format: {doc.type.toUpperCase()} • Diunggah: {doc.uploadedAt}</span>
                           </div>
                         </div>
                         <a
                           href={doc.url}
-                          onClick={(e) => e.preventDefault()}
+                          target="_blank"
+                          rel="noreferrer"
                           className="text-xs font-bold text-primary hover:underline shrink-0 pl-3"
                         >
                           Unduh Berkas
@@ -1042,6 +906,42 @@ export default function SubmissionDetailPage() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="pt-4 border-t border-slate-100">
+                    <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4">
+                      Sistem Koordinat & Transformasi Helmert 2D
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nama File CAD Asal</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 block truncate" title={sub.coordinate?.cadFileName}>{sub.coordinate?.cadFileName || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Faktor Skala Spasial (s)</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 block">{sub.coordinate?.cadScale !== undefined ? sub.coordinate.cadScale : '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Parameter Helmert A</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 block">{sub.coordinate?.cadParamA !== undefined ? sub.coordinate.cadParamA : '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Parameter Helmert B</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 block">{sub.coordinate?.cadParamB !== undefined ? sub.coordinate.cadParamB : '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Translasi X (Tx)</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 block">{sub.coordinate?.cadParamTx !== undefined ? sub.coordinate.cadParamTx : '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Translasi Y (Ty)</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 block">{sub.coordinate?.cadParamTy !== undefined ? sub.coordinate.cadParamTy : '-'}</span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Sudut Rotasi Spasial (Radian)</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 block">{sub.coordinate?.cadRotation !== undefined ? `${sub.coordinate.cadRotation} rad` : '-'}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Kolom Kanan: Visualisasi Peta Proyeksi Spasial */}
@@ -1147,6 +1047,63 @@ export default function SubmissionDetailPage() {
                   <Award className="h-4.5 w-4.5 text-primary" />
                   Parameter Teknis Kategori: {sub.submissionDetails?.category || 'PERUMAHAN'}
                 </h3>
+
+                {/* Sandingan Metrik Tiga Sisi (Read-Only) */}
+                <div className="space-y-2 text-left mb-6">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                    Sandingan Metrik Tiga Sisi (Proposed vs Bylaws vs Verified)
+                  </span>
+                  <div className="overflow-x-auto border border-border">
+                    <table className="min-w-full divide-y divide-border text-[11px] font-sans">
+                      <thead className="bg-slate-50 font-bold text-slate-500 text-left">
+                        <tr>
+                          <th className="px-3 py-2 border-r border-border">Parameter</th>
+                          <th className="px-3 py-2 border-r border-border">Proposed (Pemohon)</th>
+                          <th className="px-3 py-2 border-r border-border">Bylaws (Aturan Perda)</th>
+                          <th className="px-3 py-2">Verified (Hasil Dinas)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border bg-white text-slate-700">
+                        <tr>
+                          <td className="px-3 py-2 border-r border-border font-semibold">KDB (Koefisien Dasar Bangunan)</td>
+                          <td className="px-3 py-2 border-r border-border font-mono">
+                            {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
+                            {sub.landArea && sub.technical?.applicantBuildingArea ? ` (${((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)` : ''}
+                          </td>
+                          <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKdb || 60}%</td>
+                          <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKdb !== undefined && sub.verifiedKdb !== null ? `${sub.verifiedKdb}%` : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 border-r border-border font-semibold">KLB (Koefisien Lantai Bangunan)</td>
+                          <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.klb || '-'}</td>
+                          <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKlb || 3.5}</td>
+                          <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKlb !== undefined && sub.verifiedKlb !== null ? sub.verifiedKlb : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 border-r border-border font-semibold">KDH (Koefisien Dasar Hijau)</td>
+                          <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
+                          <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinKdh || 10}%</td>
+                          <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKdh !== undefined && sub.verifiedKdh !== null ? `${sub.verifiedKdh}%` : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 border-r border-border font-semibold">GSB (Garis Sempadan Bangunan)</td>
+                          <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
+                          <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinGsb || 5} m</td>
+                          <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedGsb !== undefined && sub.verifiedGsb !== null ? `${sub.verifiedGsb} m` : '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 border-r border-border font-semibold">RTH (Ruang Terbuka Hijau)</td>
+                          <td className="px-3 py-2 border-r border-border font-mono">
+                            {sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}
+                            {sub.landArea && sub.technical?.applicantRthArea ? ` (${((sub.technical.applicantRthArea / sub.landArea) * 100).toFixed(1)}%)` : ''}
+                          </td>
+                          <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinRthArea || 1400} m² (10%)</td>
+                          <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedRthArea !== undefined && sub.verifiedRthArea !== null ? `${sub.verifiedRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
                 {/* Rendering kondisional parameter berdasarkan kategori aktual permohonan */}
                 {(!sub.submissionDetails?.category || sub.submissionDetails.category === 'PERUMAHAN') && (
@@ -1484,99 +1441,101 @@ export default function SubmissionDetailPage() {
 
           {/* Panel Tim Teknis */}
           {showTechPanel && (
-            <div className="bg-white border border-primary p-5 shadow-[1px_1px_5px_rgba(0,0,0,0.02)] space-y-5 rounded-none text-left animate-in slide-in-from-bottom-2 duration-300">
-              <div className="border-b border-border pb-3 flex items-center justify-between">
+            <div className="bg-[#e8f2ea]/20 border border-primary p-5 text-left space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center justify-between border-b border-border pb-3">
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Panel Tindakan: Verifikasi Teknis Spasial</h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Lakukan audit fisik, spasial GIS, dan parameter site plan.</p>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Proses Verifikasi Teknis & Spasial</h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Lakukan evaluasi terhadap 13 aspek spasial dan sandingan parameter rencana tapak.</p>
                 </div>
                 <span className="px-2 py-0.5 bg-[#e8f2ea] text-primary font-bold text-[9px] uppercase border border-[#A1CCA5]">TIM TEKNIS</span>
               </div>
-
-              {/* Checklist */}
-              <div className="space-y-2.5">
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={techChecks.polygon}
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, polygon: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian Batas Lahan & Polygon Spasial Bidang BPN</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={techChecks.rth}
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, rth: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian Alokasi RTH & PSU Dinas (Minimum 20%)</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={techChecks.utilities}
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, utilities: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Rencana Utilitas (ROW Lebar Jalan, Jaringan Air & Drainase) Memenuhi Syarat</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={techChecks.cad}
-                    onChange={(e) => setTechChecks(prev => ({ ...prev, cad: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Gambar CAD / DWG Site Plan Valid & Telah Diasistensi</span>
-                </label>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <p className="text-xs text-slate-600 max-w-xl">
+                  Anda sedang bertindak sebagai Tim Teknis. Lembar verifikasi khusus telah disediakan pada halaman terpisah guna menjamin compliance pengawasan dokumen pemohon sebelum pengambilan keputusan.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsVerificationConsentOpen(true)}
+                  className="px-5 py-2.5 bg-primary text-white font-bold text-xs uppercase tracking-wider rounded-none hover:bg-primary/95 transition-all cursor-pointer border-none"
+                >
+                  Mulai Lembar Verifikasi
+                </button>
               </div>
+            </div>
+          )}
 
-              {/* Catatan Area */}
-              <div className="space-y-1.5">
-                <label className={labelClass}>Catatan Teknis / Rekomendasi Perubahan</label>
-                <textarea
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Tuliskan catatan teknis detail hasil audit spasial..."
-                  className={inputClass}
-                />
-              </div>
-
-              {/* Tindakan */}
-              <div className="pt-2 flex items-center justify-end gap-3 flex-wrap">
-                {/* Kembalikan ke Admin — Jalur Revert Internal (amber) */}
-                <button
-                  type="button"
-                  disabled={mutation.isPending}
-                  onClick={handleRevertToAdministrativeLocal}
-                  title="Kembalikan ke Admin SIPAS untuk perbaikan dokumen (SLA tetap berjalan)"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" />
-                  </svg>
-                  Kembalikan ke Admin
-                </button>
-                <button
-                  type="button"
-                  disabled={mutation.isPending}
-                  onClick={() => handleTechActionLocal(false)}
-                  className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all rounded-none cursor-pointer"
-                >
-                  Kembalikan untuk Revisi
-                </button>
-                <button
-                  type="button"
-                  disabled={mutation.isPending || !allTechChecked}
-                  onClick={() => handleTechActionLocal(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white text-xs font-bold transition-all rounded-none cursor-pointer"
-                >
-                  {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Setujui & Kirim ke Kabid
-                </button>
+          {/* Consent Compliance Modal */}
+          {isVerificationConsentOpen && (
+            <div className="fixed inset-0 z-[999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white border-2 border-primary max-w-lg w-full p-6 space-y-5 text-left animate-in fade-in zoom-in-95 duration-200">
+                <div className="border-b border-border pb-3">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Pernyataan Konfirmasi Verifikasi</h3>
+                  <p className="text-[10px] text-slate-400 mt-1">SOP Audit Berkas & Keputusan Teknis Kabupaten Bogor [Buku 2]</p>
+                </div>
+                
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Sebelum memulai pengisian lembar verifikasi teknis, Anda diwajibkan untuk mengunduh dan meninjau keabsahan berkas permohonan yang telah diunggah oleh pemohon:
+                  </p>
+                  
+                  <div className="space-y-2 max-h-[180px] overflow-y-auto border border-border p-2 bg-slate-50">
+                    {sub.documents && sub.documents.length > 0 ? (
+                      sub.documents.map((doc: any) => (
+                        <div key={doc.id} className="flex items-center justify-between p-2 bg-white border border-border/60 text-xs">
+                          <span className="font-semibold text-slate-700 truncate max-w-[200px]" title={doc.name}>
+                            {doc.name}
+                          </span>
+                          <a
+                            href={doc.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] text-primary font-bold hover:underline shrink-0"
+                          >
+                            Unduh Berkas
+                          </a>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[10px] text-slate-400">Tidak ada berkas dokumen yang terlampir.</p>
+                    )}
+                  </div>
+                  
+                  <label className="flex items-start gap-2.5 cursor-pointer pt-2 select-none">
+                    <input
+                      type="checkbox"
+                      checked={hasReviewedDocs}
+                      onChange={(e) => setHasReviewedDocs(e.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 accent-primary cursor-pointer border border-slate-300 rounded-none"
+                    />
+                    <span className="text-[10px] text-slate-600 leading-normal font-bold">
+                      Saya menyatakan telah mengunduh, meneliti, dan bertanggung jawab atas kesesuaian berkas di atas secara administratif dan spasial.
+                    </span>
+                  </label>
+                </div>
+                
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsVerificationConsentOpen(false);
+                      setHasReviewedDocs(false);
+                    }}
+                    className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all rounded-none cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!hasReviewedDocs}
+                    onClick={() => {
+                      navigate(`/pengajuan/verifikasi/${sub.id}`);
+                    }}
+                    className="px-4 py-2 bg-primary hover:bg-primary/95 text-white text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border-none"
+                  >
+                    Lanjutkan ke Lembar Verifikasi
+                  </button>
+                </div>
               </div>
             </div>
           )}

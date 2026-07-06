@@ -51,6 +51,8 @@ export default function SubmissionCreatePage() {
     enabled: !!id,
   });
 
+  const isLocked = existingSub ? (existingSub.status !== 'Draft' && existingSub.status !== 'Ditolak') : false;
+
   // Pre-load data draf ke form
   useEffect(() => {
     if (existingSub) {
@@ -301,19 +303,20 @@ export default function SubmissionCreatePage() {
           <div className="bg-white border border-border p-6 md:p-8 min-h-[500px] flex flex-col shadow-[1px_1px_3px_rgba(0,0,0,0.015)]">
             <FormProvider {...methods}>
               <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col">
-
                 {/* Form Sections Viewport */}
                 <div className="flex-1 mb-8">
-                  {currentStep === 1 && <ApplicantSection />}
-                  {currentStep === 2 && <SubmissionSection />}
-                  {currentStep === 3 && <LocationSection />}
-                  {currentStep === 4 && <CoordinateSection />}
-                  {currentStep === 5 && <SpatialSection />}
-                  {currentStep === 6 && <TechnicalSection />}
-                  {currentStep === 7 && <ConsultantSection />}
-                  {currentStep === 8 && <DocumentSection />}
-                  {currentStep === 9 && <PhotoSection />}
-                  {currentStep === 10 && <StatementSection />}
+                  <fieldset disabled={isLocked} className="border-none p-0 m-0 min-w-0 flex-1">
+                    {currentStep === 1 && <ApplicantSection />}
+                    {currentStep === 2 && <SubmissionSection />}
+                    {currentStep === 3 && <LocationSection />}
+                    {currentStep === 4 && <CoordinateSection />}
+                    {currentStep === 5 && <SpatialSection />}
+                    {currentStep === 6 && <TechnicalSection />}
+                    {currentStep === 7 && <ConsultantSection />}
+                    {currentStep === 8 && <DocumentSection />}
+                    {currentStep === 9 && <PhotoSection />}
+                    {currentStep === 10 && <StatementSection />}
+                  </fieldset>
                 </div>
 
                 {/* Tombol Navigasi Kaki Formulir (Ramping, Siku Kaku, Hunter Green) */}
@@ -328,25 +331,27 @@ export default function SubmissionCreatePage() {
                     Sebelumnya
                   </button>
 
-                  {/* Tombol Simpan Draf */}
-                  <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    disabled={draftMutation.isPending || mutation.isPending}
-                    className="inline-flex items-center justify-center px-4.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-slate-800 border border-border rounded-none transition-colors cursor-pointer outline-none"
-                  >
-                    {draftMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                        <span>Menyimpan...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-3.5 w-3.5 mr-1.5" />
-                        <span>{id ? 'Perbarui Draf' : 'Simpan Draf'}</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Tombol Simpan Draf (Hanya muncul jika form tidak dikunci) */}
+                  {!isLocked && (
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={draftMutation.isPending || mutation.isPending}
+                      className="inline-flex items-center justify-center px-4.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-slate-800 border border-border rounded-none transition-colors cursor-pointer outline-none"
+                    >
+                      {draftMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          <span>Menyimpan...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-3.5 w-3.5 mr-1.5" />
+                          <span>{id ? 'Perbarui Draf' : 'Simpan Draf'}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
                   {currentStep < steps.length ? (
                     <button
@@ -358,23 +363,25 @@ export default function SubmissionCreatePage() {
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </button>
                   ) : (
-                    <button
-                      type="submit"
-                      disabled={mutation.isPending}
-                      className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-none transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer outline-none"
-                    >
-                      {mutation.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin text-white" />
-                          <span>Mengirimkan...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4" />
-                          <span>Simpan Pengajuan Final</span>
-                        </>
-                      )}
-                    </button>
+                    !isLocked && (
+                      <button
+                        type="submit"
+                        disabled={mutation.isPending}
+                        className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-none transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer outline-none"
+                      >
+                        {mutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin text-white" />
+                            <span>Mengirimkan...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4" />
+                            <span>Simpan Pengajuan Final</span>
+                          </>
+                        )}
+                      </button>
+                    )
                   )}
                 </div>
 
