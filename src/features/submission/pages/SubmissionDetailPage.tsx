@@ -475,6 +475,11 @@ export default function SubmissionDetailPage() {
               <CheckCircle className="h-4 w-4 text-emerald-600" />
               SLA: BERHASIL ({slaDaysRemaining} Hari)
             </div>
+          ) : slaDaysRemaining < 0 ? (
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none animate-pulse">
+              <AlertTriangle className="h-4 w-4 text-rose-600" />
+              SLA: TERLEWATI {Math.abs(slaDaysRemaining)} HARI
+            </div>
           ) : (
             <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
               <Clock className="h-4 w-4 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
