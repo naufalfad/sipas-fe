@@ -1,10 +1,20 @@
+/**
+ * ============================================================================
+ * GEOSIPAS SUBMISSION FORM SECTIONS — [FormSections.tsx] (REVISED v3)
+ * ============================================================================
+ * Peran: Menyediakan komponen-komponen formulir pendaftaran 10-tahap secara
+ *        modular dan terpadu, mendukung distributed uploads on-the-fly,
+ *        dan input metrik usulan spasial pemohon secara presisi.
+ * ============================================================================
+ */
+
 import { useState, useEffect } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 import bogorRegions from '../data/bogorRegions.json';
 import {
   UploadCloud, CheckCircle2, Loader2, FileUp, Info,
-  Settings2, Compass, RefreshCw
+  Settings2, Compass, RefreshCw, Layers, FileCheck, CheckCircle
 } from 'lucide-react';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
@@ -14,7 +24,7 @@ import { cn } from '@/lib/utils';
 const uploadFileToBackend = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const token = localStorage.getItem('token');
   const response = await fetch('http://localhost:8000/api/v1/submissions/upload', {
     method: 'POST',
@@ -23,12 +33,12 @@ const uploadFileToBackend = async (file: File) => {
     },
     body: formData
   });
-  
+
   if (!response.ok) {
     const errText = await response.text();
     throw new Error(errText || 'Gagal mengunggah berkas ke server');
   }
-  
+
   const data = await response.json();
   return data; // { file_name, file_path, file_url }
 };
@@ -89,12 +99,12 @@ const FormattedInput = ({
       name={name as any}
       render={({ field: { value, onChange, onBlur } }) => {
         const numVal = value !== undefined && value !== null && !isNaN(Number(value)) ? Number(value) : undefined;
-        
+
         let displayVal = '';
         if (isFocused) {
           displayVal = numVal !== undefined ? String(numVal) : '';
         } else {
-          displayVal = numVal !== undefined 
+          displayVal = numVal !== undefined
             ? `${numVal.toLocaleString('id-ID', { maximumFractionDigits: isDecimal ? 2 : 0 })} ${unit}`.trim()
             : '';
         }
@@ -139,6 +149,80 @@ const FormattedInput = ({
         );
       }}
     />
+  );
+};
+
+// ─── PURE FABRICATION: REUSABLE CONTEXTUAL DIRECT UPLOAD COMPONENT ───────────
+export const ContextualUploadBox = ({
+  label,
+  fieldKey,
+  accept = ".pdf,.jpg,.jpeg,.png,.zip",
+  helpText
+}: {
+  label: string;
+  fieldKey: string;
+  accept?: string;
+  helpText?: string;
+}) => {
+  const { setValue, watch } = useFormContext<FullSubmissionFormValues>();
+  const [loading, setLoading] = useState(false);
+  const fileUrl = watch(fieldKey as any);
+
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setLoading(true);
+        const res = await uploadFileToBackend(file);
+        setValue(fieldKey as any, res.file_url);
+        toast.success(`Berhasil mengunggah: ${file.name}`);
+      } catch (err) {
+        toast.error('Gagal mengunggah berkas ke server');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const onClear = () => {
+    setValue(fieldKey as any, undefined);
+  };
+
+  return (
+    <div className="space-y-1.5 text-left select-none">
+      <LabelWithInfo label={label} helpText={helpText} />
+      {loading ? (
+        <div className="flex items-center gap-2.5 p-3.5 bg-slate-50 border border-dashed border-border">
+          <Loader2 className="h-4.5 w-4.5 animate-spin text-primary" />
+          <span className="text-[10px] font-black text-primary uppercase tracking-widest animate-pulse leading-none">Mengunggah...</span>
+        </div>
+      ) : fileUrl ? (
+        <div className="flex items-center justify-between p-3 bg-[#e8f2ea]/20 border border-primary/30">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle className="h-4.5 w-4.5 text-primary shrink-0" />
+            <span className="text-[11px] font-mono text-primary truncate max-w-[240px]">{fileUrl.split('/').pop() || 'File terunggah'}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[10px] font-bold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer outline-none border-none bg-transparent"
+          >
+            Hapus
+          </button>
+        </div>
+      ) : (
+        <div className="relative border border-dashed border-slate-300 bg-slate-50/30 hover:bg-slate-50 p-3 flex items-center justify-center gap-2 cursor-pointer transition-all">
+          <input
+            type="file"
+            accept={accept}
+            onChange={onFileChange}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+          <UploadCloud className="h-4.5 w-4.5 text-slate-400" />
+          <span className="text-xs font-semibold text-slate-600">Klik untuk Unggah Berkas</span>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -363,10 +447,14 @@ export const ApplicantSection = () => {
         setValue('applicant.name', 'Budi Santoso');
         setValue('applicant.nik', '3201020304050607');
         setValue('applicant.address', 'Jl. Raya Pajajaran No. 123, Bogor Tengah, Kota Bogor, Jawa Barat');
+        // Direct upload to legal doc as standard fallback
+        setValue('document.legalDoc', 'uploads/permohonan/mock_KTP_uploaded.pdf');
       } else {
         setValue('applicant.name', 'PT. Maju Bersama Jaya');
         setValue('applicant.nib', '9120304050607');
         setValue('applicant.address', 'Kawasan Industri Sentul Blok C2, Babakan Madang, Kabupaten Bogor, Jawa Barat');
+        // Direct upload to legal doc as standard fallback
+        setValue('document.legalDoc', 'uploads/permohonan/mock_NIB_uploaded.pdf');
       }
       setOcrLoading(null);
     }, 2000);
@@ -527,7 +615,7 @@ export const ApplicantSection = () => {
         </div>
 
         <div className="md:col-span-2">
-          <LabelWithInfo label="Alamat Lengkap Pemohon" helpText="Alamat lengkap domisili pemohon atau alamat kantor pusat terdaftar badan usaha." />
+          <label className={labelClass}>Alamat Lengkap Pemohon</label>
           <textarea {...register('applicant.address')} rows={3} className={inputClass} placeholder="Tulis alamat korespondensi lengkap..." />
           {errors.applicant?.address && <p className="text-xs text-rose-500 mt-1">{errors.applicant.address.message}</p>}
         </div>
@@ -710,6 +798,15 @@ export const LocationSection = () => {
           <input {...register('location.certificateOwner')} type="text" className={inputClass} placeholder="Nama pemegang hak..." />
           {errors.location?.certificateOwner && <p className="text-xs text-rose-500 mt-1">{errors.location.certificateOwner.message}</p>}
         </div>
+
+        {/* ─── DYNAMIC UPLOAD: Sertifikat Hak Lahan (SHM/HGB) ─── */}
+        <div className="md:col-span-2 pt-2 border-t border-slate-100">
+          <ContextualUploadBox
+            label="Unggah Scan Dokumen Sertifikat Tanah (SHM/HGB)"
+            fieldKey="document.legalDoc"
+            helpText="Unggah scan dokumen sertifikat kepemilikan tanah asli BPN untuk validasi data administratif."
+          />
+        </div>
       </div>
     </div>
   );
@@ -717,7 +814,7 @@ export const LocationSection = () => {
 
 // ─── SECTION 4: DATA KOORDINAT AREA & VALIDASI CAD WIZARD [Jakarta 5] ─────────
 export const CoordinateSection = () => {
-  const { register, setValue } = useFormContext<FullSubmissionFormValues>();
+  const { register, setValue, watch } = useFormContext<FullSubmissionFormValues>();
   const [spatialLoading, setSpatialLoading] = useState(false);
   const [uploadedGeoJson, setUploadedGeoJson] = useState<any>(null);
 
@@ -825,7 +922,7 @@ export const CoordinateSection = () => {
       properties: { label: 'Batas Lahan BPN' },
       geometry: { type: 'Polygon', coordinates: [params.polygon] }
     };
-    
+
     // Blok A Kaveling (dikalkulasi secara relatif dalam koordinat terkalibrasi)
     const lotAFeature = {
       type: 'Feature',
@@ -979,7 +1076,7 @@ export const CoordinateSection = () => {
             />
             <label
               htmlFor="cad-file-input"
-              className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs cursor-pointer transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs cursor-pointer transition-colors"
             >
               <FileUp className="h-4.5 w-4.5" />
               Pilih Berkas CAD
@@ -1113,6 +1210,15 @@ export const SpatialSection = () => {
             )}
           </div>
         </div>
+
+        {/* ─── DYNAMIC UPLOAD: SK KKPR / IPPT Awal ─── */}
+        <div className="md:col-span-2 pt-2 border-t border-slate-100">
+          <ContextualUploadBox
+            label="Unggah Dokumen SK KKPR / IPPT Awal"
+            fieldKey="document.supportDoc"
+            helpText="Unggah dokumen keputusan KKPR atau izin prinsip yang didapatkan dari BKPRD/DPMPTSP."
+          />
+        </div>
       </div>
     </div>
   );
@@ -1123,6 +1229,7 @@ export const TechnicalSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   const category = watch('submission.category') || 'PERUMAHAN';
   const landArea = watch('location.landArea') || 0;
+
   const cemeteryAreaVal = watch('technical.cemeteryArea');
   const [cemeteryPercent, setCemeteryPercent] = useState<string>('');
 
@@ -1148,7 +1255,27 @@ export const TechnicalSection = () => {
     }
   }, [landArea, cemeteryAreaVal]);
 
-  const greenBufferAreaVal = watch('technical.greenBufferArea');
+  // ─── REVISI: KALKULATOR KDB MANDIRI LIVE UNTUK PEMOHON ───
+  const applicantBuildingAreaVal = watch('technical.applicantBuildingArea');
+  const [computedKdbPercent, setComputedKdbPercent] = useState<string>('');
+
+  const handleBuildingAreaChange = (val: number | undefined) => {
+    if (landArea > 0 && val !== undefined && !isNaN(val)) {
+      const calculated = (val / landArea) * 100;
+      setValue('technical.kdb', Math.round(calculated * 100) / 100);
+      setComputedKdbPercent(calculated.toFixed(1));
+    } else {
+      setValue('technical.kdb', undefined);
+      setComputedKdbPercent('');
+    }
+  };
+
+  useEffect(() => {
+    if (landArea > 0 && applicantBuildingAreaVal) {
+      const calculated = (applicantBuildingAreaVal / landArea) * 100;
+      setComputedKdbPercent(calculated.toFixed(1));
+    }
+  }, [landArea, applicantBuildingAreaVal]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -1158,6 +1285,49 @@ export const TechnicalSection = () => {
           6. Parameter Teknis Rencana Tapak
         </h3>
         <p className="text-[10px] text-slate-400 mt-1">Rincian parameter teknis fisik pembangunan berdasarkan kriteria teknis dinas terkait.</p>
+      </div>
+
+      {/* ─── BARU: BLOK DEKLARASI MANDIRI KESESUAIAN TATA RUANG (PROPOSED METRICS) ─── */}
+      <div className="border border-primary/25 bg-[#e8f2ea]/20 p-5 space-y-4 text-left">
+        <h4 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
+          <Layers className="h-4 w-4" />
+          Deklarasi Mandiri Kesesuaian Tata Ruang (Proposed Metrics)
+        </h4>
+        <p className="text-[10px] text-slate-500 leading-relaxed">
+          Tuliskan estimasi dimensi teknis yang Anda rencanakan pada site plan. Nilai ini akan dihitung ulang secara manual oleh dinas menggunakan berkas CAD yang Anda unggah [Buku 1, 11].
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <LabelWithInfo label="Luas Lantai Dasar Bangunan (m²)" helpText="Total luasan lantai dasar bangunan rencana untuk kalkulasi KDB." />
+            <FormattedInput name="technical.applicantBuildingArea" placeholder="Contoh: 6000" unit="m²" onChangeCustom={handleBuildingAreaChange} />
+          </div>
+
+          <div>
+            <LabelWithInfo label="Garis Sempadan Bangunan (GSB - m)" helpText="Batas penarikan mundur minimal dinding bangunan dari tepi rencana jalan (Buku 2 Hal 22)." />
+            <FormattedInput name="technical.applicantGsb" placeholder="Contoh: 5" unit="meter" />
+          </div>
+
+          <div>
+            <LabelWithInfo label="Luas Hijau Resapan Rencana (RTH - m²)" helpText="Total luasan area pekarangan hijau penyerap air hujan yang akan dibangun." />
+            <FormattedInput name="technical.applicantRthArea" placeholder="Contoh: 1500" unit="m²" />
+          </div>
+        </div>
+
+        {/* Real-time calculated proposed KDB Indicator */}
+        {computedKdbPercent && (
+          <div className="pt-2 border-t border-primary/10 flex items-center gap-2 text-xs font-semibold text-slate-700">
+            <span>Estimasi KDB Usulan:</span>
+            <span className={cn(
+              "font-bold font-mono px-2 py-0.5 rounded-none border text-[11px]",
+              Number(computedKdbPercent) <= 60.0
+                ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+            )}>
+              {computedKdbPercent}% {Number(computedKdbPercent) <= 60.0 ? " (Memenuhi Batas Maks 60%)" : " (Melanggar Batas Maks 60%!)"}
+            </span>
+          </div>
+        )}
       </div>
 
       {category === 'PERUMAHAN' && (
@@ -1222,6 +1392,15 @@ export const TechnicalSection = () => {
             <LabelWithInfo label="Sistem Distribusi Air Bersih" helpText="Sistem penyediaan air minum bagi warga kawasan tapak perumahan." />
             <input {...register('technical.waterSystem')} type="text" className={inputClass} placeholder="Contoh: PDAM / Sumur Bor Komunal" />
           </div>
+
+          {/* ─── DYNAMIC UPLOAD: Dokumen Rencana PSU ─── */}
+          <div className="md:col-span-2 pt-2 border-t border-slate-100">
+            <ContextualUploadBox
+              label="Unggah Dokumen Detail Rencana PSU"
+              fieldKey="document.technicalDoc"
+              helpText="Unggah draf rencana sistem Prasarana, Sarana, dan Utilitas (PSU) yang divalidasi oleh konsultan perencana."
+            />
+          </div>
         </div>
       )}
 
@@ -1255,6 +1434,15 @@ export const TechnicalSection = () => {
           <div className="md:col-span-2">
             <LabelWithInfo label="Total Luas Lantai Bangunan (m²)" helpText="Akumulasi luas seluruh lantai bangunan yang direncanakan (m²)." />
             <FormattedInput name="technical.totalFloorArea" placeholder="Contoh: 4500" unit="m²" />
+          </div>
+
+          {/* ─── DYNAMIC UPLOAD: Dokumen Andalalin ─── */}
+          <div className="md:col-span-2 pt-2 border-t border-slate-100">
+            <ContextualUploadBox
+              label="Unggah Dokumen Kajian Dampak Lalu Lintas (Andalalin)"
+              fieldKey="document.supportDoc2"
+              helpText="Unggah surat persetujuan teknis Andalalin yang diterbitkan resmi oleh Dinas Perhubungan setempat."
+            />
           </div>
         </div>
       )}
@@ -1293,6 +1481,15 @@ export const TechnicalSection = () => {
             <LabelWithInfo label="Rencana Sistem Proteksi Kebakaran Aktif" helpText="Infrastruktur pemadam kebakaran mandiri yang terpasang di area tapak pelayanan." />
             <input {...register('technical.fireProtection')} type="text" className={inputClass} placeholder="Contoh: Pemasangan Hydrant Mandiri, APAR di setiap koridor" />
           </div>
+
+          {/* ─── DYNAMIC UPLOAD: Andalalin / Rekomendasi Instansi ─── */}
+          <div className="md:col-span-2 pt-2 border-t border-slate-100">
+            <ContextualUploadBox
+              label="Unggah Dokumen Persetujuan Andalalin / Rekomendasi Instansi"
+              fieldKey="document.supportDoc2"
+              helpText="Unggah surat rekomendasi teknis dinas sektoral (misal Dinas Perhubungan atau Dinas Kesehatan)."
+            />
+          </div>
         </div>
       )}
 
@@ -1325,6 +1522,20 @@ export const TechnicalSection = () => {
               <option value="TIDAK">Tidak Disediakan (Kerjasama Pihak Ketiga)</option>
             </select>
           </div>
+
+          {/* ─── DYNAMIC UPLOADS: AMDAL & Persetujuan Air Limbah ─── */}
+          <div className="md:col-span-2 pt-2 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ContextualUploadBox
+              label="Unggah Dokumen Analisis Lingkungan AMDAL/UKL-UPL"
+              fieldKey="document.technicalDoc"
+              helpText="Unggah dokumen kelayakan lingkungan yang diterbitkan oleh Dinas Lingkungan Hidup."
+            />
+            <ContextualUploadBox
+              label="Unggah Dokumen Persetujuan Teknis Air Limbah"
+              fieldKey="document.supportDoc2"
+              helpText="Unggah persetujuan teknis pembuangan/pemanfaatan air limbah industri."
+            />
+          </div>
         </div>
       )}
     </div>
@@ -1346,7 +1557,7 @@ export const ConsultantSection = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
         <div className="md:col-span-2">
-          <LabelWithInfo label="Nama Biro / Perusahaan Konsultan Perencana" helpText="Nama resmi badan hukum biro konsultan tata ruang/arsitektur yang ditunjuk pemohon." />
+          <LabelWithInfo label="Nama Biro / Perusahaan Konsultan Perencana" helpText="Nama resmi resmi badan hukum biro konsultan tata ruang/arsitektur yang ditunjuk pemohon." />
           <input {...register('consultant.companyName')} type="text" className={inputClass} placeholder="PT / CV Biro Rekayasa Geospasial..." />
           {errors.consultant?.companyName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.companyName.message}</p>}
         </div>
@@ -1367,148 +1578,96 @@ export const ConsultantSection = () => {
           />
           {errors.consultant?.picName && <p className="text-xs text-rose-500 mt-1">{errors.consultant.picName.message}</p>}
         </div>
+
+        {/* ─── DYNAMIC UPLOAD: SKA / Sertifikat Keahlian ─── */}
+        <div className="md:col-span-2 pt-2 border-t border-slate-100">
+          <ContextualUploadBox
+            label="Unggah Scan Sertifikat Keahlian (SKA / SKEA) Arsitek"
+            fieldKey="document.supportDoc"
+            helpText="Unggah bukti sertifikat lisensi arsitek aktif (IAI) guna jaminan tanggung jawab teknis gambar."
+          />
+        </div>
       </div>
     </div>
   );
 };
 
-// ─── SECTION 8: LAMPIRAN DOKUMEN ──────────────────────────────────────────────
+// ─── SECTION 8: LAMPIRAN DOKUMEN (SUMMARY / REKAPITULASI DOKUMEN TERUNGGAH) ───
 export const DocumentSection = () => {
-  const { watch, setValue } = useFormContext<FullSubmissionFormValues>();
-  const category = watch('submission.category');
+  const { watch } = useFormContext<FullSubmissionFormValues>();
 
-  // Menentukan dokumen dinamis berdasarkan kategori site plan
-  const getConditionalDocs = () => {
-    switch (category) {
-      case 'PERUMAHAN':
-        return [
-          { name: 'Dokumen Rencana PSU', desc: 'Rencana utilitas, jalan, RTH, drainase perumahan' }
-        ];
-      case 'NON_PERUMAHAN':
-        return [
-          { name: 'Kajian Dokumen ANDALIN', desc: 'Analisis Dampak Lalu Lintas perhubungan daerah' }
-        ];
-      case 'FASUM':
-        return [
-          { name: 'Kajian Dokumen ANDALIN', desc: 'Analisis Dampak Lalu Lintas perhubungan daerah' },
-          { name: 'Rekomendasi Instansi Terkait', desc: 'Surat rekomendasi dinas/lembaga vertikal' }
-        ];
-      case 'INDUSTRI':
-        return [
-          { name: 'Kajian Analisis Lingkungan AMDAL', desc: 'Dokumen kelayakan lingkungan AMDAL resmi' },
-          { name: 'Persetujuan Teknis Air Limbah', desc: 'Rencana pengelolaan IPAL & izin buang limbah cair' }
-        ];
-      default:
-        return [];
-    }
-  };
+  // Membaca state seluruh file yang diunggah secara asinkron di sepanjang langkah 1-7
+  const legalDoc = watch('document.legalDoc');
+  const technicalDoc = watch('document.technicalDoc');
+  const supportDoc = watch('document.supportDoc');
+  const supportDoc2 = watch('document.supportDoc2');
 
-  const defaultDocs = [
-    { name: 'Dokumen Legalitas Lahan (SHM/HGB/KTP)', desc: 'Scan sertifikat kepemilikan tanah & KTP pemohon' },
-    { name: 'Gambar Teknis Rencana Site Plan (CAD/DWG)', desc: 'File gambar tapak format DWG/DXF dari konsultan' },
+  const docSummary = [
+    { name: 'Sertifikat Tanah & KTP (Langkah 3)', value: legalDoc, mandatory: true },
+    { name: 'Gambar Rencana Teknis CAD / Amdal (Langkah 4/6)', value: technicalDoc, mandatory: true },
+    { name: 'SK KKPR Awal / SKA Arsitek (Langkah 5/7)', value: supportDoc, mandatory: true },
+    { name: 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)', value: supportDoc2, mandatory: false },
   ];
-
-  const conditionalDocs = getConditionalDocs();
-  const allDocs = [...defaultDocs, ...conditionalDocs];
-
-  const getFieldKey = (docName: string) => {
-    if (docName.includes('Legalitas') || docName.includes('KTP')) return 'document.legalDoc';
-    if (docName.includes('Gambar Teknis') || docName.includes('CAD') || docName.includes('DWG')) return 'document.technicalDoc';
-    if (docName.includes('Instansi') || docName.includes('Air Limbah')) return 'document.supportDoc2';
-    return 'document.supportDoc';
-  };
-
-  const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        setIsUploading(prev => ({ ...prev, [fieldKey]: true }));
-        const uploadResult = await uploadFileToBackend(file);
-        setValue(fieldKey, uploadResult.file_url);
-        toast.success(`Berhasil mengunggah: ${file.name}`);
-      } catch (err) {
-        toast.error('Gagal mengunggah berkas ke server');
-      } finally {
-        setIsUploading(prev => ({ ...prev, [fieldKey]: false }));
-      }
-    }
-  };
-
-  const handleClearFile = (fieldKey: any) => {
-    setValue(fieldKey, undefined);
-  };
-
-  const triggerFileInput = (idx: number) => {
-    const input = document.getElementById(`doc-upload-${idx}`) as HTMLInputElement;
-    if (input) {
-      input.click();
-    }
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
         <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          8. Upload Lampiran Berkas Dokumen
+          8. Rekapitulasi Berkas Dokumen Terunggah
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Unggah seluruh dokumen persyaratan administratif dalam bentuk berkas digital resmi.</p>
+        <p className="text-[10px] text-slate-400 mt-1">Guna mematuhi asas transparansi, pastikan seluruh dokumen administratif dan spasial di bawah ini telah terisi secara sah.</p>
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 px-4 py-2 flex items-center gap-2 mb-4">
-        <Info className="h-4 w-4 text-primary" />
-        <span className="text-[10px] text-slate-500 font-semibold uppercase">
-          Dokumen Persyaratan untuk Kategori: <span className="text-primary">{category || 'PERUMAHAN'}</span>
-        </span>
+      <div className="bg-[#e8f2ea]/30 border border-primary/10 p-4 text-left select-none mb-4">
+        <h5 className="text-[10px] font-bold text-[#111D13] uppercase tracking-wide flex items-center gap-1.5 mb-1">
+          <Info size={14} className="text-primary" />
+          Status Berkas Pendaftaran Terdistribusi
+        </h5>
+        <p className="text-[10px] text-slate-500 leading-relaxed">
+          Sistem GEOSIPAS v3.0 mendistribusikan penempatan tombol unggah berkas secara langsung di langkah (*step*) pengisian data yang relevan agar meminimalkan beban ingatan Anda (*low cognitive load*).
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left">
-        {allDocs.map((doc, idx) => {
-          const fieldKey = getFieldKey(doc.name);
-          const fileValue = watch(fieldKey as any);
-
+      {/* Grid Status Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+        {docSummary.map((doc, idx) => {
+          const isUploaded = !!doc.value;
           return (
-            <div key={idx} className="relative group min-h-[160px]">
-              <input
-                type="file"
-                id={`doc-upload-${idx}`}
-                className="hidden"
-                onChange={(e) => handleFileChange(e, fieldKey)}
-                accept=".pdf,.jpg,.jpeg,.png,.zip"
-              />
+            <div
+              key={idx}
+              className={cn(
+                "p-4 border transition-all duration-300 flex items-center justify-between rounded-none shadow-none",
+                isUploaded
+                  ? "bg-[#e8f2ea]/20 border-primary/40 text-primary"
+                  : doc.mandatory
+                    ? "bg-amber-50/20 border-amber-200 text-amber-800 animate-pulse"
+                    : "bg-slate-50/50 border-slate-200 text-slate-400"
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold text-xs truncate">{doc.name}</h4>
+                <p className="text-[10px] opacity-75 mt-1 leading-none font-medium">
+                  {isUploaded
+                    ? `✓ Berkas Siap: ${typeof doc.value === 'string' ? doc.value.split('/').pop() : 'OK'}`
+                    : doc.mandatory
+                      ? '⚠ Wajib Diisi (Kembali ke langkah bersangkutan)'
+                      : 'Pilihan (Opsional)'}
+                </p>
+              </div>
 
-              {isUploading[fieldKey] ? (
-                <div className="p-6 flex flex-col items-center justify-center text-center bg-slate-50 border border-dashed border-border h-full min-h-[160px] rounded-none">
-                  <Loader2 className="h-7 w-7 text-primary mb-2.5 animate-spin" />
-                  <p className="text-xs text-slate-500 font-semibold uppercase">Mengunggah...</p>
-                </div>
-              ) : fileValue ? (
-                <div className="p-6 flex flex-col items-center justify-center text-center bg-[#e8f2ea]/20 border border-primary/45 h-full min-h-[160px] rounded-none">
-                  <CheckCircle2 className="h-7 w-7 text-primary mb-2.5" />
-                  <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
-                  <p className="text-[10px] text-primary font-mono max-w-full truncate px-2 mb-3">
-                    {fileValue instanceof File ? fileValue.name : typeof fileValue === 'string' ? fileValue : 'File terunggah'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleClearFile(fieldKey)}
-                    className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 text-[10px] font-bold rounded-none transition-colors cursor-pointer outline-none"
-                  >
-                    Hapus Berkas
-                  </button>
-                </div>
+              {isUploaded ? (
+                <span className="h-6 w-6 bg-primary text-white flex items-center justify-center font-bold text-xs shrink-0 rounded-full border border-white">
+                  ✓
+                </span>
+              ) : doc.mandatory ? (
+                <span className="h-6 w-6 bg-amber-500 text-white flex items-center justify-center font-bold text-xs shrink-0 rounded-full border border-white">
+                  !
+                </span>
               ) : (
-                <div
-                  onClick={() => triggerFileInput(idx)}
-                  className="p-6 flex flex-col items-center justify-center text-center bg-white border border-dashed border-border hover:bg-slate-50/50 transition-colors cursor-pointer select-none h-full min-h-[160px] rounded-none"
-                >
-                  <UploadCloud className="h-7 w-7 text-secondary-foreground/60 mb-2.5 group-hover:text-primary transition-colors" />
-                  <p className="text-xs font-bold text-slate-700 mb-1 leading-snug">{doc.name}</p>
-                  <p className="text-[9px] text-slate-400 mb-2">{doc.desc}</p>
-                  <p className="text-[10px] text-slate-400">PDF, JPG, PNG or zip hingga 15MB</p>
-                </div>
+                <span className="h-6 w-6 bg-slate-200 text-slate-400 flex items-center justify-center font-bold text-xs shrink-0 rounded-full border-none">
+                  -
+                </span>
               )}
             </div>
           );

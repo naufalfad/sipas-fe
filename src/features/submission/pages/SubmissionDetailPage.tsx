@@ -1,6 +1,16 @@
-import { useState, useMemo, useRef } from 'react';
+/**
+ * ============================================================================
+ * GEOSIPAS DETIL & COCKPIT VERIFIKASI — [SubmissionDetailPage.tsx] (REVISED v3)
+ * ============================================================================
+ * Peran: Layar utama verifikasi dinas lintas OPD dan dasbor scorecard pemohon.
+ *        Mengintegrasikan 13 aspek checklist toggle, tabel komparasi tiga sisi,
+ *        SLA tracking dinamis, andalalin/AMDAL check, dan tanda tangan digital.
+ * ============================================================================
+ */
+
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
@@ -9,10 +19,10 @@ import { SubmissionService } from '@/features/submission/services/submission.ser
 import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, Clock, CheckCircle2,
-  MapPin, File, Loader2,
+  MapPin, File, Loader2, UploadCloud,
   XCircle, CheckCircle, FileSignature, AlertTriangle, ShieldCheck,
   User, Phone, Mail, Award, HardHat, Camera, Landmark,
-  Scale, Globe, Fingerprint
+  Scale, Globe, Fingerprint, RefreshCw, Layers
 } from 'lucide-react';
 import { Source, Layer } from 'react-map-gl/maplibre';
 import GISMapContainer from '@/components/maps/GISMapContainer';
@@ -20,6 +30,32 @@ import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import AuditTrailViewer from '@/features/approval/components/AuditTrailViewer';
+
+const uploadFileToBackend = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = localStorage.getItem('token');
+  const response = await fetch('http://localhost:8000/api/v1/submissions/upload', {
+    method: 'POST',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(errText || 'Gagal mengunggah berkas ke server');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+// ─── STYLING CONSTANTS (PROTECTED VARIATIONS) ──────────────────────────────────
+const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
+const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
 
 // ─── MOCK DATA LAHAN KOMPENSASI DAERAH [Purworejo 8, Bogor 11] ────────────────
 const mockKompensasiList: LahanKompensasi[] = [
@@ -45,6 +81,21 @@ const mockKompensasiList: LahanKompensasi[] = [
     luasKompensasiM2: 12000,
     statusPemenuhan: 'BELUM_TERPENUHI',
     polygon: [
+      [-6.6010, 106.8055],
+      [-6.6010, 106.8065],
+      [-6.6025, 106.8065],
+      [-6.6025, 106.8055],
+      [-6.6010, 106.8055]
+    ],
+    buktiLegalitasUrl: '#',
+  },
+  {
+    idKompensasi: 'komp-103',
+    idPermohonan: 'sub-3',
+    tipeKompensasi: 'LAHAN_SAWAH',
+    luasKompensasiM2: 12000,
+    statusPemenuhan: 'BELUM_TERPENUHI',
+    polygon: [
       [-6.6210, 106.8110],
       [-6.6210, 106.8120],
       [-6.6220, 106.8120],
@@ -55,16 +106,93 @@ const mockKompensasiList: LahanKompensasi[] = [
   }
 ];
 
+const getStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case 'Disetujui':
+      return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
+    case 'Ditolak':
+      return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
+    default:
+      return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
+  }
+};
+
+const getCoordinates = (
+  e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  canvas: HTMLCanvasElement | null
+) => {
+  if (!canvas) return { x: 0, y: 0 };
+  const rect = canvas.getBoundingClientRect();
+  const displayWidth = rect.width;
+  const displayHeight = rect.height;
+  const logicalWidth = canvas.width;
+  const logicalHeight = canvas.height;
+
+  if ('touches' in e) {
+    if (e.touches.length === 0) return { x: 0, y: 0 };
+    const clientX = e.touches[0].clientX - rect.left;
+    const clientY = e.touches[0].clientY - rect.top;
+    return {
+      x: (clientX / displayWidth) * logicalWidth,
+      y: (clientY / displayHeight) * logicalHeight
+    };
+  }
+
+  const clientX = e.clientX - rect.left;
+  const clientY = e.clientY - rect.top;
+  return {
+    x: (clientX / displayWidth) * logicalWidth,
+    y: (clientY / displayHeight) * logicalHeight
+  };
+};
+
+function calculateCentroid(polygon: [number, number][]): [number, number] {
+  let totalLng = 0;
+  let totalLat = 0;
+  polygon.forEach((coord) => {
+    const [a, b] = coord;
+    if (a >= -15 && a <= 10 && b >= 90 && b <= 145) {
+      totalLng += b;
+      totalLat += a;
+    } else {
+      totalLng += a;
+      totalLat += b;
+    }
+  });
+  return [totalLng / polygon.length, totalLat / polygon.length];
+}
+
+// ─── DEFINISI 13 ASPEK CHECKLIST VERIFIKASI RESMI DINAS ───
+interface AspectDefinition {
+  code: string;
+  label: string;
+  helpText: string;
+}
+
+const VERIFICATION_ASPECTS: AspectDefinition[] = [
+  { code: 'REQ_ZONING', label: 'Kesesuaian dengan RTRW / RDTR', helpText: 'Memastikan posisi koordinat bidang tanah berada pada peruntukan zona ruang yang tepat (RDTR DKI Jakarta Buku 2 Hal 6).' },
+  { code: 'REQ_LEGAL', label: 'Status & Legalitas Kepemilikan Lahan', helpText: 'Validasi dokumen sertifikat tanah (SHM/HGB) asli terdaftar resmi BPN tanpa adanya catatan sengketa.' },
+  { code: 'REQ_ACCESS', label: 'Aksesibilitas & Lebar Jalan Utama (ROW)', helpText: 'Uji kesesuaian sirkulasi masuk-keluar kendaraan, lebar jalan, serta pekarangan trotoar pejalan kaki.' },
+  { code: 'REQ_DRAINAGE', label: 'Sistem Drainase & Pengendalian Banjir', helpText: 'Audit kelayakan jaringan saluran air hujan internal tapak guna mencegah potensi genangan/banjir.' },
+  { code: 'REQ_KDB', label: 'Koefisien Dasar Bangunan (KDB)', helpText: 'Uji rasio tutupan lantai dasar bangunan terhadap luas lahan efektif (Buku 2 Hal 7).' },
+  { code: 'REQ_KLB', label: 'Koefisien Lantai Bangunan (KLB)', helpText: 'Uji batas total luas seluruh lantai gedung yang diizinkan (Buku 2 Hal 8).' },
+  { code: 'REQ_KDH', label: 'Koefisien Dasar Hijau (KDH)', helpText: 'Uji persentase area pekarangan terbuka penyerapan air alami (Buku 2 Hal 11).' },
+  { code: 'REQ_RTH', label: 'Ruang Terbuka Hijau (RTH) Minimum', helpText: 'Kewajiban pemenuhan luasan RTH minimal 20% bagi kawasan perumahan daerah (Buku 2 Hal 11).' },
+  { code: 'REQ_GSB', label: 'Garis Sempadan Bangunan (GSB)', helpText: 'Uji jarak mundur fisik dinding bangunan terluar dari as rencana jalan kota (Buku 2 Hal 13).' },
+  { code: 'REQ_UTILITY', label: 'Prasarana & Utilitas Kota', helpText: 'Ketersediaan jaringan listrik PLN, gardu penunjang, pembuangan sampah mandiri, dan suplai air minum.' },
+  { code: 'REQ_ENV_IMPACT', label: 'Dampak Lingkungan (AMDAL / UKL-UPL)', helpText: 'Penyertaan dokumen kelayakan lingkungan AMDAL resmi untuk kawasan industri/skala besar.' },
+  { code: 'REQ_TRAFFIC', label: 'Dampak Lalu Lintas (Andalalin)', helpText: 'Penyertaan surat persetujuan andalalin dari Dishub guna mencegah kemacetan sirkulasi jalan.' },
+  { code: 'REQ_PSU', label: 'Sarana Utilitas Umum / Fasum / Fasos', helpText: 'Penyediaan lahan pemakaman (TPU 2%) dan penyerahan PSU untuk perumahan (Purworejo 8).' },
+];
+
 export default function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { activeRole: uiActiveRole, userProfile: uiUserProfile } = useUIStore();
   const { user } = useAuthStore();
 
-  // Determine effective role: prefer authenticated user role (normalized),
-  // otherwise fall back to UI simulator role.
   const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
-
   const activeRole = effectiveRole;
   const userProfile = user ? {
     name: user.full_name || user.username,
@@ -81,86 +209,7 @@ export default function SubmissionDetailPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
 
-  // Canvas drawing handlers for signature pad
-  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-
-    // Get actual display size
-    const displayWidth = rect.width;
-    const displayHeight = rect.height;
-
-    // Get logical canvas dimensions
-    const logicalWidth = canvas.width;
-    const logicalHeight = canvas.height;
-
-    // For touch events
-    if ('touches' in e) {
-      if (e.touches.length === 0) return { x: 0, y: 0 };
-      const clientX = e.touches[0].clientX - rect.left;
-      const clientY = e.touches[0].clientY - rect.top;
-      return {
-        x: (clientX / displayWidth) * logicalWidth,
-        y: (clientY / displayHeight) * logicalHeight
-      };
-    }
-
-    // For mouse events
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-    return {
-      x: (clientX / displayWidth) * logicalWidth,
-      y: (clientY / displayHeight) * logicalHeight
-    };
-  };
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const { x, y } = getCoordinates(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    isDrawingRef.current = true;
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const { x, y } = getCoordinates(e);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = '#0f172a'; // slate-900
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    if (!isDrawingRef.current) return;
-    isDrawingRef.current = false;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    // Export signature as base64 png
-    const dataUrl = canvas.toDataURL('image/png');
-    setSignature(dataUrl);
-  };
-
-  const clearSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setSignature('');
-  };
+  // State untuk Tab Aktif
   const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'audit'>('ringkasan');
 
   // Checklist states
@@ -180,11 +229,61 @@ export default function SubmissionDetailPage() {
 
   const [kabidAgreed, setKabidAgreed] = useState(false);
 
+  // ─── REVISI: STATE UNTUK PENILAIAN DYNAMIC CHECKLIST & SANDING ANGKA VERIFIKATOR ───
+  const [kkprVerdict, setKkprVerdict] = useState<string>('Sesuai');
+  const [verifiedKdb, setVerifiedKdb] = useState<number | ''>('');
+  const [verifiedKlb, setVerifiedKlb] = useState<number | ''>('');
+  const [verifiedKdh, setVerifiedKdh] = useState<number | ''>('');
+  const [verifiedGsb, setVerifiedGsb] = useState<number | ''>('');
+  const [verifiedRthArea, setVerifiedRthArea] = useState<number | ''>('');
+
+  // State dictionary untuk mumpung 13-aspek pemeriksaan dinas
+  const [checklistStates, setChecklistStates] = useState<Record<string, {
+    status: 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai';
+    catatan: string;
+    attachmentUrl?: string;
+    isUploading?: boolean;
+  }>>({});
+
   const { data: sub, isLoading } = useQuery({
     queryKey: ['submission', id],
     queryFn: () => SubmissionService.getById(id || ''),
     enabled: !!id,
   });
+
+  // Pre-populate input verifikasi dinas jika sudah ada evaluasi sebelumnya di DB
+  useEffect(() => {
+    if (sub) {
+      if (sub.kkprVerdict) setKkprVerdict(sub.kkprVerdict);
+      if (sub.verifiedKdb !== undefined && sub.verifiedKdb !== null) setVerifiedKdb(sub.verifiedKdb);
+      if (sub.verifiedKlb !== undefined && sub.verifiedKlb !== null) setVerifiedKlb(sub.verifiedKlb);
+      if (sub.verifiedKdh !== undefined && sub.verifiedKdh !== null) setVerifiedKdh(sub.verifiedKdh);
+      if (sub.verifiedGsb !== undefined && sub.verifiedGsb !== null) setVerifiedGsb(sub.verifiedGsb);
+      if (sub.verifiedRthArea !== undefined && sub.verifiedRthArea !== null) setVerifiedRthArea(sub.verifiedRthArea);
+
+      if (sub.evaluationChecklist && sub.evaluationChecklist.length > 0) {
+        const mappedStates: typeof checklistStates = {};
+        sub.evaluationChecklist.forEach((item) => {
+          mappedStates[item.aspekCode] = {
+            status: item.statusKelayakan as any,
+            catatan: item.catatanVerifikator || '',
+            attachmentUrl: item.attachmentUrl
+          };
+        });
+        setChecklistStates(mappedStates);
+      } else {
+        // Inisialisasi awal default state checklist
+        const defaultStates: typeof checklistStates = {};
+        VERIFICATION_ASPECTS.forEach((aspect) => {
+          defaultStates[aspect.code] = {
+            status: 'Sesuai',
+            catatan: ''
+          };
+        });
+        setChecklistStates(defaultStates);
+      }
+    }
+  }, [sub]);
 
   const mutation = useMutation({
     mutationFn: async ({
@@ -198,9 +297,17 @@ export default function SubmissionDetailPage() {
       notes: string;
       passphrase?: string;
       signatureBase64?: string;
-      // Override eksplisit untuk jalur revert internal (opsional)
       actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE';
     }) => {
+      // Map checklist items dari state lokal ke format yang diharapkan backend
+      const checklistItemsPayload = Object.entries(checklistStatesMapped).map(([code, item]) => ({
+        aspekCode: code,
+        aspekLabel: item.aspekLabel,
+        statusKelayakan: item.statusKelayakan,
+        catatanVerifikator: item.catatanVerifikator,
+        attachmentUrl: item.attachmentUrl
+      }));
+
       return SubmissionService.updateStatus(
         sub?.id || '',
         status,
@@ -208,7 +315,14 @@ export default function SubmissionDetailPage() {
         notes,
         passphrase,
         signatureBase64,
-        actionTypeOverride
+        actionTypeOverride,
+        kkpr_verdict_final,
+        verified_kdb_final,
+        verified_klb_final,
+        verified_kdh_final,
+        verified_gsb_final,
+        verified_rth_area_final,
+        checklistItemsPayload
       );
     },
     onSuccess: async () => {
@@ -279,64 +393,67 @@ export default function SubmissionDetailPage() {
     return { type: 'FeatureCollection' as const, features };
   }, [sub]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-[50vh] flex flex-col justify-center items-center space-y-4">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        <p className="text-xs text-slate-500">Menghubungkan data basis spasial...</p>
-      </div>
-    );
-  }
-
-  if (!sub) {
-    return (
-      <div className="flex flex-col justify-center items-center py-16 text-center max-w-md mx-auto select-none bg-white border border-border p-8">
-        <XCircle className="h-10 w-10 text-rose-500 mx-auto mb-3" />
-        <h3 className="text-sm font-bold text-slate-800">Berkas Tidak Ditemukan</h3>
-        <p className="text-xs text-slate-400 mt-2 mb-6 leading-relaxed">
-          Nomor registrasi berkas pengajuan tidak terdaftar di dalam sistem administrasi GEOSIPAS.
-        </p>
-        <Link to="/pengajuan/daftar" className="px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold transition-colors rounded-none">
-          Kembali ke Daftar
-        </Link>
-      </div>
-    );
-  }
-
-
-
-  // Pengkondisian gaya visual lencana status sesuai standardisasi palet organik baru (WCAG AA Compliant)
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'Disetujui':
-        return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
-      case 'Ditolak':
-        return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
-      default:
-        return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
-    }
+  // Canvas drawing handlers for signature pad
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const { x, y } = getCoordinates(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    isDrawingRef.current = true;
   };
 
-  // --- LOGIKA KONTROL SLA CLOCK PAUSE/RESUME [Bogor 16] ---
-  const isSlaPaused = sub.status === 'Ditolak' || sub.status === 'Draft';
-  const slaDaysRemaining = sub.remaining_sla_days ?? 0;
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const { x, y } = getCoordinates(e, canvas);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#0f172a'; // slate-900
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Export signature as base64 png
+    const dataUrl = canvas.toDataURL('image/png');
+    setSignature(dataUrl);
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSignature('');
+  };
+
+  const getCoordinatesLocal = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    return getCoordinates(e, canvasRef.current);
+  };
+  const startDrawingLocal = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => startDrawing(e);
+  const drawLocal = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => draw(e);
+  const stopDrawingLocal = () => stopDrawing();
 
   // Helper variables for role-based conditional rendering
-  // SOD: Super Admin tidak boleh melihat panel verifikasi fungsional.
   const isAdminActive = effectiveRole === 'Admin SIPAS';
   const isTechActive = effectiveRole === 'Tim Teknis';
   const isKabidActive = effectiveRole === 'Kepala Bidang';
 
-  const showAdminPanel = isAdminActive && (sub.status === 'Menunggu Verifikasi' || sub.status === 'Verifikasi Administrasi');
-  const showTechPanel = isTechActive && sub.status === 'Verifikasi Teknis';
-  const showKabidPanel = isKabidActive && sub.status === 'Menunggu Persetujuan';
-
-  // Debug variables (safe: declared after dependent flags)
-  const debugRole = effectiveRole;
-  const debugUiRole = uiActiveRole;
-  const debugStatus = sub.status;
-  const debugIsKabid = isKabidActive;
-  const debugShowKabid = showKabidPanel;
+  const showAdminPanel = sub && isAdminActive && (sub.status === 'Menunggu Verifikasi' || sub.status === 'Verifikasi Administrasi');
+  const showTechPanel = sub && isTechActive && sub.status === 'Verifikasi Teknis';
+  const showKabidPanel = sub && isKabidActive && sub.status === 'Menunggu Persetujuan';
 
   const allAdminChecked = Object.values(adminChecks).every(Boolean);
   const allTechChecked = Object.values(techChecks).every(Boolean);
@@ -386,9 +503,6 @@ export default function SubmissionDetailPage() {
     });
   };
 
-  // ── HANDLER PENGEMBALIAN INTERNAL: Kabid → Tim Teknis ──────────────────────
-  // Dipanggil saat Kepala Bidang menemukan isu teknis yang perlu diklarifikasi
-  // ulang oleh Tim Teknis SEBELUM TTE diterbitkan. SLA clock tetap berjalan.
   const handleRevertToTechnical = () => {
     if (!notes.trim()) {
       toast.error('Catatan alasan pengembalian wajib diisi sebelum mengembalikan berkas ke Tim Teknis.');
@@ -401,9 +515,6 @@ export default function SubmissionDetailPage() {
     });
   };
 
-  // ── HANDLER PENGEMBALIAN INTERNAL: Tim Teknis → Admin SIPAS ───────────────
-  // Dipanggil saat Tim Teknis menemukan kelengkapan dokumen administratif yang
-  // perlu diperbaiki Admin SEBELUM audit spasial dapat dilanjutkan. SLA tetap berjalan.
   const handleRevertToAdministrative = () => {
     if (!notes.trim()) {
       toast.error('Catatan alasan pengembalian wajib diisi sebelum mengembalikan berkas ke Admin SIPAS.');
@@ -416,11 +527,20 @@ export default function SubmissionDetailPage() {
     });
   };
 
+  const handleAdminActionLocal = (approved: boolean) => handleAdminAction(approved);
+  const handleTechActionLocal = (approved: boolean) => handleTechAction(approved);
+  const handleKabidActionLocal = (approved: boolean) => handleKabidAction(approved);
+
+  // ── HANDLER PENGEMBALIAN INTERNAL: Kabid → Tim Teknis ──────────────────────
+  const handleRevertToTechnicalLocal = () => handleRevertToTechnical();
+
+  // ── HANDLER PENGEMBALIAN INTERNAL: Tim Teknis → Admin SIPAS ───────────────
+  const handleRevertToAdministrativeLocal = () => handleRevertToAdministrative();
+
   // Handler Visualisasi Lahan Kompensasi pada Peta Spasial [Purworejo 8]
   const handleShowCompensationOnMap = (komp: LahanKompensasi) => {
     setActiveKompensasi(komp);
 
-    // Hitung centroid poligon kompensasi untuk mengarahkan kamera
     const centroid = calculateCentroid(komp.polygon);
     flyTo({
       longitude: centroid[0],
@@ -431,21 +551,139 @@ export default function SubmissionDetailPage() {
     toast.info('GIS Engine memfokuskan kamera ke poligon lahan pengganti!');
   };
 
-  function calculateCentroid(polygon: [number, number][]): [number, number] {
-    let totalLat = 0;
-    let totalLng = 0;
-    polygon.forEach(([lat, lng]) => {
-      totalLat += lat;
-      totalLng += lng;
+  // ─── REVISI: DYNAMIC CHECKLIST ACTIONS HANDLER (YES/NO/CONDITIONAL TOGGLE) ──
+  const handleToggleAspect = (code: string, statusVal: 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai') => {
+    setChecklistStates((prev) => ({
+      ...prev,
+      [code]: {
+        ...prev[code],
+        status: statusVal
+      }
+    }));
+  };
+
+  const handleAspectNoteChange = (code: string, noteVal: string) => {
+    setChecklistStates((prev) => ({
+      ...prev,
+      [code]: {
+        ...prev[code],
+        catatan: noteVal
+      }
+    }));
+  };
+
+  const handleAspectAttachmentUpload = async (code: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setChecklistStates((prev) => ({
+        ...prev,
+        [code]: { ...prev[code], isUploading: true }
+      }));
+
+      const res = await uploadFileToBackend(file);
+      setChecklistStates((prev) => ({
+        ...prev,
+        [code]: {
+          ...prev[code],
+          attachmentUrl: res.file_url,
+          isUploading: false
+        }
+      }));
+      toast.success(`Berhasil mengunggah dokumen pendukung aspek: ${file.name}`);
+    } catch {
+      setChecklistStates((prev) => ({
+        ...prev,
+        [code]: { ...prev[code], isUploading: false }
+      }));
+      toast.error('Gagal mengunggah berkas peninjauan teknis ke server.');
+    }
+  };
+
+  // ─── PREPARE DTO SINKRONISASI MUTATION ───
+  // Menyusun struktur checklist penampung state data form
+  const checklistItemsForPayload = useMemo(() => {
+    return VERIFICATION_ASPECTS.map((aspect) => {
+      const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
+      return {
+        aspek_code: aspect.code,
+        aspek_label: aspect.label,
+        status_kelayakan: state.status,
+        catatan_verifikator: state.catatan || null,
+        attachment_url: state.attachmentUrl || null
+      };
     });
-    return [totalLng / polygon.length, totalLat / polygon.length];
+  }, [checklistStates]);
+
+  const handleTriggerSubmissionVerification = () => {
+    if (kkprVerdict === 'Sesuai Bersyarat' && !notes.trim()) {
+      toast.error('Catatan teknis bersyarat wajib dicantumkan pada kolom justifikasi global pimpinan.');
+      return;
+    }
+
+    mutation.mutate({
+      status: kkprVerdict === 'Sesuai' || kkprVerdict === 'Sesuai Bersyarat' ? 'Menunggu Persetujuan' : 'Ditolak',
+      notes: notes.trim() || `Verifikasi spasial diselesaikan dengan keputusan final: ${kkprVerdict}.`
+    });
+  };
+
+  // Bind values for mutation referencing
+  const checklistStatesMapped = useMemo(() => {
+    const map: Record<string, any> = {};
+    VERIFICATION_ASPECTS.forEach((aspect) => {
+      const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
+      map[aspect.code] = {
+        aspekLabel: aspect.label,
+        statusModel: state.status,
+        statusKelayakan: state.status,
+        catatanVerifikator: state.catatan || null,
+        attachmentUrl: state.attachmentUrl || null
+      };
+    });
+    return map;
+  }, [checklistStates]);
+
+  const kkpr_verdict_final = kkprVerdict;
+  const verified_kdb_final = verifiedKdb === '' ? undefined : Number(verifiedKdb);
+  const verified_klb_final = verifiedKlb === '' ? undefined : Number(verifiedKlb);
+  const verified_kdh_final = verifiedKdh === '' ? undefined : Number(verifiedKdh);
+  const verified_gsb_final = verifiedGsb === '' ? undefined : Number(verifiedGsb);
+  const verified_rth_area_final = verifiedRthArea === '' ? undefined : Number(verifiedRthArea);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex flex-col justify-center items-center space-y-4">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <p className="text-xs text-slate-500">Menghubungkan data basis spasial...</p>
+      </div>
+    );
   }
 
-  const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
-  const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
+  if (!sub) {
+    return (
+      <div className="flex flex-col justify-center items-center py-16 text-center max-w-md mx-auto select-none bg-white border border-border p-8">
+        <XCircle className="h-10 w-10 text-rose-500 mx-auto mb-3" />
+        <h3 className="text-sm font-bold text-slate-800">Berkas Tidak Ditemukan</h3>
+        <p className="text-xs text-slate-400 mt-2 mb-6 leading-relaxed">
+          Nomor registrasi berkas pengajuan tidak terdaftar di dalam sistem administrasi GEOSIPAS.
+        </p>
+        <Link to="/pengajuan/daftar" className="px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold transition-colors rounded-none">
+          Kembali ke Daftar
+        </Link>
+      </div>
+    );
+  }
+
+  // SLA and Pause variables
+  const isSlaPaused = sub.status === 'Ditolak' || sub.status === 'Draft';
+  const slaDaysRemaining = sub.remaining_sla_days ?? 0;
+
+  // ─── REVISI: INTERACTIVE SCORECARD UNTUK PEMOHON ───
+  const hasRevisionIssues = sub.kkprVerdict === 'Sesuai Bersyarat' || sub.status === 'Ditolak';
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-6 font-sans text-slate-700">
 
       {/* ─── SEKSI 1: HEADER SUMMARY BLOCK ─── */}
       <div className="flex items-center gap-4 select-none">
@@ -460,8 +698,6 @@ export default function SubmissionDetailPage() {
             Informasi administrasi, penelusuran riwayat evaluasi, dan lampiran berkas teknis {sub.submissionNo}.
           </p>
         </div>
-
-
 
         {/* ─── DYNAMIC SLA TRACKER HUD [Bogor 16] ─── */}
         <div className="shrink-0 select-none flex items-center gap-3">
@@ -489,35 +725,77 @@ export default function SubmissionDetailPage() {
         </div>
       </div>
 
-      {/* ─── AMARAN REVISI / PENOLAKAN UNTUK PEMOHON ─── */}
-      {sub.status === 'Ditolak' && (
-        <div className="bg-rose-50 border border-rose-200 p-5 text-left font-sans flex items-start gap-4 shadow-[3px_3px_0px_0px_rgba(239,68,68,0.08)]">
-          <div className="p-2 bg-rose-100 text-rose-700 shrink-0">
-            <AlertTriangle className="h-5 w-5" />
+      {/* ─── BARU: INTERACTIVE SCORECARD KEPATUHAN SPASIAL PEMOHON ─── */}
+      {effectiveRole === 'Pemohon' && hasRevisionIssues && (
+        <div className="bg-white border border-border p-6 shadow-md text-left space-y-5 animate-in slide-in-from-top-2 duration-300">
+          <div className="border-b border-border pb-3 flex justify-between items-center select-none">
+            <div className="space-y-1">
+              <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest leading-none block">Dinas Tata Ruang Verdict</span>
+              <h3 className="text-sm font-bold text-slate-900 uppercase">Laporan Kepatuhan Tata Ruang (KKPR Scorecard)</h3>
+            </div>
+            <span className={cn(
+              "px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-none leading-none border",
+              sub.kkprVerdict === 'Sesuai Bersyarat' ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-200"
+            )}>
+              {sub.kkprVerdict || 'Perlu Perbaikan'}
+            </span>
           </div>
-          <div className="flex-1 space-y-1">
-            <h4 className="text-xs font-black text-rose-950 uppercase tracking-wide">Permohonan Membutuhkan Revisi</h4>
-            <p className="text-xs text-rose-800 leading-relaxed">
-              Berkas pengajuan Anda telah ditolak/dikembalikan oleh petugas dengan catatan berikut:
-            </p>
-            {/* Tampilkan catatan penolakan terakhir dari history jika ada */}
-            {sub.history && sub.history.length > 0 && (
-              <div className="mt-2 p-3 bg-white border border-rose-100 text-xs text-slate-700 font-mono italic leading-relaxed">
-                "{sub.history.find((h: any) => h.status === 'Ditolak' || h.action === 'REJECT')?.notes || sub.history[0]?.notes || 'Tidak ada catatan khusus.'}"
+
+          <p className="text-xs text-slate-500 leading-relaxed text-justify">
+            Berdasarkan hasil peninjauan dan kalkulasi ulang manual tim teknis dinas, rencana tapak Anda dinilai <strong className="font-bold text-slate-800">{sub.kkprVerdict === 'Sesuai Bersyarat' ? 'Dapat Disetujui dengan Ketentuan Khusus' : 'Belum Memenuhi Syarat Kepatuhan'}</strong>. Silakan tinjau rincian poin evaluasi berikut:
+          </p>
+
+          <div className="border border-slate-100 divide-y divide-slate-100">
+            {sub.evaluationChecklist && sub.evaluationChecklist.length > 0 ? (
+              sub.evaluationChecklist.map((item: any) => {
+                const isCompliant = item.statusKelayakan === 'Sesuai';
+                const isConditional = item.statusKelayakan === 'Sesuai Bersyarat';
+                return (
+                  <div key={item.aspekCode} className="p-3.5 flex items-start justify-between gap-4">
+                    <div className="space-y-1 flex-1">
+                      <h4 className="text-xs font-bold text-slate-800">{item.aspekLabel}</h4>
+                      {item.catatanVerifikator && (
+                        <p className="text-xs text-slate-500 font-mono italic">"{item.catatanVerifikator}"</p>
+                      )}
+                      {item.attachmentUrl && (
+                        <a
+                          href={item.attachmentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block text-[10px] font-bold text-teal-600 hover:underline mt-1"
+                        >
+                          📥 Unduh Berkas Coretan Dinas
+                        </a>
+                      )}
+                    </div>
+                    <span className={cn(
+                      "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border leading-none rounded-none shrink-0",
+                      isCompliant ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        isConditional ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-200"
+                    )}>
+                      {item.statusKelayakan}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-4 text-center text-xs text-slate-400">
+                Pemeriksaan aspek spasial belum diselesaikan oleh tim teknis dinas.
               </div>
             )}
-            {effectiveRole === 'Pemohon' && (
-              <div className="pt-3">
-                <Link
-                  to={`/pengajuan/edit/${sub.id}`}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all uppercase tracking-wider rounded-none decoration-none"
-                >
-                  <FileSignature className="h-3.5 w-3.5" />
-                  Mulai Revisi & Ajukan Kembali
-                </Link>
-              </div>
-            )}
           </div>
+
+          {sub.status === 'Ditolak' && (
+            <div className="pt-3 border-t border-slate-100 text-right">
+              <Link
+                to={`/pengajuan/edit/${sub.id}`}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(220,38,38,0.15)] rounded-none decoration-none"
+              >
+                <FileSignature className="h-4 w-4" />
+                Buka Form Revisi & Perbaiki Sekarang
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
@@ -526,30 +804,6 @@ export default function SubmissionDetailPage() {
 
         {/* Kolom Kiri (2/3): Informasi Proyek & Berkas Laporan */}
         <div className="lg:col-span-2 space-y-6">
-
-          {/* Tab Selector */}
-          <div className="flex border-b border-border bg-white overflow-x-auto no-scrollbar select-none">
-            {[
-              { id: 'ringkasan', label: 'Ringkasan & Berkas' },
-              { id: 'pemohon', label: 'Pemohon & Konsultan' },
-              { id: 'lokasi', label: 'Lokasi & Tata Ruang' },
-              { id: 'teknis', label: 'Parameter Teknis' },
-              { id: 'kompensasi', label: 'Kompensasi & Mitigasi' }, // Tab Baru [Purworejo 8]
-              { id: 'foto', label: 'Dokumentasi Foto' },
-              { id: 'audit', label: 'Jejak Audit' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-5 py-3 font-bold text-xs border-b-2 transition-all duration-200 whitespace-nowrap cursor-pointer ${activeTab === tab.id
-                  ? 'border-primary text-primary bg-slate-50/60 font-extrabold'
-                  : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50/20'
-                  }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
 
           <div className="bg-white border border-border p-6 shadow-[1px_1px_4px_rgba(0,0,0,0.015)] rounded-none text-left min-h-[350px]">
             {activeTab === 'ringkasan' && (
@@ -1210,7 +1464,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending}
-                  onClick={() => handleAdminAction(false)}
+                  onClick={() => handleAdminActionLocal(false)}
                   className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all rounded-none cursor-pointer"
                 >
                   Tolak Berkas
@@ -1218,7 +1472,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending || !allAdminChecked}
-                  onClick={() => handleAdminAction(true)}
+                  onClick={() => handleAdminActionLocal(true)}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white text-xs font-bold transition-all rounded-none cursor-pointer"
                 >
                   {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -1297,7 +1551,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending}
-                  onClick={handleRevertToAdministrative}
+                  onClick={handleRevertToAdministrativeLocal}
                   title="Kembalikan ke Admin SIPAS untuk perbaikan dokumen (SLA tetap berjalan)"
                   className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1309,7 +1563,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending}
-                  onClick={() => handleTechAction(false)}
+                  onClick={() => handleTechActionLocal(false)}
                   className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all rounded-none cursor-pointer"
                 >
                   Kembalikan untuk Revisi
@@ -1317,7 +1571,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending || !allTechChecked}
-                  onClick={() => handleTechAction(true)}
+                  onClick={() => handleTechActionLocal(true)}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white text-xs font-bold transition-all rounded-none cursor-pointer"
                 >
                   {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -1404,13 +1658,13 @@ export default function SubmissionDetailPage() {
                     ref={canvasRef}
                     width={380}
                     height={150}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
+                    onMouseDown={startDrawingLocal}
+                    onMouseMove={drawLocal}
+                    onMouseUp={stopDrawingLocal}
+                    onMouseLeave={stopDrawingLocal}
+                    onTouchStart={startDrawingLocal}
+                    onTouchMove={drawLocal}
+                    onTouchEnd={stopDrawingLocal}
                     className="w-full h-[150px] cursor-crosshair touch-none bg-slate-50"
                   />
                   {!signature && (
@@ -1427,7 +1681,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending}
-                  onClick={handleRevertToTechnical}
+                  onClick={handleRevertToTechnicalLocal}
                   title="Kembalikan ke Tim Teknis untuk klarifikasi teknis (SLA tetap berjalan)"
                   className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1439,7 +1693,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending}
-                  onClick={() => handleKabidAction(false)}
+                  onClick={() => handleKabidActionLocal(false)}
                   className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all rounded-none cursor-pointer"
                 >
                   Tolak Pengesahan
@@ -1447,7 +1701,7 @@ export default function SubmissionDetailPage() {
                 <button
                   type="button"
                   disabled={mutation.isPending || !kabidAgreed}
-                  onClick={() => handleKabidAction(true)}
+                  onClick={() => handleKabidActionLocal(true)}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#415D43] hover:bg-[#415D43]/95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-[#415D43] text-white text-xs font-bold transition-all rounded-none cursor-pointer"
                 >
                   {mutation.isPending ? (
@@ -1458,48 +1712,6 @@ export default function SubmissionDetailPage() {
                   Tanda Tangan SK & Sahkan
                 </button>
               </div>
-            </div>
-          )}
-
-          {/* Tombol Unduh SK Jika Status Disetujui (Celah C) */}
-          {sub.status === 'Disetujui' && (
-            <div className="bg-[#e8f2ea]/30 border border-primary/20 p-5 rounded-none text-left flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-in slide-in-from-bottom-2 duration-500">
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
-                  <ShieldCheck className="h-4.5 w-4.5 text-primary" />
-                  Berkas Site Plan Telah Disahkan
-                </h4>
-                <p className="text-[10px] text-slate-400 mt-1">Surat Keputusan (SK) resmi dan salinan digital peta rencana tapak telah terbit.</p>
-                <div className="mt-3">
-                  {sub.signatureHash ? (
-                    <span className="font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 break-all text-[10px] block">
-                      <Fingerprint className="inline mr-1" size={12} /> {sub.signatureHash}
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 text-[10px]">Belum Ditandatangani Elektronik</span>
-                  )}
-                </div>
-                {sub.kabidSignature && (
-                  <div className="mt-3 select-none">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Tanda Tangan Fisik (Coretan Tangan):</span>
-                    <div className="border border-slate-200 bg-white p-2 w-[160px] h-[75px] flex items-center justify-center">
-                      <img src={sub.kabidSignature} alt="Tanda Tangan Kabid" className="max-w-full max-h-full object-contain" />
-                    </div>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => {
-                  if (sub.signedPdfUrl) {
-                    window.open(sub.signedPdfUrl, '_blank');
-                  } else {
-                    window.alert(`Mengunduh Surat Keputusan Pengesahan Site Plan (${sub.submissionNo}-SK.pdf)...`);
-                  }
-                }}
-                className="px-4 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs transition-colors rounded-none border-none cursor-pointer"
-              >
-                Unduh Surat Keputusan (SK) PDF
-              </button>
             </div>
           )}
 
@@ -1522,7 +1734,7 @@ export default function SubmissionDetailPage() {
           <div className="space-y-4">
             <h4 className="font-bold text-xs text-slate-400 uppercase tracking-wide">Riwayat Proses Pelacakan</h4>
 
-            <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-6 py-1">
+            <div className="relative border-l border-border/80 ml-3 pl-6 space-y-6 py-1">
               {sub.history.map((hist, i) => {
                 const isApproved = hist.status === 'Disetujui';
                 const isRejected = hist.status === 'Ditolak';
@@ -1530,7 +1742,7 @@ export default function SubmissionDetailPage() {
                 return (
                   <div key={i} className="relative">
                     {/* Circle timeline nodes (bulat sempurna terlindung di index.css) */}
-                    <div className={`absolute -left-[35px] top-0 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center text-white ${isApproved ? 'bg-emerald-600' : isRejected ? 'bg-rose-600' : 'bg-amber-500'
+                    <div className={`absolute -left-9 mt-0.5 rounded-full p-1 border-4 border-white text-white ${isApproved ? 'bg-emerald-600' : isRejected ? 'bg-rose-600' : 'bg-amber-500'
                       }`}>
                       {isApproved ? <CheckCircle2 className="h-3.5 w-3.5 text-white" /> :
                         isRejected ? <XCircle className="h-3.5 w-3.5 text-white" /> : <Clock className="h-3.5 w-3.5 text-white" />}

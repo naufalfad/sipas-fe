@@ -1,4 +1,20 @@
+/**
+ * ============================================================================
+ * GEOSIPAS SYSTEM SCHEMAS — [src/features/submission/schemas/submissionFormSchema.ts]
+ * ============================================================================
+ * Peran: Skema validasi formulir terpadu menggunakan Zod.
+ *        Diperbarui penuh untuk mendukung metrik usulan pemohon (proposed)
+ *        pada Tahap 6 serta tipe data string hasil Direct Upload dokumen/foto.
+ * ============================================================================
+ */
+
 import * as z from 'zod';
+
+// ─── PURE FABRICATION: HELPER PREPROSES DATA NUMERIK ────────────────────────
+const numericPreprocess = (val: unknown) => {
+  if (val === '' || val === null || val === undefined) return undefined;
+  return Number(val);
+};
 
 export const applicantSchema = z.object({
   type: z.enum(['PERORANGAN', 'BADAN_USAHA']),
@@ -54,12 +70,12 @@ export const spatialSchema = z.object({
 export const technicalSchema = z.object({
   // --- KATEGORI 1: PERUMAHAN ---
   lotCount: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Jumlah kaveling harus berupa angka positif').optional()
   ),
   housingType: z.enum(['SUBSIDI', 'NON_SUBSIDI', 'CAMPURAN']).optional(),
   cemeteryArea: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().min(0, 'Luas makam tidak boleh negatif').optional()
   ),
   roadRowMain: z.string().optional(),      // Lebar ROW Jalan Utama
@@ -68,38 +84,38 @@ export const technicalSchema = z.object({
 
   // --- KATEGORI 2: NON_PERUMAHAN ---
   buildingBlocks: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Jumlah blok harus positif').optional()
   ),
   kdb: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().min(0).max(100, 'KDB maksimal 100%').optional()
   ),
   klb: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('KLB harus berupa angka positif').optional()
   ),
   kdh: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().min(0).max(100, 'KDH maksimal 100%').optional()
   ),
   parkingCapacity: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Kapasitas parkir harus positif').optional()
   ),
   maxFloors: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Jumlah lantai harus positif').optional()
   ),
   totalFloorArea: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Total luas lantai harus positif').optional()
   ),
 
   // --- KATEGORI 3: FASUM ---
   facilityType: z.string().optional(),     // Jenis Layanan (Kesehatan, Pendidikan, dll)
   capacity: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Daya tampung harus positif').optional()
   ),
   disabledAccess: z.string().optional(),   // Deskripsi Aksesibilitas Difabel
@@ -108,25 +124,39 @@ export const technicalSchema = z.object({
 
   // --- KATEGORI 4: INDUSTRI ---
   warehouseCount: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Jumlah unit gudang harus positif').optional()
   ),
   roadLoadMst: z.string().optional(),      // Muatan Sumbu Terberat (MST - Ton)
   electricityPower: z.string().optional(), // Daya Listrik Terpasang
   ipalCapacity: z.string().optional(),     // Kapasitas IPAL/WWTP
   greenBufferArea: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().min(0, 'Luas penyangga hijau tidak boleh negatif').optional()
   ),
   tpsB3Provision: z.string().optional(),   // Deskripsi Penyediaan TPS B3
 
   // --- MOCK COMPATIBILITY ---
   unitArea: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    numericPreprocess,
     z.number().positive('Luas unit rata-rata minimal 1').optional()
   ),
   roadPlan: z.string().optional(),
   drainagePlan: z.string().optional(),
+
+  // ─── BARU (REVISI): METRIK USULAN PEMOHON (PROPOSED METRICS) ───
+  applicantBuildingArea: z.preprocess(
+    numericPreprocess,
+    z.number().positive('Luas bangunan harus berupa angka positif').optional()
+  ),
+  applicantGsb: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, 'GSB tidak boleh bernilai negatif').optional()
+  ),
+  applicantRthArea: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, 'Luas RTH tidak boleh bernilai negatif').optional()
+  )
 });
 
 export const consultantSchema = z.object({
@@ -135,19 +165,20 @@ export const consultantSchema = z.object({
   picName: z.string().min(3, 'Nama penanggung jawab wajib diisi'),
 });
 
+// ─── REVISI: DUKUNGAN TERHADAP FILE OBJECT MAUPUN STRING URL (INSTANT UPLOAD) ───
 export const documentSchema = z.object({
-  legalDoc: z.any().optional(),
-  technicalDoc: z.any().optional(),
-  supportDoc: z.any().optional(),
-  supportDoc2: z.any().optional(),
+  legalDoc: z.union([z.string().min(1, 'Dokumen wajib dilampirkan'), z.any()]).optional(),
+  technicalDoc: z.union([z.string().min(1, 'Dokumen wajib dilampirkan'), z.any()]).optional(),
+  supportDoc: z.union([z.string(), z.any()]).optional(),
+  supportDoc2: z.union([z.string(), z.any()]).optional(),
 });
 
 export const photoSchema = z.object({
-  photoNorth: z.any().optional(),
-  photoSouth: z.any().optional(),
-  photoEast: z.any().optional(),
-  photoWest: z.any().optional(),
-  photoAccess: z.any().optional(),
+  photoNorth: z.union([z.string(), z.any()]).optional(),
+  photoSouth: z.union([z.string(), z.any()]).optional(),
+  photoEast: z.union([z.string(), z.any()]).optional(),
+  photoWest: z.union([z.string(), z.any()]).optional(),
+  photoAccess: z.union([z.string(), z.any()]).optional(),
 });
 
 export const statementSchema = z.object({

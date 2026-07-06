@@ -1,4 +1,14 @@
-import type { Submission, SubmissionStatus } from '../types';
+/**
+ * ============================================================================
+ * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts]
+ * ============================================================================
+ * Peran: Menangani seluruh komunikasi HTTP REST API dengan server backend.
+ *        Diperbarui penuh untuk mendukung payload metrik usulan pemohon (proposed)
+ *        dan pengiriman hasil audit dinas beserta dynamic checklist (verified).
+ * ============================================================================
+ */
+
+import type { Submission, SubmissionStatus, EvaluationChecklistItem } from '../types';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1/submissions';
@@ -13,6 +23,9 @@ const getAuthHeaders = (extraHeaders?: Record<string, string>) => {
 };
 
 export const SubmissionService = {
+  /**
+   * Mengambil semua daftar permohonan aktif dari server backend.
+   */
   getAll: async (): Promise<Submission[]> => {
     const response = await fetch(API_BASE_URL, {
       headers: getAuthHeaders()
@@ -24,6 +37,9 @@ export const SubmissionService = {
     return await response.json();
   },
 
+  /**
+   * Mengambil satu data permohonan spesifik berdasarkan ID Permohonan.
+   */
   getById: async (id: string): Promise<Submission> => {
     const response = await fetch(`${API_BASE_URL}/${id}`, {
       headers: getAuthHeaders()
@@ -35,8 +51,10 @@ export const SubmissionService = {
     return await response.json();
   },
 
+  /**
+   * Membuat atau memperbarui draf/berkas pengajuan site plan (Proposed Metrics).
+   */
   create: async (data: FullSubmissionFormValues, isDraft = false): Promise<Submission> => {
-    // Generasikan id_permohonan client-side jika belum ada (misal draf baru)
     const id_permohonan = data.id_permohonan || `sub-${Date.now()}`;
     const payload = {
       id_permohonan,
@@ -64,6 +82,11 @@ export const SubmissionService = {
     }
   },
 
+  /**
+   * ─── REVISI: UPDATE STATUS & KIRIM HASIL AUDIT TEKNIS SPASIAL MANUAL ───
+   * Mengirimkan keputusan verifikasi, angka hitung ulang dinas (KDB/GSB),
+   * serta dynamic checklist ke API `/verify` di backend.
+   */
   updateStatus: async (
     id: string,
     status: SubmissionStatus,
@@ -71,19 +94,26 @@ export const SubmissionService = {
     notes: string,
     passphrase?: string,
     signatureBase64?: string,
-    // Opsional: override eksplisit action_type untuk jalur mundur internal.
-    // Jika tidak disediakan, akan disimpulkan dari parameter `status`:
-    //   status === 'Ditolak'  → 'REJECT'
-    //   status !== 'Ditolak'  → 'APPROVE'
-    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE'
+    // Override jenis keputusan pengembalian berkas internal
+    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE',
+
+    // Parameter Teknis Verifikasi Lapisan Dinas (Verified)
+    kkpr_verdict?: string,
+    verified_kdb?: number,
+    verified_klb?: number,
+    verified_kdh?: number,
+    verified_gsb?: number,
+    verified_rth_area?: number,
+    checklist_items?: EvaluationChecklistItem[]
   ): Promise<Submission | undefined> => {
-    // Parsing data aktor dan role untuk integrasi /verify
+
+    // 1. Ekstrak data aktor dan peran
     const nameMatch = actor.match(/^([^(]+)/);
     const roleMatch = actor.match(/\(([^)]+)\)/);
     const actor_name = nameMatch ? nameMatch[1].trim() : actor;
     const rawRole = roleMatch ? roleMatch[1].trim() : 'Pemohon';
 
-    // Map role FE → BE (sesuai enum UserModel.role di database)
+    // Map role FE ke model string enum di database backend
     let role = 'ADMIN';
     if (rawRole.toUpperCase().includes('KABID') || rawRole.toUpperCase().includes('BIDANG')) {
       role = 'KABID_PUPR';
@@ -93,33 +123,51 @@ export const SubmissionService = {
       role = 'PEMOHON';
     }
 
-    // Tentukan action_type: gunakan override eksplisit jika ada,
-    // jika tidak, simpulkan dari parameter status target.
+    // Tentukan action_type: utamakan override eksplisit (misal untuk revert internal)
     const action_type: string = actionTypeOverride ?? (status === 'Ditolak' ? 'REJECT' : 'APPROVE');
+
+    // 2. Transformasikan key checklist FE (camelCase) ke BE (snake_case)
+    const formattedChecklist = checklist_items?.map((item) => ({
+      aspek_code: item.aspekCode,
+      aspek_label: item.aspekLabel,
+      status_kelayakan: item.statusKelayakan,
+      catatan_verifikator: item.catatanVerifikator || null,
+      attachment_url: item.attachmentUrl || null
+    })) || [];
+
+    const payload = {
+      actor_name,
+      role,
+      nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
+      passphrase: passphrase || undefined,
+      signature_base64: signatureBase64 || undefined,
+      action_type,
+      notes,
+      is_spatially_compliant: true,
+
+      // Injeksi parameter komparasi teknis revisi
+      kkpr_verdict: kkpr_verdict || undefined,
+      verified_kdb: verified_kdb ?? undefined,
+      verified_klb: verified_klb ?? undefined,
+      verified_kdh: verified_kdh ?? undefined,
+      verified_gsb: verified_gsb ?? undefined,
+      verified_rth_area: verified_rth_area ?? undefined,
+      checklist_items: formattedChecklist.length > 0 ? formattedChecklist : undefined
+    };
 
     // ── FASE 1: Kirim keputusan verifikasi ke API Backend ──────────────────
     const verifyResponse = await fetch(`${API_BASE_URL}/${id}/verify`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({
-        actor_name,
-        role,
-        nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
-        passphrase: passphrase || undefined,
-        signature_base64: signatureBase64 || undefined,
-        action_type,
-        notes,
-        is_spatially_compliant: true
-      })
+      body: JSON.stringify(payload)
     });
 
-    // Jika API mengembalikan error (4xx/5xx), ekstrak pesan dan throw — jangan fallback ke mock
     if (!verifyResponse.ok) {
       let errMsg = `Gagal memverifikasi permohonan (HTTP ${verifyResponse.status})`;
       try {
         const errData = await verifyResponse.json();
         errMsg = errData.detail || errMsg;
-      } catch { /* biarkan pesan default jika response bukan JSON */ }
+      } catch { /* ignore */ }
       throw new Error(errMsg);
     }
 
@@ -136,7 +184,9 @@ export const SubmissionService = {
     return await refreshResponse.json();
   },
 
-
+  /**
+   * Mengambil seluruh detail geometri spasial internal kaveling, RTH, dan jalan.
+   */
   getGeometries: async (id_permohonan: string): Promise<{
     roadPolygons?: number[][][];
     rthPolygons?: number[][][];
@@ -155,5 +205,3 @@ export const SubmissionService = {
     }
   }
 };
-
-
