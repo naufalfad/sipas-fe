@@ -1,3 +1,12 @@
+/**
+ * ============================================================================
+ * GEOSIPAS SYSTEM CONTRACTS — [src/features/submission/types/index.ts]
+ * ============================================================================
+ * Peran: Kontrak tipe data (Single Source of Truth) untuk permohonan site plan.
+ *        Diperbarui penuh untuk mendukung perbandingan metrik tiga sisi,
+ *        dynamic checklist evaluasi dinas, dan metadata verifikasi KKPR.
+ * ============================================================================
+ */
 
 export type SubmissionStatus =
   | 'Draft'
@@ -8,6 +17,18 @@ export type SubmissionStatus =
   | 'Proses TTE'
   | 'Disetujui'
   | 'Ditolak';
+
+export type KKPRVerdict =
+  | 'Sesuai'
+  | 'Sesuai Bersyarat'
+  | 'Perlu Perbaikan / Revisi'
+  | 'Tidak Sesuai / Ditolak';
+
+export type ChecklistStatus =
+  | 'Sesuai'
+  | 'Sesuai Bersyarat'
+  | 'Tidak Sesuai'
+  | 'Pending';
 
 export interface StatusHistory {
   date: string;
@@ -102,6 +123,11 @@ export interface TechnicalDetails {
   unitArea?: number;
   roadPlan?: string;
   drainagePlan?: string;
+
+  // --- REVISI: METRIK PROPOSED DETAIL JALUR MANDIRI PEMOHON ---
+  applicantBuildingArea?: number; // Luas bangunan dalam satuan m2
+  applicantGsb?: number;          // GSB dalam satuan meter
+  applicantRthArea?: number;      // Luas RTH rencana dalam satuan m2
 }
 
 export interface ConsultantDetails {
@@ -133,6 +159,14 @@ export interface StatementDetails {
   agreed: boolean;
 }
 
+export interface EvaluationChecklistItem {
+  aspekCode: string;               // e.g., 'REQ_ZONING', 'REQ_LEGAL', 'REQ_KDB'
+  aspekLabel: string;              // e.g., "Kesesuaian dengan RTRW/RDTR"
+  statusKelayakan: ChecklistStatus; // 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai' | 'Pending'
+  catatanVerifikator?: string;     // Justifikasi penolakan atau instruksi bersyarat
+  attachmentUrl?: string;          // PDF coretan/bukti kalkulasi dinas dari AutoCAD
+}
+
 export interface Submission {
   id: string;
   submissionNo: string;
@@ -146,13 +180,15 @@ export interface Submission {
   signatureHash?: string;
   signedPdfUrl?: string;
   kabidSignature?: string;
-  // Penambahan parameter hasil hitung sistem (Slide 6)
+
+  // Penambahan parameter hasil hitung sistem lama (Baku Backwards-compatibility)
   kdbPercent?: number;
   klbValue?: number;
   kdhPercent?: number;
   rthArea?: number;
   psuArea?: number;
   roadArea?: number;
+
   documents: {
     id: string;
     name: string;
@@ -173,5 +209,31 @@ export interface Submission {
   consultant?: ConsultantDetails;
   photos?: PhotoDetails;
   statement?: StatementDetails;
-}
 
+  // ─── REVISI: PROPOSED METRICS (DEKLARASI MANDIRI PEMOHON) ───
+  applicantBuildingArea?: number; // Luas bangunan total (KDB m2)
+  applicantGsb?: number;          // GSB usulan (m)
+  applicantRthArea?: number;      // RTH usulan (m2)
+
+  // ─── REVISI: BYLAW METRICS (BATAS RDTR DINAMIS DARI SYSTEM) ───
+  bylawMaxKdb?: number;
+  bylawMaxKlb?: number;
+  bylawMinKdh?: number;
+  bylawMinGsb?: number;
+  bylawMinRthArea?: number;
+
+  // ─── REVISI: VERIFIED METRICS (HITUNG MANUAL OLEH VERIFIKATOR) ───
+  verifiedKdb?: number;
+  verifiedKlb?: number;
+  verifiedKdh?: number;
+  verifiedGsb?: number;
+  verifiedRthArea?: number;
+
+  // ─── REVISI: METADATA HASIL EVALUASI KKPR AKHIR ───
+  kkprVerdict?: KKPRVerdict;       // Sesuai | Sesuai Bersyarat | Perlu Perbaikan / Revisi | Tidak Sesuai / Ditolak
+  kkprVerifiedAt?: string;         // ISO 8601 Timestamp verifikasi
+  kkprVerifierName?: string;       // Nama lengkap verifikator
+
+  // ─── REVISI: DYNAMIC CHECKLIST EVALUASI MANDIRI DINAS ───
+  evaluationChecklist?: EvaluationChecklistItem[];
+}
