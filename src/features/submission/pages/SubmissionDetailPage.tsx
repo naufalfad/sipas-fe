@@ -159,7 +159,7 @@ export default function SubmissionDetailPage() {
       return SubmissionService.updateStatus(
         sub?.id || '',
         status,
-        `${userProfile?.name || activeRole}`,
+        `${userProfile?.name || 'Verifikator'} (${user?.role || activeRole})`,
         notes,
         passphrase,
         signatureBase64,
