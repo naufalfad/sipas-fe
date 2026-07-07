@@ -35,6 +35,19 @@ import { VERIFICATION_ASPECTS } from '../constants/verificationAspects';
 const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
 const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
 
+// ─── PURE FABRICATION: RESOLVER LABEL DOKUMEN BERSIH (Decoupled from Steps) ───
+const getDocCategoryLabel = (key?: string) => {
+  if (key === 'ktpDoc') return 'Scan KTP Pemohon / Penanggung Jawab';
+  if (key === 'nibDoc') return 'Scan NIB Perusahaan';
+  if (key === 'legalDoc') return 'Sertifikat Kepemilikan Lahan / Hak Atas Tanah';
+  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD / AMDAL';
+  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT';
+  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Lingkungan';
+  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf)';
+  return 'Dokumen Lampiran Pendukung';
+};
+
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Disetujui':
@@ -95,9 +108,7 @@ export default function SubmissionDetailPage() {
     kkpr: false
   });
 
-
   const [kabidAgreed, setKabidAgreed] = useState(false);
-
 
   // State dictionary untuk mumpung 13-aspek pemeriksaan dinas
   const [checklistStates, setChecklistStates] = useState<Record<string, {
@@ -183,8 +194,6 @@ export default function SubmissionDetailPage() {
     }
   });
 
-
-
   // Helper variables for role-based conditional rendering
   const isAdminActive = effectiveRole === 'Admin SIPAS';
   const isTechActive = effectiveRole === 'Tim Teknis';
@@ -204,7 +213,6 @@ export default function SubmissionDetailPage() {
       notes: notes.trim() || defaultNotes
     });
   };
-
 
   const handleKabidAction = (approved: boolean) => {
     const targetStatus = approved ? 'Disetujui' : 'Ditolak';
@@ -245,7 +253,6 @@ export default function SubmissionDetailPage() {
     });
   };
 
-
   const handleAdminActionLocal = (approved: boolean) => handleAdminAction(approved);
   const handleKabidActionLocal = (approved: boolean) => handleKabidAction(approved);
 
@@ -265,8 +272,6 @@ export default function SubmissionDetailPage() {
     });
     toast.info('GIS Engine memfokuskan kamera ke poligon lahan pengganti!');
   };
-
-
 
   if (isLoading) {
     return (
@@ -480,7 +485,7 @@ export default function SubmissionDetailPage() {
                 <span className="px-2 py-0.5 bg-secondary text-primary font-bold text-[9px] uppercase border border-border">ADMINISTRATOR</span>
               </div>
 
-              {/* Checklist */}
+              {/* Checklist Administrasi Dinamis (GRASP: Information Expert) */}
               <div className="space-y-2.5">
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -489,7 +494,12 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian Identitas Pemohon (KTP / NIB Direktur)</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {sub.applicant?.type === 'BADAN_USAHA'
+                      ? "Kesesuaian Nomor Induk Berusaha (NIB) Badan Usaha"
+                      : "Kesesuaian Kartu Tanda Penduduk (KTP) Pemohon"
+                    }
+                  </span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -507,7 +517,12 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian NPWP Wajib Pajak (Badan Usaha / Perorangan)</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {sub.applicant?.type === 'BADAN_USAHA'
+                      ? "Kesesuaian NPWP Wajib Pajak Badan Usaha"
+                      : "Kesesuaian NPWP Pribadi Pemohon"
+                    }
+                  </span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -565,7 +580,7 @@ export default function SubmissionDetailPage() {
                 </div>
                 <span className="px-2 py-0.5 bg-[#e8f2ea] text-primary font-bold text-[9px] uppercase border border-[#A1CCA5]">TIM TEKNIS</span>
               </div>
-              
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <p className="text-xs text-slate-600 max-w-xl">
                   Anda sedang bertindak sebagai Tim Teknis. Lembar verifikasi khusus telah disediakan pada halaman terpisah guna menjamin compliance pengawasan dokumen pemohon sebelum pengambilan keputusan.
@@ -581,7 +596,7 @@ export default function SubmissionDetailPage() {
             </div>
           )}
 
-          {/* Consent Compliance Modal */}
+          {/* Consent Compliance Modal (GRASP: Protected Variations) */}
           {isVerificationConsentOpen && (
             <div className="fixed inset-0 z-[999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white border-2 border-primary max-w-lg w-full p-6 space-y-5 text-left animate-in fade-in zoom-in-95 duration-200">
@@ -589,24 +604,30 @@ export default function SubmissionDetailPage() {
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Pernyataan Konfirmasi Verifikasi</h3>
                   <p className="text-[10px] text-slate-400 mt-1">SOP Audit Berkas & Keputusan Teknis Kabupaten Bogor [Buku 2]</p>
                 </div>
-                
+
                 <div className="space-y-3">
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Sebelum memulai pengisian lembar verifikasi teknis, Anda diwajibkan untuk mengunduh dan meninjau keabsahan berkas permohonan yang telah diunggah oleh pemohon:
                   </p>
-                  
+
                   <div className="space-y-2 max-h-[180px] overflow-y-auto border border-border p-2 bg-slate-50">
                     {sub.documents && sub.documents.length > 0 ? (
                       sub.documents.map((doc: any) => (
-                        <div key={doc.id} className="flex items-center justify-between p-2 bg-white border border-border/60 text-xs">
-                          <span className="font-semibold text-slate-700 truncate max-w-[200px]" title={doc.name}>
-                            {doc.name}
-                          </span>
+                        <div key={doc.id} className="flex items-center justify-between p-2.5 bg-white border border-border/60 text-xs">
+                          {/* Penyelarasan Kategori Nama Dokumen Asli Tanpa Indeks Langkah */}
+                          <div className="min-w-0 flex-1 pr-2 text-left">
+                            <span className="text-[8px] font-black uppercase tracking-wider text-teal-600 block mb-0.5">
+                              {getDocCategoryLabel(doc.key)}
+                            </span>
+                            <span className="font-semibold text-slate-700 truncate block" title={doc.name}>
+                              {doc.name}
+                            </span>
+                          </div>
                           <a
                             href={doc.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-[10px] text-primary font-bold hover:underline shrink-0"
+                            className="text-[10px] text-primary font-bold hover:underline shrink-0 block"
                           >
                             Unduh Berkas
                           </a>
@@ -616,7 +637,7 @@ export default function SubmissionDetailPage() {
                       <p className="text-[10px] text-slate-400">Tidak ada berkas dokumen yang terlampir.</p>
                     )}
                   </div>
-                  
+
                   <label className="flex items-start gap-2.5 cursor-pointer pt-2 select-none">
                     <input
                       type="checkbox"
@@ -629,7 +650,7 @@ export default function SubmissionDetailPage() {
                     </span>
                   </label>
                 </div>
-                
+
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
                   <button
                     type="button"
@@ -768,7 +789,7 @@ export default function SubmissionDetailPage() {
         {/* Kolom Kanan (1/3): Status & Riwayat Pelacakan */}
         <div className="bg-white border border-border p-5 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] space-y-6 rounded-none text-left">
 
-          {/* Status Terkini */}
+          {/* Status Terkini (GRASP: Information Expert) */}
           <div className="border-b border-border pb-5 select-none">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Status Berkas Saat Ini</span>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold mt-2.5 border ${getStatusBadgeClass(sub.status)}`}>

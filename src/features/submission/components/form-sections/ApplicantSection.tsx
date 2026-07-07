@@ -18,7 +18,7 @@ export const ApplicantSection = () => {
   const handleOCRUpload = async (file: File, type: 'KTP' | 'NIB') => {
     if (!file) return;
 
-    // Limit size to 20MB
+    // Batasan ukuran unggah maksimal 20MB secara ketat
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -62,23 +62,26 @@ export const ApplicantSection = () => {
       const parsedUrl = new URL(url, window.location.origin);
       const nameParam = parsedUrl.searchParams.get('name');
       if (nameParam) return decodeURIComponent(nameParam);
-    } catch (e) {}
+    } catch (e) { }
     const lastSegment = url.split('/').pop() || 'File terunggah';
     return lastSegment.split('?')[0];
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          1. Data Pemohon
+          Identitas Pemohon
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Lengkapi data identitas pemohon perseorangan atau badan usaha secara sah.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Lengkapi berkas identitas pemohon perorangan atau badan usaha secara sah untuk keperluan otentikasi berkas.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Box KTP */}
+        {/* Kotak Unggah KTP */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'KTP')}
@@ -120,13 +123,13 @@ export const ApplicantSection = () => {
                 }}
               />
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
-              <p className="text-xs font-bold text-slate-700">Upload KTP untuk Auto-Fill</p>
-              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas gambar KTP Anda di sini</p>
+              <p className="text-xs font-bold text-slate-700">Unggah KTP Pemohon (Auto-Fill)</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file atau klik untuk memilih</p>
             </>
           )}
         </div>
 
-        {/* Box NIB */}
+        {/* Kotak Unggah NIB */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'NIB')}
@@ -168,8 +171,8 @@ export const ApplicantSection = () => {
                 }}
               />
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
-              <p className="text-xs font-bold text-slate-700">Upload NIB untuk Auto-Fill</p>
-              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file NIB di sini</p>
+              <p className="text-xs font-bold text-slate-700">Unggah NIB Perusahaan (Auto-Fill)</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file atau klik untuk memilih</p>
             </>
           )}
         </div>

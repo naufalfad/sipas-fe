@@ -6,12 +6,15 @@ export const StatementSection = () => {
   const { register, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          10. Surat Pernyataan Tanggung Jawab Mutlak
+          Pernyataan Tanggung Jawab Mutlak
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Pernyataan komitmen keabsahan data dan kesediaan tunduk pada peraturan tata ruang daerah.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Pernyataan komitmen keabsahan data dan kepatuhan hukum terhadap rencana tata ruang daerah.
+        </p>
       </div>
 
       <div className="bg-[#e8f2ea]/40 p-6 border border-border text-left">

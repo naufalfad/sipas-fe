@@ -22,7 +22,7 @@ export const CoordinateSection = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 20MB
+    // Batasan ukuran berkas 20MB secara ketat
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -96,7 +96,7 @@ export const CoordinateSection = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 20MB
+    // Batasan ukuran berkas 20MB secara ketat
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -106,7 +106,7 @@ export const CoordinateSection = () => {
     if (file.name.endsWith('.dwg') || file.name.endsWith('.dxf')) {
       setValue('coordinate.cadFileName', file.name);
       setIsCadWizardOpen(true);
-      
+
       try {
         setSpatialLoading(true);
         const res = await uploadFileToBackend(file);
@@ -223,7 +223,6 @@ export const CoordinateSection = () => {
     if (cadInput) cadInput.value = '';
 
     setUploadedGeoJson(null);
-    setCadFileName('');
 
     setValue('coordinate.polygon', undefined);
     setValue('coordinate.coordinatesText', '');
@@ -240,20 +239,23 @@ export const CoordinateSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3 flex justify-between items-center">
         <div>
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
             <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-            4. Data Koordinat Batas Lahan
+            Koordinat Batas Lahan
           </h3>
-          <p className="text-[10px] text-slate-400 mt-1">Unggah file spasial BPN resmi atau gambar rencana CAD untuk menyelaraskan koordinat tapak.</p>
+          <p className="text-[10px] text-slate-400 mt-1">
+            Petakan batas bidang tanah menggunakan file spasial BPN atau selaraskan gambar rencana kerja CAD.
+          </p>
         </div>
         <button
           type="button"
           onClick={handleResetCoordinates}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 text-xs font-bold rounded-none transition-colors cursor-pointer outline-none"
         >
-          <RefreshCw className="h-3.5 w-3.5 animate-spin-hover" />
+          <RefreshCw className="h-3.5 w-3.5" />
           Reset Spasial / Ulangi
         </button>
       </div>
