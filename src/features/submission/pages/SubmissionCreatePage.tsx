@@ -140,6 +140,10 @@ export default function SubmissionCreatePage() {
           technicalDoc: existingSub.document?.technicalDoc || undefined,
           supportDoc: existingSub.document?.supportDoc || undefined,
           supportDoc2: existingSub.document?.supportDoc2 || undefined,
+          skaDoc: existingSub.document?.skaDoc || undefined,
+          cadDoc: existingSub.document?.cadDoc || undefined,
+          ktpDoc: existingSub.document?.ktpDoc || undefined,
+          nibDoc: existingSub.document?.nibDoc || undefined,
         },
         photo: {
           photoNorth: existingSub.photo?.photoNorth || undefined,

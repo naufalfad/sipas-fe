@@ -5,13 +5,17 @@ import { toast } from 'sonner';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { LabelWithInfo } from './LabelWithInfo';
 import { inputClass, labelClass } from './styles';
+import { uploadFileToBackend } from '../../utils/upload';
 
 export const ApplicantSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   const applicantType = watch('applicant.type');
   const [ocrLoading, setOcrLoading] = useState<'KTP' | 'NIB' | null>(null);
 
-  const handleOCRUpload = (file: File, type: 'KTP' | 'NIB') => {
+  const ktpDoc = watch('document.ktpDoc');
+  const nibDoc = watch('document.nibDoc');
+
+  const handleOCRUpload = async (file: File, type: 'KTP' | 'NIB') => {
     if (!file) return;
 
     // Limit size to 20MB
@@ -21,30 +25,46 @@ export const ApplicantSection = () => {
       return;
     }
 
-    setOcrLoading(type);
+    try {
+      setOcrLoading(type);
+      const res = await uploadFileToBackend(file);
+      const fileUrl = `${res.file_url}?name=${encodeURIComponent(file.name)}`;
 
-    setTimeout(() => {
       if (type === 'KTP') {
+        setValue('document.ktpDoc', fileUrl);
         setValue('applicant.name', 'Budi Santoso');
         setValue('applicant.nik', '3201020304050607');
         setValue('applicant.address', 'Jl. Raya Pajajaran No. 123, Bogor Tengah, Kota Bogor, Jawa Barat');
-        // Direct upload to legal doc as standard fallback
-        setValue('document.legalDoc', 'uploads/permohonan/mock_KTP_uploaded.pdf');
+        toast.success(`Berhasil mengunggah KTP: ${file.name}`);
       } else {
+        setValue('document.nibDoc', fileUrl);
         setValue('applicant.name', 'PT. Maju Bersama Jaya');
         setValue('applicant.nib', '9120304050607');
         setValue('applicant.address', 'Kawasan Industri Sentul Blok C2, Babakan Madang, Kabupaten Bogor, Jawa Barat');
-        // Direct upload to legal doc as standard fallback
-        setValue('document.legalDoc', 'uploads/permohonan/mock_NIB_uploaded.pdf');
+        toast.success(`Berhasil mengunggah NIB: ${file.name}`);
       }
+    } catch (err) {
+      toast.error('Gagal mengunggah berkas identitas pemohon ke server');
+    } finally {
       setOcrLoading(null);
-    }, 2000);
+    }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, type: 'KTP' | 'NIB') => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handleOCRUpload(file, type);
+  };
+
+  const getOriginalFileName = (url?: string) => {
+    if (!url) return '';
+    try {
+      const parsedUrl = new URL(url, window.location.origin);
+      const nameParam = parsedUrl.searchParams.get('name');
+      if (nameParam) return decodeURIComponent(nameParam);
+    } catch (e) {}
+    const lastSegment = url.split('/').pop() || 'File terunggah';
+    return lastSegment.split('?')[0];
   };
 
   return (
@@ -58,27 +78,47 @@ export const ApplicantSection = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Box KTP */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'KTP')}
           className="border border-dashed border-slate-300 bg-slate-50/50 hover:bg-slate-100/50 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
         >
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            className="absolute inset-0 opacity-0 cursor-pointer"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleOCRUpload(file, 'KTP');
-            }}
-          />
           {ocrLoading === 'KTP' ? (
             <div className="flex flex-col items-center space-y-2">
               <Loader2 className="h-6 w-6 text-primary animate-spin" />
-              <p className="text-[10px] font-bold text-primary">Mengekstrak data KTP (OCR)...</p>
+              <p className="text-[10px] font-bold text-primary">Mengunggah & Mengekstrak data KTP (OCR)...</p>
+            </div>
+          ) : ktpDoc ? (
+            <div className="flex flex-col items-center justify-center p-2.5 w-full h-full relative z-10">
+              <CheckCircle2 className="h-7 w-7 text-primary mb-1 shrink-0" />
+              <p className="text-[10px] font-bold text-primary uppercase tracking-wider">KTP Terunggah</p>
+              <span className="text-[9px] font-mono text-slate-500 truncate max-w-[200px] mt-0.5" title={getOriginalFileName(ktpDoc)}>
+                {getOriginalFileName(ktpDoc)}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setValue('document.ktpDoc', undefined);
+                }}
+                className="mt-2 text-[9px] font-bold text-rose-600 hover:text-rose-700 transition-colors border-none bg-transparent cursor-pointer"
+              >
+                Hapus Berkas
+              </button>
             </div>
           ) : (
             <>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleOCRUpload(file, 'KTP');
+                }}
+              />
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
               <p className="text-xs font-bold text-slate-700">Upload KTP untuk Auto-Fill</p>
               <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas gambar KTP Anda di sini</p>
@@ -86,27 +126,47 @@ export const ApplicantSection = () => {
           )}
         </div>
 
+        {/* Box NIB */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'NIB')}
           className="border border-dashed border-slate-300 bg-slate-50/50 hover:bg-slate-100/50 p-4 text-center cursor-pointer transition-all relative flex flex-col items-center justify-center min-h-[100px]"
         >
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            className="absolute inset-0 opacity-0 cursor-pointer"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleOCRUpload(file, 'NIB');
-            }}
-          />
           {ocrLoading === 'NIB' ? (
             <div className="flex flex-col items-center space-y-2">
               <Loader2 className="h-6 w-6 text-primary animate-spin" />
-              <p className="text-[10px] font-bold text-primary">Mengekstrak data NIB (OCR)...</p>
+              <p className="text-[10px] font-bold text-primary">Mengunggah & Mengekstrak data NIB (OCR)...</p>
+            </div>
+          ) : nibDoc ? (
+            <div className="flex flex-col items-center justify-center p-2.5 w-full h-full relative z-10">
+              <CheckCircle2 className="h-7 w-7 text-primary mb-1 shrink-0" />
+              <p className="text-[10px] font-bold text-primary uppercase tracking-wider">NIB Terunggah</p>
+              <span className="text-[9px] font-mono text-slate-500 truncate max-w-[200px] mt-0.5" title={getOriginalFileName(nibDoc)}>
+                {getOriginalFileName(nibDoc)}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setValue('document.nibDoc', undefined);
+                }}
+                className="mt-2 text-[9px] font-bold text-rose-600 hover:text-rose-700 transition-colors border-none bg-transparent cursor-pointer"
+              >
+                Hapus Berkas
+              </button>
             </div>
           ) : (
             <>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleOCRUpload(file, 'NIB');
+                }}
+              />
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
               <p className="text-xs font-bold text-slate-700">Upload NIB untuk Auto-Fill</p>
               <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file NIB di sini</p>

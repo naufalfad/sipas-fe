@@ -173,6 +173,8 @@ export const documentSchema = z.object({
   supportDoc2: z.union([z.string(), z.any()]).optional(),
   skaDoc: z.union([z.string(), z.any()]).optional(),
   cadDoc: z.union([z.string(), z.any()]).optional(),
+  ktpDoc: z.union([z.string(), z.any()]).optional(),
+  nibDoc: z.union([z.string(), z.any()]).optional(),
 });
 
 export const photoSchema = z.object({

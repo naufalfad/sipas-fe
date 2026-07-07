@@ -27,7 +27,19 @@ export const ApplicantTab = ({ sub }: ApplicantTabProps) => {
             <>
               <div>
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">NIB Perusahaan</span>
-                <span className="text-xs font-mono font-bold text-slate-700 block">{sub.applicant?.nib || '-'}</span>
+                <span className="text-xs font-mono font-bold text-slate-700 flex items-center gap-2">
+                  <span>{sub.applicant?.nib || '-'}</span>
+                  {sub.document?.nibDoc && (
+                    <a
+                      href={sub.document.nibDoc}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] font-bold text-primary hover:underline"
+                    >
+                      [Lihat Scan NIB]
+                    </a>
+                  )}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nama Direktur / Penanggung Jawab</span>
@@ -37,7 +49,19 @@ export const ApplicantTab = ({ sub }: ApplicantTabProps) => {
           ) : (
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nomor NIK Pemohon</span>
-              <span className="text-xs font-mono font-bold text-slate-700 block">{sub.applicant?.nik || '-'}</span>
+              <span className="text-xs font-mono font-bold text-slate-700 flex items-center gap-2">
+                <span>{sub.applicant?.nik || '-'}</span>
+                {sub.document?.ktpDoc && (
+                  <a
+                    href={sub.document.ktpDoc}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] font-bold text-primary hover:underline"
+                  >
+                    [Lihat Scan KTP]
+                  </a>
+                )}
+              </span>
             </div>
           )}
           <div>

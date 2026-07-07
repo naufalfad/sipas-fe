@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom';
 import { File, MapPin } from 'lucide-react';
 
 const getDocCategoryLabel = (key?: string) => {
-  if (key === 'legalDoc') return 'Sertifikat Tanah & KTP (Langkah 3)';
+  if (key === 'ktpDoc') return 'Scan KTP Pemohon (Langkah 1)';
+  if (key === 'nibDoc') return 'Scan NIB Perusahaan (Langkah 1)';
+  if (key === 'legalDoc') return 'Sertifikat Kepemilikan Lahan / Hak Atas Tanah (Langkah 3)';
   if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD (Langkah 6)';
   if (key === 'supportDoc') return 'SK KKPR Awal / IPPT (Langkah 5)';
   if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)';
