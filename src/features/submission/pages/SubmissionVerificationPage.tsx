@@ -308,126 +308,125 @@ export default function SubmissionVerificationPage() {
         </div>
       </div>
 
+      {/* Section: Sandingan Metrik Tapak - Full Width */}
+      <div className="space-y-4">
+        <div className="border-b border-slate-300 pb-2">
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
+          <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
+        </div>
+
+        <div className="w-full border border-slate-300 bg-white rounded-none">
+          <table className="w-full text-xs font-sans text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
+                <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
+                <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
+                <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                  {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
+                  {sub.landArea && sub.technical?.applicantBuildingArea ? (
+                    <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
+                  ) : ''}
+                </td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={verifiedKdb}
+                      onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="KDB"
+                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.klb || '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={verifiedKlb}
+                    onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="KLB"
+                    className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={verifiedKdh}
+                      onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="KDH"
+                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={verifiedGsb}
+                      onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="GSB"
+                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      value={verifiedRthArea}
+                      onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="RTH"
+                      className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        {/* KOLOM KIRI: METRIK perbandingan, FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
+        {/* KOLOM KIRI: FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
         <div className="lg:col-span-5 space-y-8">
-
-          {/* Section: Sandingan Metrik Tapak */}
-          <div className="space-y-4">
-            <div className="border-b border-slate-300 pb-2">
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
-              <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
-            </div>
-
-            {/* Container tabel dengan overflow-x-auto agar tidak terpotong di mobile */}
-            <div className="w-full overflow-x-auto border border-slate-300 bg-white rounded-none">
-              <table className="w-full min-w-[500px] text-xs font-sans text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
-                    <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
-                    <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
-                    <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
-                      {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
-                      {sub.landArea && sub.technical?.applicantBuildingArea ? (
-                        <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
-                      ) : ''}
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={verifiedKdb}
-                          onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="KDB"
-                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.klb || '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={verifiedKlb}
-                        onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
-                        placeholder="KLB"
-                        className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={verifiedKdh}
-                          onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="KDH"
-                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={verifiedGsb}
-                          onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="GSB"
-                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          value={verifiedRthArea}
-                          onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="RTH"
-                          className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
 
           {/* Section: Keputusan Akhir */}
           <div className="space-y-4 pt-4 border-t border-slate-300">
