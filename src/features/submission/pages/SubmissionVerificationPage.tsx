@@ -8,7 +8,7 @@ import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, Loader2, UploadCloud,
   FileSignature, AlertTriangle, ShieldCheck,
-  ChevronDown
+  ChevronDown, Check, X, Trash2, Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -25,8 +25,8 @@ const getDocCategoryLabel = (key?: string) => {
   return 'Dokumen Lampiran Pendukung';
 };
 
-const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
-const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
+const inputClass = "w-full px-3 py-2 bg-white border border-slate-300 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-800 transition-all font-sans text-xs rounded-none";
+const labelClass = "block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider";
 
 export default function SubmissionVerificationPage() {
   const { id } = useParams<{ id: string }>();
@@ -60,7 +60,6 @@ export default function SubmissionVerificationPage() {
     enabled: !!id,
   });
 
-  // Pre-populate verifier inputs
   useEffect(() => {
     if (sub) {
       if (sub.kkprVerdict) setKkprVerdict(sub.kkprVerdict);
@@ -93,7 +92,6 @@ export default function SubmissionVerificationPage() {
     }
   }, [sub]);
 
-  // Derived evaluation values mapping
   const checklistStatesMapped = useMemo(() => {
     const output: Record<string, {
       aspekLabel: string;
@@ -241,35 +239,34 @@ export default function SubmissionVerificationPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center gap-2">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="text-slate-500 font-medium">Memuat Formulir Verifikasi Teknis...</span>
+      <div className="min-h-[400px] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
+        <span className="text-slate-500 font-medium text-xs tracking-wider uppercase">Memuat Formulir Verifikasi Teknis...</span>
       </div>
     );
   }
 
   if (!sub) {
     return (
-      <div className="p-8 text-center bg-white border border-border space-y-4 max-w-md mx-auto mt-10 text-left">
-        <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto" />
-        <h4 className="font-bold text-slate-800 text-center">Permohonan Tidak Ditemukan</h4>
-        <p className="text-xs text-slate-500 text-center">Berkas pendaftaran dengan ID yang dicari tidak terdaftar dalam pangkalan data.</p>
-        <Link to="/pengajuan" className="block text-center text-xs font-bold text-primary hover:underline">
+      <div className="p-8 text-left bg-white border border-slate-300 max-w-md mx-auto mt-12 rounded-none space-y-4">
+        <AlertTriangle className="h-8 w-8 text-rose-600" />
+        <h4 className="font-bold text-slate-900 uppercase tracking-wide">Permohonan Tidak Ditemukan</h4>
+        <p className="text-xs text-slate-500 leading-relaxed">Berkas pendaftaran dengan ID yang dicari tidak terdaftar dalam pangkalan data.</p>
+        <Link to="/pengajuan" className="inline-block text-xs font-bold text-slate-900 underline hover:text-slate-700">
           Kembali ke Daftar Antrean
         </Link>
       </div>
     );
   }
 
-  // Double check authorization
   const isVerifier = effectiveRole === 'Tim Teknis' || effectiveRole === 'Kepala Bidang' || effectiveRole === 'Super Admin';
   if (!isVerifier || sub.status !== 'Verifikasi Teknis') {
     return (
-      <div className="p-8 text-center bg-white border border-border space-y-4 max-w-md mx-auto mt-10 text-left">
-        <ShieldCheck className="h-10 w-10 text-amber-500 mx-auto" />
-        <h4 className="font-bold text-slate-800 text-center">Akses Terbatas</h4>
-        <p className="text-xs text-slate-500 text-center">Halaman verifikasi teknis hanya dapat diakses oleh pejabat berwenang ketika berkas berada pada tahapan Verifikasi Teknis.</p>
-        <button onClick={() => navigate(`/pengajuan/detail/${sub.id}`)} className="w-full text-center text-xs font-bold text-primary hover:underline bg-transparent border-none outline-none">
+      <div className="p-8 text-left bg-white border border-slate-300 max-w-md mx-auto mt-12 rounded-none space-y-4">
+        <ShieldCheck className="h-8 w-8 text-amber-600" />
+        <h4 className="font-bold text-slate-900 uppercase tracking-wide">Akses Terbatas</h4>
+        <p className="text-xs text-slate-500 leading-relaxed">Halaman verifikasi teknis hanya dapat diakses oleh pejabat berwenang ketika berkas berada pada tahapan Verifikasi Teknis.</p>
+        <button onClick={() => navigate(`/pengajuan/detail/${sub.id}`)} className="text-xs font-bold text-slate-900 underline hover:text-slate-700 bg-transparent border-none cursor-pointer p-0">
           Kembali ke Detail Permohonan
         </button>
       </div>
@@ -277,66 +274,227 @@ export default function SubmissionVerificationPage() {
   }
 
   return (
-    <div className="space-y-6 font-sans text-left">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <button
-            onClick={() => navigate(`/pengajuan/detail/${sub.id}`)}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors mb-2 font-bold bg-transparent border-none outline-none cursor-pointer"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Kembali ke Detail Permohonan
-          </button>
-          <h1 className="text-2xl font-bold text-[#111D13] leading-none flex items-center gap-2.5">
-            <FileSignature className="h-6 w-6 text-primary" />
-            Lembar Verifikasi Teknis & Spasial
-          </h1>
-          <p className="text-xs text-slate-500 mt-2">
-            No. Permohonan: <span className="font-mono font-bold text-slate-700">{sub.submissionNo}</span> • Pemohon: <span className="font-bold text-slate-700">{sub.developerName}</span>
-          </p>
+    <div className="space-y-8 font-sans text-left max-w-[1600px] mx-auto px-4 py-6">
+      {/* Navigation & Header */}
+      <div className="border-b border-slate-300 pb-6 space-y-4">
+        <button
+          onClick={() => navigate(`/pengajuan/detail/${sub.id}`)}
+          className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors bg-transparent border-none cursor-pointer uppercase tracking-wider p-0"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Kembali ke Detail Permohonan
+        </button>
+
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3 rounded-none">
+              <FileSignature className="h-6 w-6 text-slate-800 shrink-0" />
+              LEMBAR VERIFIKASI TEKNIS & SPASIAL
+            </h1>
+            <p className="text-xs text-slate-500">
+              No. Permohonan: <span className="font-mono font-bold text-slate-800">{sub.submissionNo}</span> • Pemohon: <span className="font-bold text-slate-800 uppercase">{sub.developerName}</span>
+            </p>
+          </div>
+          <div className="border border-slate-800 px-3 py-1.5 text-xs font-bold bg-slate-900 text-white tracking-widest uppercase rounded-none self-start">
+            TAHAPAN: {sub.status}
+          </div>
         </div>
-        <span className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shrink-0 self-start md:self-center">
-          TAHAPAN: {sub.status.toUpperCase()}
-        </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Kolom Informasi & Dokumen Pendaftaran (Lebar 1/3) */}
-        <div className="space-y-6 lg:col-span-1">
-          {/* Card Ringkasan Permohonan */}
-          <div className="bg-white border border-border p-4 space-y-3">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Detail Pendaftaran</h3>
-            <div className="grid grid-cols-2 gap-y-2 text-xs">
-              <span className="text-slate-400">Rencana Tapak:</span>
-              <span className="font-bold text-slate-800 text-right truncate">{sub.housingName}</span>
-              <span className="text-slate-400">Luas Lahan:</span>
-              <span className="font-mono text-slate-800 text-right">{sub.landArea?.toLocaleString('id-ID')} m²</span>
-              <span className="text-slate-400">Jenis Kegiatan:</span>
-              <span className="font-bold text-primary text-right">{sub.submissionDetails?.category || '-'}</span>
-              <span className="text-slate-400">Lokasi:</span>
-              <span className="text-slate-600 text-right truncate" title={sub.locationDetails?.fullAddress}>
-                {sub.locationDetails?.village || '-'}, {sub.locationDetails?.district || '-'}
-              </span>
+      {/* Main Layout Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        {/* KOLOM KIRI: METRIK perbandingan, FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
+        <div className="lg:col-span-5 space-y-8">
+
+          {/* Section: Sandingan Metrik Tapak */}
+          <div className="space-y-4">
+            <div className="border-b border-slate-300 pb-2">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
+            </div>
+
+            {/* Container tabel dengan overflow-x-auto agar tidak terpotong di mobile */}
+            <div className="w-full overflow-x-auto border border-slate-300 bg-white rounded-none">
+              <table className="w-full min-w-[500px] text-xs font-sans text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
+                    <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
+                    <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
+                    <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                      {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
+                      {sub.landArea && sub.technical?.applicantBuildingArea ? (
+                        <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
+                      ) : ''}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={verifiedKdb}
+                          onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="KDB"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.klb || '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={verifiedKlb}
+                        onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="KLB"
+                        className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={verifiedKdh}
+                          onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="KDH"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={verifiedGsb}
+                          onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="GSB"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          value={verifiedRthArea}
+                          onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="RTH"
+                          className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* List Dokumen Terunggah untuk Download */}
-          <div className="bg-white border border-border p-4 space-y-4">
-            <div>
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Berkas Unggahan Pemohon</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">Daftar file administrasi & gambar CAD asli pemohon.</p>
+          {/* Section: Keputusan Akhir */}
+          <div className="space-y-4 pt-4 border-t border-slate-300">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Keputusan Akhir Verifikasi</h2>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className={labelClass}>Kesimpulan Akhir KKPR</label>
+                <select
+                  value={kkprVerdict}
+                  onChange={(e) => setKkprVerdict(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 focus:border-slate-800 text-xs font-semibold text-slate-800 rounded-none outline-none"
+                >
+                  <option value="Sesuai">Sesuai (Dapat Disetujui)</option>
+                  <option value="Sesuai Bersyarat">Sesuai Bersyarat (Ketentuan Khusus)</option>
+                  <option value="Perlu Perbaikan / Revisi">Perlu Perbaikan / Revisi</option>
+                  <option value="Tidak Sesuai / Ditolak">Tidak Sesuai / Ditolak</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={labelClass}>Catatan Penilaian Global / Justifikasi</label>
+                <textarea
+                  rows={5}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Tuliskan alasan teknis secara komprehensif..."
+                  className="w-full px-3 py-2 bg-white border border-slate-300 focus:border-slate-800 text-xs rounded-none outline-none transition-all text-slate-800"
+                />
+              </div>
             </div>
-            
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+          </div>
+
+          {/* Section: Ringkasan Pengajuan */}
+          <div className="space-y-4 pt-4 border-t border-slate-300">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Detail Pendaftaran</h2>
+            <div className="divide-y divide-slate-200 text-xs">
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-slate-500">Nama Perumahan</span>
+                <span className="font-bold text-slate-800 text-right">{sub.housingName}</span>
+              </div>
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-slate-500">Luas Lahan</span>
+                <span className="font-mono font-bold text-slate-800 text-right">{sub.landArea?.toLocaleString('id-ID')} m²</span>
+              </div>
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-slate-500">Jenis Kegiatan</span>
+                <span className="font-bold text-slate-800 text-right uppercase text-[11px]">{sub.submissionDetails?.category || '-'}</span>
+              </div>
+              <div className="py-2.5 flex justify-between gap-4">
+                <span className="text-slate-500">Lokasi Tapak</span>
+                <span className="text-slate-700 text-right font-medium" title={sub.locationDetails?.fullAddress}>
+                  {sub.locationDetails?.village || '-'}, {sub.locationDetails?.district || '-'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Berkas Unggahan Pemohon */}
+          <div className="space-y-4 pt-4 border-t border-slate-300">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Berkas Unggahan Pemohon</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">Daftar file administrasi dan gambar CAD yang diunggah pemohon.</p>
+            </div>
+
+            <div className="divide-y divide-slate-200 border border-slate-300 max-h-[250px] overflow-y-auto bg-white rounded-none">
               {sub.documents && sub.documents.length > 0 ? (
                 sub.documents.map((doc: any) => (
-                  <div key={doc.id} className="p-3 bg-slate-50 border border-border hover:bg-slate-100/50 transition-colors flex flex-col space-y-2 text-left">
-                    <div>
-                      <span className="text-[8px] font-black uppercase tracking-wider text-teal-600 block leading-none mb-1">
+                  <div key={doc.id} className="p-3.5 flex items-start justify-between gap-4 hover:bg-slate-50 transition-colors">
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-[8px] font-bold uppercase tracking-wider text-slate-500 block">
                         {getDocCategoryLabel(doc.key)}
                       </span>
-                      <h5 className="font-bold text-xs text-slate-800 truncate" title={doc.name}>
+                      <h5 className="font-bold text-xs text-slate-900 truncate" title={doc.name}>
                         {doc.name}
                       </h5>
                     </div>
@@ -344,323 +502,176 @@ export default function SubmissionVerificationPage() {
                       href={doc.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-white border border-border hover:bg-slate-50 text-[10px] font-bold text-slate-700 transition-all rounded-none cursor-pointer self-start"
+                      className="px-2.5 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors rounded-none cursor-pointer shrink-0"
                     >
-                      📥 Unduh Berkas
+                      Unduh
                     </a>
                   </div>
                 ))
               ) : (
-                <div className="text-center p-4 border border-dashed border-slate-200">
-                  <p className="text-xs text-slate-400">Tidak ada berkas terlampir.</p>
+                <div className="text-center p-6 bg-slate-50">
+                  <p className="text-xs text-slate-400 font-medium">Tidak ada berkas terlampir.</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Kolom Verifikasi Cockpit (Lebar 2/3) */}
-        <div className="lg:col-span-2 bg-white border border-primary p-5 shadow-[1px_1px_5px_rgba(0,0,0,0.02)] space-y-5 rounded-none text-left">
-          <div className="border-b border-border pb-3 flex items-center justify-between">
+        {/* KOLOM KANAN: CHECKLIST EVALUASI 13 ASPEK (col-span-7) */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="border-b border-slate-300 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Lembar Evaluasi Tim Teknis</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">Sandi metrik intensitas fisik dan nyalakan switch checklist evaluasi spasial.</p>
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Checklist Evaluasi 13 Aspek</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">Lakukan evaluasi kelayakan spasial secara mendetail per parameter.</p>
             </div>
-            <span className="px-2 py-0.5 bg-[#e8f2ea] text-primary font-bold text-[9px] uppercase border border-[#A1CCA5]">VERIFIER</span>
+            <div className="px-3 py-1 bg-slate-100 border border-slate-400 text-slate-800 font-mono text-[10px] font-bold rounded-none uppercase">
+              {Object.values(checklistStates).filter(v => v.status === 'Sesuai').length} / 13 Sesuai
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-            
-            {/* Kolom Kiri Cockpit: Sandingan Metrik & Verdict */}
-            <div className="xl:col-span-5 space-y-5">
-              {/* Sandingan Metrik Tiga Sisi (Comparison Ledger) */}
-              <div className="space-y-2 text-left">
-                <h4 className="text-[10px] font-black text-primary uppercase tracking-wider block mb-1">
-                  Sandingan Metrik Tiga Sisi (Comparison Ledger)
-                </h4>
-                <div className="overflow-x-auto border border-border">
-                  <table className="min-w-full divide-y divide-border text-[11px] font-sans">
-                    <thead className="bg-slate-50 font-bold text-slate-500 text-left">
-                      <tr>
-                        <th className="px-3 py-2 border-r border-border">Parameter</th>
-                        <th className="px-3 py-2 border-r border-border">Proposed</th>
-                        <th className="px-3 py-2 border-r border-border">Bylaws</th>
-                        <th className="px-3 py-2">Verified (Dinas)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border bg-white text-slate-700">
-                      <tr>
-                        <td className="px-3 py-2 border-r border-border font-semibold">KDB</td>
-                        <td className="px-3 py-2 border-r border-border font-mono">
-                          {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
-                          {sub.landArea && sub.technical?.applicantBuildingArea ? ` (${((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)` : ''}
-                        </td>
-                        <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKdb || 60}%</td>
-                        <td className="px-3 py-1">
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={verifiedKdb}
-                              onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
-                              placeholder="KDB..."
-                              className="w-16 px-1.5 py-0.5 bg-white border border-border focus:outline-none focus:border-primary text-xs font-mono"
-                            />
-                            <span className="text-slate-400">%</span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-3 py-2 border-r border-border font-semibold">KLB</td>
-                        <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.klb || '-'}</td>
-                        <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKlb || 3.5}</td>
-                        <td className="px-3 py-1">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={verifiedKlb}
-                            onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
-                            placeholder="KLB..."
-                            className="w-16 px-1.5 py-0.5 bg-white border border-border focus:outline-none focus:border-primary text-xs font-mono"
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-3 py-2 border-r border-border font-semibold">KDH</td>
-                        <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
-                        <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinKdh || 10}%</td>
-                        <td className="px-3 py-1">
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={verifiedKdh}
-                              onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
-                              placeholder="KDH..."
-                              className="w-16 px-1.5 py-0.5 bg-white border border-border focus:outline-none focus:border-primary text-xs font-mono"
-                            />
-                            <span className="text-slate-400">%</span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-3 py-2 border-r border-border font-semibold">GSB</td>
-                        <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
-                        <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinGsb || 5} m</td>
-                        <td className="px-3 py-1">
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={verifiedGsb}
-                              onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
-                              placeholder="GSB..."
-                              className="w-16 px-1.5 py-0.5 bg-white border border-border focus:outline-none focus:border-primary text-xs font-mono"
-                            />
-                            <span className="text-slate-400">m</span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-3 py-2 border-r border-border font-semibold">RTH</td>
-                        <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
-                        <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinRthArea || 1400} m²</td>
-                        <td className="px-3 py-1">
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              value={verifiedRthArea}
-                              onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
-                              placeholder="RTH..."
-                              className="w-16 px-1.5 py-0.5 bg-white border border-border focus:outline-none focus:border-primary text-xs font-mono"
-                            />
-                            <span className="text-slate-400">m²</span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+          <div className="divide-y divide-slate-300 border-b border-slate-300">
+            {VERIFICATION_ASPECTS.map((aspect) => {
+              const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
+              const isExpanded = expandedAspect === aspect.code;
+              const isSesuai = state.status === 'Sesuai';
 
-              {/* Decision Verdict (Kesimpulan Akhir KKPR) */}
-              <div className="space-y-4 text-left border-t border-border pt-4">
-                <h4 className="text-[10px] font-black text-primary uppercase tracking-wider block mb-1">
-                  Keputusan Akhir Verifikasi
-                </h4>
-                <div className="space-y-1.5">
-                  <label className={labelClass}>Kesimpulan Akhir KKPR</label>
-                  <select
-                    value={kkprVerdict}
-                    onChange={(e) => setKkprVerdict(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="Sesuai">Sesuai (Dapat Disetujui)</option>
-                    <option value="Sesuai Bersyarat">Sesuai Bersyarat (Ketentuan Khusus)</option>
-                    <option value="Perlu Perbaikan / Revisi">Perlu Perbaikan / Revisi</option>
-                    <option value="Tidak Sesuai / Ditolak">Tidak Sesuai / Ditolak</option>
-                  </select>
-                </div>
-                
-                <div className="space-y-1.5">
-                  <label className={labelClass}>Catatan Penilaian Global / Justifikasi</label>
-                  <textarea
-                    rows={4}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Tuliskan justifikasi detail persetujuan..."
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
+              return (
+                <div key={aspect.code} className="py-4 first:pt-0 last:pb-0">
+                  {/* Row Header */}
+                  <div className="flex items-start justify-between gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedAspect(isExpanded ? null : aspect.code)}
+                      className="flex-1 text-left bg-transparent border-none outline-none cursor-pointer group p-0 min-w-0"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block font-mono">
+                          KODE: {aspect.code}
+                        </span>
+                        <h5 className="font-bold text-xs text-slate-900 group-hover:text-slate-600 transition-colors leading-tight">
+                          {aspect.label}
+                        </h5>
+                      </div>
+                    </button>
 
-            {/* Kolom Kanan Cockpit: Checklist 13 Aspek */}
-            <div className="xl:col-span-7 space-y-3">
-              <h4 className="text-[10px] font-black text-primary uppercase tracking-wider block mb-1">
-                Checklist Evaluasi 13 Aspek Teknis & Spasial
-              </h4>
-              <div className="border border-border divide-y divide-border bg-white max-h-[450px] overflow-y-auto">
-                {VERIFICATION_ASPECTS.map((aspect) => {
-                  const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
-                  const isExpanded = expandedAspect === aspect.code;
-                  const isSesuai = state.status === 'Sesuai';
-                  
-                  return (
-                    <div key={aspect.code} className="transition-all duration-200">
-                      {/* Accordion Header */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {/* Segmented Flat Control (Instead of Rounded Switch Toggle) */}
+                      <div className="flex border border-slate-300 rounded-none overflow-hidden text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAspect(aspect.code, 'Sesuai')}
+                          className={cn(
+                            "px-2.5 py-1 font-bold uppercase tracking-wider transition-all border-none cursor-pointer rounded-none",
+                            isSesuai
+                              ? "bg-slate-900 text-white"
+                              : "bg-white text-slate-400 hover:bg-slate-50"
+                          )}
+                        >
+                          Sesuai
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAspect(aspect.code, 'Tidak Sesuai')}
+                          className={cn(
+                            "px-2.5 py-1 font-bold uppercase tracking-wider transition-all border-none cursor-pointer rounded-none",
+                            !isSesuai
+                              ? "bg-rose-700 text-white"
+                              : "bg-white text-slate-400 hover:bg-slate-50"
+                          )}
+                        >
+                          Tidak
+                        </button>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => setExpandedAspect(isExpanded ? null : aspect.code)}
-                        className={cn(
-                          "w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors text-left border-none outline-none cursor-pointer",
-                          isExpanded ? "bg-slate-50/80" : "bg-white"
-                        )}
+                        className="p-1 text-slate-400 hover:text-slate-700 transition-colors bg-transparent border-none cursor-pointer rounded-none"
                       >
-                        <div className="min-w-0 flex-1 pr-4">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none mb-1">
-                            KODE: {aspect.code}
-                          </span>
-                          <h5 className="font-bold text-xs text-slate-800 leading-tight truncate">{aspect.label}</h5>
-                        </div>
-                        
-                        <div className="flex items-center space-x-3 shrink-0">
-                          {/* Short Status Badge on Header */}
-                          <span className={cn(
-                            "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border leading-none rounded-none shrink-0",
-                            isSesuai
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-rose-50 text-rose-700 border-rose-200"
-                          )}>
-                            {isSesuai ? 'Sesuai' : 'Tidak Sesuai'}
-                          </span>
-                          <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform duration-200", isExpanded && "rotate-180")} />
-                        </div>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-180")} />
                       </button>
+                    </div>
+                  </div>
 
-                      {/* Accordion Content */}
-                      {isExpanded && (
-                        <div className="p-3 bg-slate-50/30 border-t border-border space-y-3 animate-in fade-in duration-200">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <p className="text-[10px] text-slate-500 leading-relaxed flex-1">{aspect.helpText}</p>
-                            
-                            {/* 2-way Toggle Switch */}
-                            <div className="flex items-center space-x-2 shrink-0 self-start sm:self-center">
-                              <span className={cn(
-                                "text-[9px] font-bold uppercase tracking-wider",
-                                isSesuai ? "text-emerald-700" : "text-rose-600"
-                              )}>
-                                {isSesuai ? 'Sesuai' : 'Tidak Sesuai'}
-                              </span>
+                  {/* Row Body Content (Accordion) */}
+                  {isExpanded && (
+                    <div className="mt-3.5 pt-3.5 border-t border-dashed border-slate-200 space-y-4 animate-in fade-in duration-200 pl-2">
+
+                      {/* Help Text */}
+                      <div className="text-[10px] text-slate-600 leading-relaxed flex items-start gap-2 bg-slate-50 p-3 border-l-2 border-slate-800 rounded-none">
+                        <Info className="h-4 w-4 text-slate-600 shrink-0" />
+                        <span className="text-justify">{aspect.helpText}</span>
+                      </div>
+
+                      {/* Catatan Per Aspek & Upload Bukti */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                        <div className="md:col-span-8">
+                          <input
+                            type="text"
+                            value={state.catatan}
+                            onChange={(e) => handleAspectNoteChange(aspect.code, e.target.value)}
+                            placeholder="Tuliskan temuan verifikasi spesifik aspek ini..."
+                            className="w-full px-3 py-2 bg-white border border-slate-300 focus:border-slate-800 text-[10px] rounded-none outline-none"
+                          />
+                        </div>
+
+                        <div className="md:col-span-4">
+                          {state.isUploading ? (
+                            <div className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 text-slate-400 text-[10px] rounded-none">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500 shrink-0" />
+                              <span className="font-bold uppercase tracking-wider">Mengunggah...</span>
+                            </div>
+                          ) : state.attachmentUrl ? (
+                            <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-slate-50 border border-slate-300 text-[10px] rounded-none">
+                              <a
+                                href={state.attachmentUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-slate-900 font-bold hover:underline truncate max-w-[120px] uppercase tracking-wider"
+                              >
+                                📂 Bukti Fisik
+                              </a>
                               <button
                                 type="button"
-                                onClick={() => handleToggleAspect(aspect.code, isSesuai ? 'Tidak Sesuai' : 'Sesuai')}
-                                className={cn(
-                                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none border-none p-0",
-                                  isSesuai ? "bg-emerald-600" : "bg-slate-300"
-                                )}
+                                onClick={() => setChecklistStates(prev => ({
+                                  ...prev,
+                                  [aspect.code]: { ...prev[aspect.code], attachmentUrl: undefined }
+                                }))}
+                                className="text-rose-700 font-bold hover:text-rose-900 transition-colors flex items-center gap-1 cursor-pointer border-none bg-transparent outline-none p-0 uppercase text-[9px] tracking-wider"
                               >
-                                <span
-                                  className={cn(
-                                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                                    isSesuai ? "translate-x-4" : "translate-x-0"
-                                  )}
-                                />
+                                <Trash2 className="h-3 w-3" /> Hapus
                               </button>
                             </div>
-                          </div>
-
-                          {/* Catatan Per Aspek & Upload Bukti Koreksi */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-                            <div className="md:col-span-2">
+                          ) : (
+                            <div className="relative border border-dashed border-slate-300 hover:border-slate-800 bg-white hover:bg-slate-50 px-3 py-2 flex items-center justify-center gap-2 cursor-pointer transition-all rounded-none">
                               <input
-                                type="text"
-                                value={state.catatan}
-                                onChange={(e) => handleAspectNoteChange(aspect.code, e.target.value)}
-                                placeholder="Catatan khusus aspek ini..."
-                                className="w-full px-2 py-1 bg-white border border-border text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-primary text-[10px]"
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={(e) => handleAspectAttachmentUpload(aspect.code, e)}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
                               />
+                              <UploadCloud className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Unggah Bukti</span>
                             </div>
-                            <div>
-                              {state.isUploading ? (
-                                <div className="flex items-center gap-2 px-2 py-1 bg-white border border-border text-slate-400 text-[10px]">
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
-                                  <span>Mengunggah...</span>
-                                </div>
-                              ) : state.attachmentUrl ? (
-                                <div className="flex items-center justify-between gap-2 px-2 py-0.5 bg-[#e8f2ea]/20 border border-primary/30 text-[10px]">
-                                  <a
-                                    href={state.attachmentUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-primary font-bold hover:underline truncate max-w-[90px]"
-                                  >
-                                    📥 Bukti
-                                  </a>
-                                  <button
-                                    type="button"
-                                    onClick={() => setChecklistStates(prev => ({
-                                      ...prev,
-                                      [aspect.code]: { ...prev[aspect.code], attachmentUrl: undefined }
-                                    }))}
-                                    className="text-rose-600 font-bold hover:text-rose-700 transition-colors"
-                                  >
-                                    Hapus
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="relative border border-dashed border-slate-300 bg-white hover:bg-slate-50 px-2 py-1 flex items-center justify-center gap-1 cursor-pointer transition-all">
-                                  <input
-                                    type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(e) => handleAspectAttachmentUpload(aspect.code, e)}
-                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                  />
-                                  <UploadCloud className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                  <span className="text-[10px] text-slate-500 font-bold">Unggah Bukti</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                      </div>
 
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Action buttons */}
-          <div className="pt-4 flex items-center justify-end gap-3 flex-wrap border-t border-border">
-            {/* Kembalikan ke Admin — Jalur Revert Internal (amber) */}
+          {/* Action Buttons Section */}
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-end gap-3 border-t border-slate-300">
             <button
               type="button"
               disabled={mutation.isPending}
               onClick={handleRevertToAdministrativeLocal}
-              title="Kembalikan ke Admin SIPAS untuk perbaikan dokumen (SLA tetap berjalan)"
-              className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Kembalikan berkas ke administrasi pemohon"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold uppercase tracking-widest transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" />
@@ -671,13 +682,15 @@ export default function SubmissionVerificationPage() {
               type="button"
               disabled={mutation.isPending}
               onClick={handleTriggerSubmissionVerification}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 border border-primary text-white text-xs font-bold transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 border border-slate-900 text-white hover:bg-slate-800 text-xs font-bold uppercase tracking-widest transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Kirim Keputusan Verifikasi
+              Kirim Hasil Keputusan
             </button>
           </div>
+
         </div>
+
       </div>
     </div>
   );
