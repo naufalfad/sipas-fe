@@ -106,7 +106,7 @@ export const LocationSection = () => {
 
         <div className="md:col-span-2">
           <LabelWithInfo label="Alamat Lengkap Lokasi Proyek" helpText="Alamat fisik lengkap (Nama Jalan, RT/RW, Dusun) guna keperluan peninjauan lapangan (ground-truthing)." />
-          <textarea {...register('location.fullAddress')} rows={2} className={inputClass} placeholder="Tulis alamat lokasi fisik tapak secara rinci..." />
+          <textarea {...register('location.fullAddress')} rows={2} className={inputClass} placeholder="Jl. Contoh Blok A No.00 RT00/00" />
           {errors.location?.fullAddress && <p className="text-xs text-rose-500 mt-1">{errors.location.fullAddress.message}</p>}
         </div>
 
@@ -121,8 +121,8 @@ export const LocationSection = () => {
           <select {...register('location.ownershipStatus')} className={inputClass}>
             <option value="SHM">SHM (Sertifikat Hak Milik)</option>
             <option value="HGB">HGB (Hak Guna Bangunan)</option>
-            <option value="HAK_PAKAI">Hak Pakai Dinas</option>
-            <option value="LAINNYA">Lainnya / Surat Adat</option>
+            <option value="HAK_PAKAI">HGU (Hak Guna Usaha)</option>
+            <option value="LAINNYA">Lainnya</option>
           </select>
           {errors.location?.ownershipStatus && <p className="text-xs text-rose-500 mt-1">{errors.location.ownershipStatus.message}</p>}
         </div>

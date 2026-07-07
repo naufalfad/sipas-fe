@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { UploadCloud, Loader2, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { LabelWithInfo } from './LabelWithInfo';
 import { inputClass, labelClass } from './styles';
@@ -12,6 +13,14 @@ export const ApplicantSection = () => {
 
   const handleOCRUpload = (file: File, type: 'KTP' | 'NIB') => {
     if (!file) return;
+
+    // Limit size to 20MB
+    const MAX_FILE_SIZE = 20 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
+      return;
+    }
+
     setOcrLoading(type);
 
     setTimeout(() => {
@@ -188,7 +197,7 @@ export const ApplicantSection = () => {
 
         <div className="md:col-span-2">
           <label className={labelClass}>Alamat Lengkap Pemohon</label>
-          <textarea {...register('applicant.address')} rows={3} className={inputClass} placeholder="Tulis alamat korespondensi lengkap..." />
+          <textarea {...register('applicant.address')} rows={3} className={inputClass} placeholder="Jl. Contoh Blok A No.00 RT00/00" />
           {errors.applicant?.address && <p className="text-xs text-rose-500 mt-1">{errors.applicant.address.message}</p>}
         </div>
       </div>

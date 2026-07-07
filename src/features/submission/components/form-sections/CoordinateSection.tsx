@@ -10,17 +10,24 @@ import GISDrawingMap from '@/components/maps/GISDrawingMap';
 import { uploadFileToBackend } from '../../utils/upload';
 
 export const CoordinateSection = () => {
-  const { register, setValue } = useFormContext<FullSubmissionFormValues>();
+  const { register, setValue, watch } = useFormContext<FullSubmissionFormValues>();
   const [spatialLoading, setSpatialLoading] = useState(false);
   const [uploadedGeoJson, setUploadedGeoJson] = useState<any>(null);
 
   // State untuk kontrol modal Wizard Georeferencing CAD
   const [isCadWizardOpen, setIsCadWizardOpen] = useState(false);
-  const [cadFileName, setCadFileName] = useState('');
+  const cadFileName = watch('coordinate.cadFileName') || '';
 
   const handleSpatialFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Limit to 20MB
+    const MAX_FILE_SIZE = 20 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
+      return;
+    }
 
     setSpatialLoading(true);
     const reader = new FileReader();
@@ -89,8 +96,14 @@ export const CoordinateSection = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Limit to 20MB
+    const MAX_FILE_SIZE = 20 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
+      return;
+    }
+
     if (file.name.endsWith('.dwg') || file.name.endsWith('.dxf')) {
-      setCadFileName(file.name);
       setValue('coordinate.cadFileName', file.name);
       setIsCadWizardOpen(true);
       

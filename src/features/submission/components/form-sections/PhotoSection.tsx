@@ -21,6 +21,13 @@ export const PhotoSection = () => {
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Limit to 20MB
+      const MAX_FILE_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
+        return;
+      }
+
       try {
         setIsUploading(prev => ({ ...prev, [fieldKey]: true }));
         const uploadResult = await uploadFileToBackend(file);

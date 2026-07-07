@@ -24,6 +24,13 @@ export const ContextualUploadBox = ({
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Limit size to 20MB
+      const MAX_FILE_SIZE = 20 * 1024 * 1024;
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
+        return;
+      }
+
       try {
         setLoading(true);
         const res = await uploadFileToBackend(file);
@@ -41,6 +48,18 @@ export const ContextualUploadBox = ({
     setValue(fieldKey as any, undefined);
   };
 
+  const getOriginalFileName = (url: string) => {
+    try {
+      const parsedUrl = new URL(url, window.location.origin);
+      const nameParam = parsedUrl.searchParams.get('name');
+      if (nameParam) return decodeURIComponent(nameParam);
+    } catch (e) {
+      // Fallback
+    }
+    const lastSegment = url.split('/').pop() || 'File terunggah';
+    return lastSegment.split('?')[0];
+  };
+
   return (
     <div className="space-y-1.5 text-left select-none">
       <LabelWithInfo label={label} helpText={helpText} />
@@ -53,7 +72,9 @@ export const ContextualUploadBox = ({
         <div className="flex items-center justify-between p-3 bg-[#e8f2ea]/20 border border-primary/30">
           <div className="flex items-center gap-2 min-w-0">
             <CheckCircle className="h-4.5 w-4.5 text-primary shrink-0" />
-            <span className="text-[11px] font-mono text-primary truncate max-w-[240px]">{fileUrl.split('/').pop() || 'File terunggah'}</span>
+            <span className="text-[11px] font-mono text-primary truncate max-w-[240px]" title={getOriginalFileName(fileUrl)}>
+              {getOriginalFileName(fileUrl)}
+            </span>
           </div>
           <button
             type="button"
