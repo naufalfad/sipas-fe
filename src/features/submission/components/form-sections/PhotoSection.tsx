@@ -21,7 +21,7 @@ export const PhotoSection = () => {
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Limit to 20MB
+      // Batasan ukuran berkas 20MB secara ketat
       const MAX_FILE_SIZE = 20 * 1024 * 1024;
       if (file.size > MAX_FILE_SIZE) {
         toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -54,12 +54,15 @@ export const PhotoSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          9. Bukti Foto Kondisi Fisik Lapangan
+          Bukti Foto Kondisi Fisik Lapangan
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Sertakan dokumentasi foto kondisi riil rona tapak di lapangan dari 5 penjuru arah mata angin.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Sertakan dokumentasi foto kondisi riil rona tapak di lapangan dari 5 penjuru arah mata angin.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-left">

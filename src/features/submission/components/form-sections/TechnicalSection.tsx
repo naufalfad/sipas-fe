@@ -66,15 +66,18 @@ export const TechnicalSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          6. Parameter Teknis Rencana Tapak
+          Parameter Teknis Rencana Tapak
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Rincian parameter teknis fisik pembangunan berdasarkan kriteria teknis dinas terkait.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Rincian dimensi teknis fisik rencana tapak pembangunan berdasarkan kriteria kelayakan dinas terkait.
+        </p>
       </div>
 
-      {/* ─── BARU: BLOK DEKLARASI MANDIRI KESESUAIAN TATA RUANG (PROPOSED METRICS) ─── */}
+      {/* ─── BLOK DEKLARASI MANDIRI KESESUAIAN TATA RUANG (PROPOSED METRICS) ─── */}
       <div className="border border-primary/25 bg-[#e8f2ea]/20 p-5 space-y-4 text-left">
         <h4 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
           <Layers className="h-4 w-4" />
@@ -106,11 +109,11 @@ export const TechnicalSection = () => {
           <div className="text-[9px] font-black text-primary uppercase tracking-widest leading-none mb-1">
             Uji Mandiri Parameter Kepatuhan Perda (Standard Acuan Kab. Bogor)
           </div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-semibold text-slate-700">
             {/* Reference Land Area */}
             <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Luas Lahan Acuan (Langkah 3)</span>
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Luas Lahan Acuan</span>
               <span className="font-bold font-mono text-slate-800 text-[11px]">{landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : '-'}</span>
             </div>
 

@@ -3,8 +3,25 @@ import { CheckCircle2, Info } from 'lucide-react';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { cn } from '@/lib/utils';
 
+// ─── PURE FABRICATION: PARSER NAMA FILE ASLI ───────────────────────────
+const getOriginalFileName = (url: string): string => {
+  try {
+    const parsedUrl = new URL(url, window.location.origin);
+    const nameParam = parsedUrl.searchParams.get('name');
+    if (nameParam) return decodeURIComponent(nameParam);
+  } catch (e) {
+    // Fallback jika URL tidak valid
+  }
+  const lastSegment = url.split('/').pop() || 'File terunggah';
+  return lastSegment.split('?')[0];
+};
+
 export const DocumentSection = () => {
   const { watch } = useFormContext<FullSubmissionFormValues>();
+
+  // Membaca state reaktif pendaftaran untuk menyaring tipe dokumen (GRASP: Information Expert)
+  const applicantType = watch('applicant.type');
+  const submissionCategory = watch('submission.category');
 
   // Membaca state seluruh file yang diunggah secara asinkron di sepanjang langkah 1-7
   const legalDoc = watch('document.legalDoc');
@@ -13,22 +30,93 @@ export const DocumentSection = () => {
   const supportDoc2 = watch('document.supportDoc2');
   const skaDoc = watch('document.skaDoc');
   const cadDoc = watch('document.cadDoc');
+  const ktpDoc = watch('document.ktpDoc');
+  const nibDoc = watch('document.nibDoc');
 
-  const docSummary = [
-    { name: 'Sertifikat Tanah & KTP (Langkah 3)', value: legalDoc, mandatory: true },
-    { name: 'File Peta Koordinat CAD (Langkah 4)', value: cadDoc, mandatory: true },
-    { name: 'Gambar Rencana Teknis CAD (Langkah 6)', value: technicalDoc, mandatory: true },
-    { name: 'SK KKPR Awal / IPPT (Langkah 5)', value: supportDoc, mandatory: true },
-    { name: 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)', value: supportDoc2, mandatory: false },
-    { name: 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)', value: skaDoc, mandatory: true },
-  ];
+  // ─── DEKLARATIF CHECKLIST MATRIX (Protected Variations) ───────────────
+  const docSummary = [];
+
+  // 1. Validasi Identitas Pemohon (Langkah 1)
+  if (applicantType === 'PERORANGAN') {
+    docSummary.push({
+      name: 'Scan Kartu Tanda Penduduk (KTP) Pemohon',
+      value: ktpDoc,
+      mandatory: true
+    });
+  } else if (applicantType === 'BADAN_USAHA') {
+    docSummary.push({
+      name: 'Nomor Induk Berusaha (NIB) Badan Usaha',
+      value: nibDoc,
+      mandatory: true
+    });
+  }
+
+  // 2. Validasi Kepemilikan Lahan (Langkah 3)
+  docSummary.push({
+    name: 'Sertifikat Kepemilikan Tanah Resmi (SHM/HGB)',
+    value: legalDoc,
+    mandatory: true
+  });
+
+  // 3. Validasi Batas Spasial CAD (Langkah 4)
+  docSummary.push({
+    name: 'File Peta Koordinat CAD Terkalibrasi (.dwg/.dxf)',
+    value: cadDoc,
+    mandatory: true
+  });
+
+  // 4. Validasi SK KKPR Awal / IPPT (Langkah 5)
+  docSummary.push({
+    name: 'SK KKPR atau Surat Izin Peruntukan Penggunaan Tanah (IPPT)',
+    value: supportDoc,
+    mandatory: true
+  });
+
+  // 5. Validasi Parameter Teknis Dinamis (Langkah 6)
+  if (submissionCategory === 'PERUMAHAN') {
+    docSummary.push({
+      name: 'Dokumen Detail Perencanaan Prasarana, Sarana, dan Utilitas (PSU)',
+      value: technicalDoc,
+      mandatory: true
+    });
+  } else if (submissionCategory === 'NON_PERUMAHAN') {
+    docSummary.push({
+      name: 'Dokumen Kajian Dampak Lalu Lintas (Andalalin)',
+      value: supportDoc2,
+      mandatory: false
+    });
+  } else if (submissionCategory === 'FASUM') {
+    docSummary.push({
+      name: 'Rekomendasi Instansi Sektoral / Persetujuan Andalalin',
+      value: supportDoc2,
+      mandatory: false
+    });
+  } else if (submissionCategory === 'INDUSTRI') {
+    docSummary.push({
+      name: 'Dokumen Kelayakan Lingkungan Hidup (AMDAL / UKL-UPL)',
+      value: technicalDoc,
+      mandatory: true
+    });
+    docSummary.push({
+      name: 'Persetujuan Teknis Pembuangan & Pengolahan Air Limbah',
+      value: supportDoc2,
+      mandatory: true
+    });
+  }
+
+  // 6. Validasi Legalitas Perencana (Langkah 7)
+  docSummary.push({
+    name: 'Scan Sertifikat Keahlian (SKA / SKEA) Arsitek Penanggung Jawab',
+    value: skaDoc,
+    mandatory: true
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
         <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          8. Rekapitulasi Berkas Dokumen Terunggah
+          Rekapitulasi Berkas Dokumen Terunggah
         </h3>
         <p className="text-[10px] text-slate-400 mt-1">Guna mematuhi asas transparansi, pastikan seluruh dokumen administratif dan spasial di bawah ini telah terisi secara sah.</p>
       </div>
@@ -63,9 +151,9 @@ export const DocumentSection = () => {
                 <h4 className="font-bold text-xs truncate">{doc.name}</h4>
                 <p className="text-[10px] opacity-75 mt-1 leading-none font-medium">
                   {isUploaded
-                    ? `✓ Berkas Siap: ${typeof doc.value === 'string' ? doc.value.split('/').pop() : 'OK'}`
+                    ? `✓ Berkas Siap: ${typeof doc.value === 'string' ? getOriginalFileName(doc.value) : 'OK'}`
                     : doc.mandatory
-                      ? '⚠ Wajib Diisi (Kembali ke langkah bersangkutan)'
+                      ? '⚠ Berkas Wajib Diisi (Kembali ke langkah bersangkutan)'
                       : 'Pilihan (Opsional)'}
                 </p>
               </div>

@@ -38,12 +38,15 @@ export const SpatialSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          5. Informasi Kesesuaian Tata Ruang
+          Kesesuaian Tata Ruang
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Data sinkronisasi KKPR (Kesesuaian Kegiatan Pemanfaasan Ruang) daerah.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Data validasi KKPR (Kesesuaian Kegiatan Pemanfaatan Ruang) dan alokasi ruang terbuka hijau daerah.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">

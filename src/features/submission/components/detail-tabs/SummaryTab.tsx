@@ -1,15 +1,16 @@
 import { Link } from 'react-router-dom';
 import { File, MapPin } from 'lucide-react';
 
+// ─── PURE FABRICATION: RESOLVER LABEL DOKUMEN BERSIH (Decoupled from Steps) ───
 const getDocCategoryLabel = (key?: string) => {
-  if (key === 'ktpDoc') return 'Scan KTP Pemohon (Langkah 1)';
-  if (key === 'nibDoc') return 'Scan NIB Perusahaan (Langkah 1)';
-  if (key === 'legalDoc') return 'Sertifikat Kepemilikan Lahan / Hak Atas Tanah (Langkah 3)';
-  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD (Langkah 6)';
-  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT (Langkah 5)';
-  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)';
-  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)';
-  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf) (Langkah 4)';
+  if (key === 'ktpDoc') return 'Scan KTP Pemohon / Penanggung Jawab';
+  if (key === 'nibDoc') return 'Scan NIB Perusahaan';
+  if (key === 'legalDoc') return 'Sertifikat Kepemilikan Lahan / Hak Atas Tanah';
+  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD / AMDAL';
+  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT';
+  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Lingkungan';
+  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf)';
   return 'Dokumen Lampiran Pendukung';
 };
 
