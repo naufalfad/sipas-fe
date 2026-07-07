@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from './useAuthStore';
+import { API_BASE_URL } from '@/config';
 
 // ─── DEFINISI TIPE & ANTARMUKA MODULAR ──────────────────────────────────────────
 
@@ -137,7 +138,7 @@ export const useUIStore = create<UIState>((set) => ({
     else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/token', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
