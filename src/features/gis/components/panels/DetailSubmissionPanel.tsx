@@ -1,3 +1,4 @@
+/* STREAMING_CHUNK:Configuring imports and base validation schema interfaces */
 import { useMemo, useState, useEffect } from 'react';
 import {
     MapPin, CheckCircle2,
@@ -20,7 +21,19 @@ interface ValidationRow {
     status: 'LOLOS' | 'REVISI';
 }
 
+const getStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case 'Disetujui':
+      return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
+    case 'Ditolak':
+      return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
+    default:
+      return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
+  }
+};
+
 export default function DetailSubmissionPanel({ submissionData }: DetailSubmissionPanelProps) {
+    /* STREAMING_CHUNK:Initializing hooks and clear clash triggers */
     const navigate = useNavigate();
     const { validateRiverBuffer, isProcessing: isChecking } = useSpatialValidator();
     const [auditResult, setAuditResult] = useState<any>(null);
@@ -38,24 +51,57 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         };
     }, []);
 
-    // --- MATRIKS VALIDASI STANDAR DAERAH (KABUPATEN BOGOR) ---
-    // Memetakan hasil kalkulasi sistem vs standar perda (Slide 6)
+    /* STREAMING_CHUNK:Resolving proposed metrics and bylaws dynamically from API */
     const validationMatrix = useMemo<ValidationRow[]>(() => {
         if (!submissionData) return [];
-        const kdbPercent = submissionData.kdbPercent || 60.5; // Dummy fallback jika data db kosong
-        const klbValue = submissionData.klbValue || 3.2;
-        const kdhPercent = submissionData.kdhPercent || 12.1;
-        const rthArea = submissionData.rthArea || 1500;
-        const psuArea = submissionData.psuArea || 500;
-        const roadArea = submissionData.roadArea || 250;
+
+        const tech = submissionData.technical || {};
+
+        // Match proposed inputs with safe ratiometrics computed by the form
+        const kdb = tech.kdb !== undefined ? tech.kdb : (submissionData.kdbPercent || 0);
+        const klb = tech.klb !== undefined ? tech.klb : (submissionData.klbValue || 0);
+        const kdh = tech.kdh !== undefined ? tech.kdh : (submissionData.kdhPercent || 0);
+        const gsb = tech.applicantGsb !== undefined ? tech.applicantGsb : 0;
+        const rth = tech.applicantRthArea !== undefined ? tech.applicantRthArea : (submissionData.rthArea || 0);
+
+        // Dynamically resolve bylaws bounds with safe system level fallbacks
+        const maxKdb = submissionData.bylawMaxKdb !== undefined ? submissionData.bylawMaxKdb : 60.0;
+        const maxKlb = submissionData.bylawMaxKlb !== undefined ? submissionData.bylawMaxKlb : 3.5;
+        const minKdh = submissionData.bylawMinKdh !== undefined ? submissionData.bylawMinKdh : 10.0;
+        const minGsb = submissionData.bylawMinGsb !== undefined ? submissionData.bylawMinGsb : 5.0;
+        const minRth = submissionData.bylawMinRthArea !== undefined ? submissionData.bylawMinRthArea : 1400.0;
 
         return [
-            { parameter: "KDB (Koefisien Dasar Bangunan)", hasilSistem: `${kdbPercent}%`, standarPerda: "Maks 60%", status: kdbPercent <= 60 ? "LOLOS" : "REVISI" },
-            { parameter: "KLB (Koefisien Lantai Bangunan)", hasilSistem: String(klbValue), standarPerda: "Maks 3.5", status: klbValue <= 3.5 ? "LOLOS" : "REVISI" },
-            { parameter: "KDH (Koefisien Dasar Hijau)", hasilSistem: `${kdhPercent}%`, standarPerda: "Min 10%", status: kdhPercent >= 10 ? "LOLOS" : "REVISI" },
-            { parameter: "RTH (Ruang Terbuka Hijau)", hasilSistem: `${rthArea.toLocaleString('id-ID')} m²`, standarPerda: "Min 1.400 m²", status: rthArea >= 1400 ? "LOLOS" : "REVISI" },
-            { parameter: "Luas PSU (Fasilitas Umum)", hasilSistem: `${psuArea.toLocaleString('id-ID')} m²`, standarPerda: "Min 400 m²", status: psuArea >= 400 ? "LOLOS" : "REVISI" },
-            { parameter: "Luas Jalan & Saluran", hasilSistem: `${roadArea.toLocaleString('id-ID')} m²`, standarPerda: "Min 200 m²", status: roadArea >= 200 ? "LOLOS" : "REVISI" },
+            {
+                parameter: "KDB (Koefisien Dasar Bangunan)",
+                hasilSistem: kdb > 0 ? `${kdb.toFixed(1)}%` : "-",
+                standarPerda: `Maks ${maxKdb}%`,
+                status: kdb > 0 ? (kdb <= maxKdb ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "KLB (Koefisien Lantai Bangunan)",
+                hasilSistem: klb > 0 ? `${klb.toFixed(2)}x` : "-",
+                standarPerda: `Maks ${maxKlb}`,
+                status: klb > 0 ? (klb <= maxKlb ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "KDH (Koefisien Dasar Hijau)",
+                hasilSistem: kdh > 0 ? `${kdh.toFixed(1)}%` : "-",
+                standarPerda: `Min ${minKdh}%`,
+                status: kdh > 0 ? (kdh >= minKdh ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "GSB (Garis Sempadan Bangunan)",
+                hasilSistem: gsb > 0 ? `${gsb} m` : "-",
+                standarPerda: `Min ${minGsb} m`,
+                status: gsb > 0 ? (gsb >= minGsb ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "RTH (Ruang Terbuka Hijau)",
+                hasilSistem: rth > 0 ? `${rth.toLocaleString('id-ID')} m²` : "-",
+                standarPerda: `Min ${minRth.toLocaleString('id-ID')} m²`,
+                status: rth > 0 ? (rth >= minRth ? "LOLOS" : "REVISI") : "REVISI"
+            },
         ];
     }, [submissionData]);
 
@@ -67,10 +113,9 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         );
     }
 
-    // Cek apakah ada parameter yang bertentangan dengan perda (Status Revisi)
     const isRevisionRequired = validationMatrix.some(row => row.status === "REVISI");
 
-    // --- SINKRONISASI PEMANGGILAN TURF.JS PASCA-KLIK [Bogor 11] ---
+    /* STREAMING_CHUNK:Executing spatial validator via Turf.js multi-layer engine */
     const handleRunLiveAudit = async () => {
         if (!submissionData.location?.polygon || submissionData.location.polygon.length === 0) {
             toast.error('Geometri polygon batas lahan tidak ditemukan di berkas.');
@@ -110,7 +155,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         <div className="flex flex-col h-full w-full bg-white relative font-sans text-slate-800">
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0 text-left">
 
-                {/* SECTION 1: HEADER SUMMARY BLOCK */}
+                {/* STREAMING_CHUNK:Rendering header summary blocks */}
                 <div className="px-4 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-start gap-3 select-none shrink-0">
                     <div className="space-y-1.5">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Nomor Berkas</span>
@@ -118,16 +163,14 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         <h4 className="text-xs font-black text-slate-900 leading-tight uppercase mt-2">{submissionData.housingName}</h4>
                     </div>
                     <span className={cn(
-                        "rounded-none text-[8px] font-black tracking-widest px-2.5 py-1 uppercase leading-none shrink-0",
-                        submissionData.status === 'Disetujui' ? 'bg-emerald-50 text-emerald-700' :
-                            submissionData.status === 'Ditolak' ? 'bg-rose-50 text-rose-700' :
-                                'bg-amber-50 text-amber-700'
+                        "rounded-none text-[8px] font-black tracking-widest px-2.5 py-1 uppercase leading-none shrink-0 border",
+                        getStatusBadgeClass(submissionData.status)
                     )}>
                         {submissionData.status}
                     </span>
                 </div>
 
-                {/* SECTION 2: ADAPTIVE PERDA COMPLIANCE BANNER */}
+                {/* STREAMING_CHUNK:Rendering adaptive compliance warning banner */}
                 <div className={cn(
                     "px-4 py-3.5 border-b text-[11px] font-semibold leading-relaxed text-left flex items-start gap-2.5",
                     isRevisionRequired
@@ -146,7 +189,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </p>
                 </div>
 
-                {/* SECTION 3: CORE PARAMETERS CARD GRID */}
+                {/* STREAMING_CHUNK:Rendering core parameters metadata card grid */}
                 <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 text-left">
                     <div className="bg-white p-4">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none mb-1.5">
@@ -161,7 +204,8 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         <span className="text-sm font-black text-slate-800 font-mono leading-none">60.5% KDB</span>
                     </div>
                 </div>
-                {/* --- TOMBOL LIVE AUDIT SPASIAL MULTI-LAYER (TURF.JS CLIENT-SIDE) --- */}
+
+                {/* STREAMING_CHUNK:Rendering live audit checking action boxes */}
                 <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/40 space-y-3">
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none">
@@ -174,7 +218,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         type="button"
                         disabled={isChecking || !submissionData.location?.polygon}
                         onClick={handleRunLiveAudit}
-                        className="w-full h-10 bg-teal-50 hover:bg-teal-100 text-teal-700 font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-teal-200 transition-all cursor-pointer outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
+                        className="w-full h-10 bg-teal-50 hover:bg-teal-100 text-teal-700 font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-teal-200 transition-all cursor-pointer outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
                     >
                         {isChecking ? (
                             <Loader2 className="h-4.5 w-4.5 animate-spin" />
@@ -191,8 +235,8 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                             <div className={cn(
                                 "p-3 text-[11px] leading-relaxed border text-left flex items-start gap-2",
                                 auditResult.verdict === 'TIDAK_LAYAK' ? "bg-rose-50 text-rose-700 border-rose-200" :
-                                auditResult.verdict === 'PERLU_REVISI' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                "bg-teal-50 text-teal-700 border-teal-200"
+                                    auditResult.verdict === 'PERLU_REVISI' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                        "bg-teal-50 text-teal-700 border-teal-200"
                             )}>
                                 <div className="flex-1">
                                     <div className="font-black text-xs uppercase tracking-tight flex items-center gap-1.5 mb-0.5">
@@ -267,7 +311,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </button>
                 </div>
 
-                {/* SECTION 4: HIGH-DENSITY PERDA VALIDATION MATRIX (Slide 6) */}
+                {/* STREAMING_CHUNK:Rendering high-density loss parameters comparison ledger */}
                 <div className="text-left">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 leading-none">

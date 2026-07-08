@@ -10558,15 +10558,16 @@ export const PhotosTab = ({ sub }: PhotosTabProps) => {
 import { Link } from 'react-router-dom';
 import { File, MapPin } from 'lucide-react';
 
+// ─── PURE FABRICATION: RESOLVER LABEL DOKUMEN BERSIH (Decoupled from Steps) ───
 const getDocCategoryLabel = (key?: string) => {
-  if (key === 'ktpDoc') return 'Scan KTP Pemohon (Langkah 1)';
-  if (key === 'nibDoc') return 'Scan NIB Perusahaan (Langkah 1)';
-  if (key === 'legalDoc') return 'Sertifikat Kepemilikan Lahan / Hak Atas Tanah (Langkah 3)';
-  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD (Langkah 6)';
-  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT (Langkah 5)';
-  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)';
-  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)';
-  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf) (Langkah 4)';
+  if (key === 'ktpDoc') return 'Scan KTP Pemohon / Penanggung Jawab';
+  if (key === 'nibDoc') return 'Scan NIB Perusahaan';
+  if (key === 'legalDoc') return 'Sertifikat Kepemilikan Lahan / Hak Atas Tanah';
+  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD / AMDAL';
+  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT';
+  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Lingkungan';
+  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf)';
   return 'Dokumen Lampiran Pendukung';
 };
 
@@ -10864,7 +10865,7 @@ export const ApplicantSection = () => {
   const handleOCRUpload = async (file: File, type: 'KTP' | 'NIB') => {
     if (!file) return;
 
-    // Limit size to 20MB
+    // Batasan ukuran unggah maksimal 20MB secara ketat
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -10908,23 +10909,26 @@ export const ApplicantSection = () => {
       const parsedUrl = new URL(url, window.location.origin);
       const nameParam = parsedUrl.searchParams.get('name');
       if (nameParam) return decodeURIComponent(nameParam);
-    } catch (e) {}
+    } catch (e) { }
     const lastSegment = url.split('/').pop() || 'File terunggah';
     return lastSegment.split('?')[0];
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          1. Data Pemohon
+          Identitas Pemohon
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Lengkapi data identitas pemohon perseorangan atau badan usaha secara sah.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Lengkapi berkas identitas pemohon perorangan atau badan usaha secara sah untuk keperluan otentikasi berkas.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Box KTP */}
+        {/* Kotak Unggah KTP */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'KTP')}
@@ -10966,13 +10970,13 @@ export const ApplicantSection = () => {
                 }}
               />
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
-              <p className="text-xs font-bold text-slate-700">Upload KTP untuk Auto-Fill</p>
-              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas gambar KTP Anda di sini</p>
+              <p className="text-xs font-bold text-slate-700">Unggah KTP Pemohon (Auto-Fill)</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file atau klik untuk memilih</p>
             </>
           )}
         </div>
 
-        {/* Box NIB */}
+        {/* Kotak Unggah NIB */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleDrop(e, 'NIB')}
@@ -11014,8 +11018,8 @@ export const ApplicantSection = () => {
                 }}
               />
               <UploadCloud className="h-6 w-6 text-slate-400 mb-1.5" />
-              <p className="text-xs font-bold text-slate-700">Upload NIB untuk Auto-Fill</p>
-              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file NIB di sini</p>
+              <p className="text-xs font-bold text-slate-700">Unggah NIB Perusahaan (Auto-Fill)</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">Seret & lepas file atau klik untuk memilih</p>
             </>
           )}
         </div>
@@ -11335,12 +11339,15 @@ export const ConsultantSection = () => {
   const { register, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          7. Identitas Biro Konsultan Perencana
+          Biro Konsultan Perencana
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Data profesional berlisensi penanggung jawab perhitungan teknis gambar.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Data profesional berlisensi penanggung jawab perencanaan arsitektur dan tata ruang.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
@@ -11508,7 +11515,7 @@ export const CoordinateSection = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 20MB
+    // Batasan ukuran berkas 20MB secara ketat
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -11582,7 +11589,7 @@ export const CoordinateSection = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 20MB
+    // Batasan ukuran berkas 20MB secara ketat
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -11709,7 +11716,6 @@ export const CoordinateSection = () => {
     if (cadInput) cadInput.value = '';
 
     setUploadedGeoJson(null);
-    setCadFileName('');
 
     setValue('coordinate.polygon', undefined);
     setValue('coordinate.coordinatesText', '');
@@ -11726,20 +11732,23 @@ export const CoordinateSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3 flex justify-between items-center">
         <div>
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
             <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-            4. Data Koordinat Batas Lahan
+            Koordinat Batas Lahan
           </h3>
-          <p className="text-[10px] text-slate-400 mt-1">Unggah file spasial BPN resmi atau gambar rencana CAD untuk menyelaraskan koordinat tapak.</p>
+          <p className="text-[10px] text-slate-400 mt-1">
+            Petakan batas bidang tanah menggunakan file spasial BPN atau selaraskan gambar rencana kerja CAD.
+          </p>
         </div>
         <button
           type="button"
           onClick={handleResetCoordinates}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 text-xs font-bold rounded-none transition-colors cursor-pointer outline-none"
         >
-          <RefreshCw className="h-3.5 w-3.5 animate-spin-hover" />
+          <RefreshCw className="h-3.5 w-3.5" />
           Reset Spasial / Ulangi
         </button>
       </div>
@@ -11837,8 +11846,25 @@ import { CheckCircle2, Info } from 'lucide-react';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { cn } from '@/lib/utils';
 
+// ─── PURE FABRICATION: PARSER NAMA FILE ASLI ───────────────────────────
+const getOriginalFileName = (url: string): string => {
+  try {
+    const parsedUrl = new URL(url, window.location.origin);
+    const nameParam = parsedUrl.searchParams.get('name');
+    if (nameParam) return decodeURIComponent(nameParam);
+  } catch (e) {
+    // Fallback jika URL tidak valid
+  }
+  const lastSegment = url.split('/').pop() || 'File terunggah';
+  return lastSegment.split('?')[0];
+};
+
 export const DocumentSection = () => {
   const { watch } = useFormContext<FullSubmissionFormValues>();
+
+  // Membaca state reaktif pendaftaran untuk menyaring tipe dokumen (GRASP: Information Expert)
+  const applicantType = watch('applicant.type');
+  const submissionCategory = watch('submission.category');
 
   // Membaca state seluruh file yang diunggah secara asinkron di sepanjang langkah 1-7
   const legalDoc = watch('document.legalDoc');
@@ -11847,22 +11873,93 @@ export const DocumentSection = () => {
   const supportDoc2 = watch('document.supportDoc2');
   const skaDoc = watch('document.skaDoc');
   const cadDoc = watch('document.cadDoc');
+  const ktpDoc = watch('document.ktpDoc');
+  const nibDoc = watch('document.nibDoc');
 
-  const docSummary = [
-    { name: 'Sertifikat Tanah & KTP (Langkah 3)', value: legalDoc, mandatory: true },
-    { name: 'File Peta Koordinat CAD (Langkah 4)', value: cadDoc, mandatory: true },
-    { name: 'Gambar Rencana Teknis CAD (Langkah 6)', value: technicalDoc, mandatory: true },
-    { name: 'SK KKPR Awal / IPPT (Langkah 5)', value: supportDoc, mandatory: true },
-    { name: 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)', value: supportDoc2, mandatory: false },
-    { name: 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)', value: skaDoc, mandatory: true },
-  ];
+  // ─── DEKLARATIF CHECKLIST MATRIX (Protected Variations) ───────────────
+  const docSummary = [];
+
+  // 1. Validasi Identitas Pemohon (Langkah 1)
+  if (applicantType === 'PERORANGAN') {
+    docSummary.push({
+      name: 'Scan Kartu Tanda Penduduk (KTP) Pemohon',
+      value: ktpDoc,
+      mandatory: true
+    });
+  } else if (applicantType === 'BADAN_USAHA') {
+    docSummary.push({
+      name: 'Nomor Induk Berusaha (NIB) Badan Usaha',
+      value: nibDoc,
+      mandatory: true
+    });
+  }
+
+  // 2. Validasi Kepemilikan Lahan (Langkah 3)
+  docSummary.push({
+    name: 'Sertifikat Kepemilikan Tanah Resmi (SHM/HGB)',
+    value: legalDoc,
+    mandatory: true
+  });
+
+  // 3. Validasi Batas Spasial CAD (Langkah 4)
+  docSummary.push({
+    name: 'File Peta Koordinat CAD Terkalibrasi (.dwg/.dxf)',
+    value: cadDoc,
+    mandatory: true
+  });
+
+  // 4. Validasi SK KKPR Awal / IPPT (Langkah 5)
+  docSummary.push({
+    name: 'SK KKPR atau Surat Izin Peruntukan Penggunaan Tanah (IPPT)',
+    value: supportDoc,
+    mandatory: true
+  });
+
+  // 5. Validasi Parameter Teknis Dinamis (Langkah 6)
+  if (submissionCategory === 'PERUMAHAN') {
+    docSummary.push({
+      name: 'Dokumen Detail Perencanaan Prasarana, Sarana, dan Utilitas (PSU)',
+      value: technicalDoc,
+      mandatory: true
+    });
+  } else if (submissionCategory === 'NON_PERUMAHAN') {
+    docSummary.push({
+      name: 'Dokumen Kajian Dampak Lalu Lintas (Andalalin)',
+      value: supportDoc2,
+      mandatory: false
+    });
+  } else if (submissionCategory === 'FASUM') {
+    docSummary.push({
+      name: 'Rekomendasi Instansi Sektoral / Persetujuan Andalalin',
+      value: supportDoc2,
+      mandatory: false
+    });
+  } else if (submissionCategory === 'INDUSTRI') {
+    docSummary.push({
+      name: 'Dokumen Kelayakan Lingkungan Hidup (AMDAL / UKL-UPL)',
+      value: technicalDoc,
+      mandatory: true
+    });
+    docSummary.push({
+      name: 'Persetujuan Teknis Pembuangan & Pengolahan Air Limbah',
+      value: supportDoc2,
+      mandatory: true
+    });
+  }
+
+  // 6. Validasi Legalitas Perencana (Langkah 7)
+  docSummary.push({
+    name: 'Scan Sertifikat Keahlian (SKA / SKEA) Arsitek Penanggung Jawab',
+    value: skaDoc,
+    mandatory: true
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="border-b border-border pb-3">
         <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          8. Rekapitulasi Berkas Dokumen Terunggah
+          Rekapitulasi Berkas Dokumen Terunggah
         </h3>
         <p className="text-[10px] text-slate-400 mt-1">Guna mematuhi asas transparansi, pastikan seluruh dokumen administratif dan spasial di bawah ini telah terisi secara sah.</p>
       </div>
@@ -11897,9 +11994,9 @@ export const DocumentSection = () => {
                 <h4 className="font-bold text-xs truncate">{doc.name}</h4>
                 <p className="text-[10px] opacity-75 mt-1 leading-none font-medium">
                   {isUploaded
-                    ? `✓ Berkas Siap: ${typeof doc.value === 'string' ? doc.value.split('/').pop() : 'OK'}`
+                    ? `✓ Berkas Siap: ${typeof doc.value === 'string' ? getOriginalFileName(doc.value) : 'OK'}`
                     : doc.mandatory
-                      ? '⚠ Wajib Diisi (Kembali ke langkah bersangkutan)'
+                      ? '⚠ Berkas Wajib Diisi (Kembali ke langkah bersangkutan)'
                       : 'Pilihan (Opsional)'}
                 </p>
               </div>
@@ -12077,12 +12174,15 @@ export const LocationSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          3. Data Lokasi Spasial
+          Lokasi Administrasi Lahan
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Informasi lokasi administrasi geografis tapak perizinan.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Informasi letak geografis dan legalitas kepemilikan tanah tapak pembangunan.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
@@ -12209,7 +12309,7 @@ export const PhotoSection = () => {
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldKey: any) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Limit to 20MB
+      // Batasan ukuran berkas 20MB secara ketat
       const MAX_FILE_SIZE = 20 * 1024 * 1024;
       if (file.size > MAX_FILE_SIZE) {
         toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -12242,12 +12342,15 @@ export const PhotoSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          9. Bukti Foto Kondisi Fisik Lapangan
+          Bukti Foto Kondisi Fisik Lapangan
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Sertakan dokumentasi foto kondisi riil rona tapak di lapangan dari 5 penjuru arah mata angin.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Sertakan dokumentasi foto kondisi riil rona tapak di lapangan dari 5 penjuru arah mata angin.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-left">
@@ -12347,12 +12450,15 @@ export const SpatialSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          5. Informasi Kesesuaian Tata Ruang
+          Kesesuaian Tata Ruang
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Data sinkronisasi KKPR (Kesesuaian Kegiatan Pemanfaasan Ruang) daerah.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Data validasi KKPR (Kesesuaian Kegiatan Pemanfaatan Ruang) dan alokasi ruang terbuka hijau daerah.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
@@ -12424,12 +12530,15 @@ export const StatementSection = () => {
   const { register, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          10. Surat Pernyataan Tanggung Jawab Mutlak
+          Pernyataan Tanggung Jawab Mutlak
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Pernyataan komitmen keabsahan data dan kesediaan tunduk pada peraturan tata ruang daerah.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Pernyataan komitmen keabsahan data dan kepatuhan hukum terhadap rencana tata ruang daerah.
+        </p>
       </div>
 
       <div className="bg-[#e8f2ea]/40 p-6 border border-border text-left">
@@ -12577,15 +12686,18 @@ export const TechnicalSection = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header Bagian - Bersih & Tanpa Label Nomor Langkah */}
       <div className="border-b border-border pb-3">
-        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          6. Parameter Teknis Rencana Tapak
+          Parameter Teknis Rencana Tapak
         </h3>
-        <p className="text-[10px] text-slate-400 mt-1">Rincian parameter teknis fisik pembangunan berdasarkan kriteria teknis dinas terkait.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Rincian dimensi teknis fisik rencana tapak pembangunan berdasarkan kriteria kelayakan dinas terkait.
+        </p>
       </div>
 
-      {/* ─── BARU: BLOK DEKLARASI MANDIRI KESESUAIAN TATA RUANG (PROPOSED METRICS) ─── */}
+      {/* ─── BLOK DEKLARASI MANDIRI KESESUAIAN TATA RUANG (PROPOSED METRICS) ─── */}
       <div className="border border-primary/25 bg-[#e8f2ea]/20 p-5 space-y-4 text-left">
         <h4 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
           <Layers className="h-4 w-4" />
@@ -12621,7 +12733,7 @@ export const TechnicalSection = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-semibold text-slate-700">
             {/* Reference Land Area */}
             <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Luas Lahan Acuan (Langkah 3)</span>
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Luas Lahan Acuan</span>
               <span className="font-bold font-mono text-slate-800 text-[11px]">{landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : '-'}</span>
             </div>
 
@@ -14033,6 +14145,19 @@ import { VERIFICATION_ASPECTS } from '../constants/verificationAspects';
 const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
 const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
 
+// ─── PURE FABRICATION: RESOLVER LABEL DOKUMEN BERSIH (Decoupled from Steps) ───
+const getDocCategoryLabel = (key?: string) => {
+  if (key === 'ktpDoc') return 'Scan KTP Pemohon / Penanggung Jawab';
+  if (key === 'nibDoc') return 'Scan NIB Perusahaan';
+  if (key === 'legalDoc') return 'Sertifikat Kepemilikan Lahan / Hak Atas Tanah';
+  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD / AMDAL';
+  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT';
+  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Lingkungan';
+  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf)';
+  return 'Dokumen Lampiran Pendukung';
+};
+
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Disetujui':
@@ -14155,7 +14280,7 @@ export default function SubmissionDetailPage() {
       return SubmissionService.updateStatus(
         sub?.id || '',
         status,
-        `${userProfile?.name || activeRole}`,
+        `${userProfile?.name || 'Verifikator'} (${user?.role || activeRole})`,
         notes,
         passphrase,
         signatureBase64,
@@ -14470,7 +14595,7 @@ export default function SubmissionDetailPage() {
                 <span className="px-2 py-0.5 bg-secondary text-primary font-bold text-[9px] uppercase border border-border">ADMINISTRATOR</span>
               </div>
 
-              {/* Checklist */}
+              {/* Checklist Administrasi Dinamis (GRASP: Information Expert) */}
               <div className="space-y-2.5">
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -14479,7 +14604,12 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian Identitas Pemohon (KTP / NIB Direktur)</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {sub.applicant?.type === 'BADAN_USAHA'
+                      ? "Kesesuaian Nomor Induk Berusaha (NIB) Badan Usaha"
+                      : "Kesesuaian Kartu Tanda Penduduk (KTP) Pemohon"
+                    }
+                  </span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -14497,7 +14627,12 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian NPWP Wajib Pajak (Badan Usaha / Perorangan)</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {sub.applicant?.type === 'BADAN_USAHA'
+                      ? "Kesesuaian NPWP Wajib Pajak Badan Usaha"
+                      : "Kesesuaian NPWP Pribadi Pemohon"
+                    }
+                  </span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -14571,7 +14706,7 @@ export default function SubmissionDetailPage() {
             </div>
           )}
 
-          {/* Consent Compliance Modal */}
+          {/* Consent Compliance Modal (GRASP: Protected Variations) */}
           {isVerificationConsentOpen && (
             <div className="fixed inset-0 z-[999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white border-2 border-primary max-w-lg w-full p-6 space-y-5 text-left animate-in fade-in zoom-in-95 duration-200">
@@ -14588,15 +14723,21 @@ export default function SubmissionDetailPage() {
                   <div className="space-y-2 max-h-[180px] overflow-y-auto border border-border p-2 bg-slate-50">
                     {sub.documents && sub.documents.length > 0 ? (
                       sub.documents.map((doc: any) => (
-                        <div key={doc.id} className="flex items-center justify-between p-2 bg-white border border-border/60 text-xs">
-                          <span className="font-semibold text-slate-700 truncate max-w-[200px]" title={doc.name}>
-                            {doc.name}
-                          </span>
+                        <div key={doc.id} className="flex items-center justify-between p-2.5 bg-white border border-border/60 text-xs">
+                          {/* Penyelarasan Kategori Nama Dokumen Asli Tanpa Indeks Langkah */}
+                          <div className="min-w-0 flex-1 pr-2 text-left">
+                            <span className="text-[8px] font-black uppercase tracking-wider text-teal-600 block mb-0.5">
+                              {getDocCategoryLabel(doc.key)}
+                            </span>
+                            <span className="font-semibold text-slate-700 truncate block" title={doc.name}>
+                              {doc.name}
+                            </span>
+                          </div>
                           <a
                             href={doc.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-[10px] text-primary font-bold hover:underline shrink-0"
+                            className="text-[10px] text-primary font-bold hover:underline shrink-0 block"
                           >
                             Unduh Berkas
                           </a>
@@ -14758,7 +14899,7 @@ export default function SubmissionDetailPage() {
         {/* Kolom Kanan (1/3): Status & Riwayat Pelacakan */}
         <div className="bg-white border border-border p-5 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] space-y-6 rounded-none text-left">
 
-          {/* Status Terkini */}
+          {/* Status Terkini (GRASP: Information Expert) */}
           <div className="border-b border-border pb-5 select-none">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Status Berkas Saat Ini</span>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold mt-2.5 border ${getStatusBadgeClass(sub.status)}`}>
@@ -15383,126 +15524,125 @@ export default function SubmissionVerificationPage() {
         </div>
       </div>
 
+      {/* Section: Sandingan Metrik Tapak - Full Width */}
+      <div className="space-y-4">
+        <div className="border-b border-slate-300 pb-2">
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
+          <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
+        </div>
+
+        <div className="w-full border border-slate-300 bg-white rounded-none">
+          <table className="w-full text-xs font-sans text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
+                <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
+                <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
+                <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                  {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
+                  {sub.landArea && sub.technical?.applicantBuildingArea ? (
+                    <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
+                  ) : ''}
+                </td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={verifiedKdb}
+                      onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="KDB"
+                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.klb || '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={verifiedKlb}
+                    onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="KLB"
+                    className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={verifiedKdh}
+                      onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="KDH"
+                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={verifiedGsb}
+                      onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="GSB"
+                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
+                <td className="px-3 py-2 bg-slate-50/30">
+                  <div className="relative flex items-center w-full">
+                    <input
+                      type="number"
+                      value={verifiedRthArea}
+                      onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="RTH"
+                      className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                    />
+                    <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        {/* KOLOM KIRI: METRIK perbandingan, FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
+        {/* KOLOM KIRI: FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
         <div className="lg:col-span-5 space-y-8">
-
-          {/* Section: Sandingan Metrik Tapak */}
-          <div className="space-y-4">
-            <div className="border-b border-slate-300 pb-2">
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
-              <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
-            </div>
-
-            {/* Container tabel dengan overflow-x-auto agar tidak terpotong di mobile */}
-            <div className="w-full overflow-x-auto border border-slate-300 bg-white rounded-none">
-              <table className="w-full min-w-[500px] text-xs font-sans text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                    <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
-                    <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
-                    <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
-                    <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
-                      {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
-                      {sub.landArea && sub.technical?.applicantBuildingArea ? (
-                        <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
-                      ) : ''}
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={verifiedKdb}
-                          onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="KDB"
-                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.klb || '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={verifiedKlb}
-                        onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
-                        placeholder="KLB"
-                        className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={verifiedKdh}
-                          onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="KDH"
-                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={verifiedGsb}
-                          onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="GSB"
-                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
-                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
-                    <td className="px-3 py-2 bg-slate-50/30">
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="number"
-                          value={verifiedRthArea}
-                          onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="RTH"
-                          className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                        />
-                        <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
 
           {/* Section: Keputusan Akhir */}
           <div className="space-y-4 pt-4 border-t border-slate-300">

@@ -1,3 +1,4 @@
+/* STREAMING_CHUNK:Configuring imports and award icon */
 import { Award } from 'lucide-react';
 
 interface TechnicalTabProps {
@@ -7,6 +8,7 @@ interface TechnicalTabProps {
 export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-200 text-left">
+      {/* STREAMING_CHUNK:Rendering dynamic technical category header block */}
       <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4 flex items-center gap-1.5">
         <Award className="h-4.5 w-4.5 text-primary" />
         Parameter Teknis Kategori: {sub.submissionDetails?.category || 'PERUMAHAN'}
@@ -17,6 +19,8 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
           Sandingan Metrik Tiga Sisi (Proposed vs Bylaws vs Verified)
         </span>
+
+        {/* STREAMING_CHUNK:Rendering unified comparison ledger table grid */}
         <div className="overflow-x-auto border border-border">
           <table className="min-w-full divide-y divide-border text-[11px] font-sans">
             <thead className="bg-slate-50 font-bold text-slate-500 text-left">
@@ -28,6 +32,7 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-white text-slate-700">
+              {/* Row 1: KDB proposed absolute area and dynamic ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">KDB (Koefisien Dasar Bangunan)</td>
                 <td className="px-3 py-2 border-r border-border font-mono">
@@ -37,24 +42,38 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKdb || 60}%</td>
                 <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKdb !== undefined && sub.verifiedKdb !== null ? `${sub.verifiedKdb}%` : '-'}</td>
               </tr>
+
+              {/* Row 2: KLB proposed absolute floor area and dynamic multiplier ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">KLB (Koefisien Lantai Bangunan)</td>
-                <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.klb || '-'}</td>
+                <td className="px-3 py-2 border-r border-border font-mono">
+                  {sub.technical?.totalFloorArea ? `${sub.technical.totalFloorArea.toLocaleString('id-ID')} m²` : '-'}
+                  {sub.technical?.klb ? ` (${Number(sub.technical.klb).toFixed(2)}x)` : ''}
+                </td>
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKlb || 3.5}</td>
-                <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKlb !== undefined && sub.verifiedKlb !== null ? sub.verifiedKlb : '-'}</td>
+                <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKlb !== undefined && sub.verifiedKlb !== null ? `${Number(sub.verifiedKlb).toFixed(2)}x` : '-'}</td>
               </tr>
+
+              {/* Row 3: KDH proposed absolute absorption area and dynamic ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">KDH (Koefisien Dasar Hijau)</td>
-                <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
+                <td className="px-3 py-2 border-r border-border font-mono">
+                  {sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}
+                  {sub.technical?.kdh ? ` (${Number(sub.technical.kdh).toFixed(1)}%)` : ''}
+                </td>
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinKdh || 10}%</td>
                 <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKdh !== undefined && sub.verifiedKdh !== null ? `${sub.verifiedKdh}%` : '-'}</td>
               </tr>
+
+              {/* Row 4: GSB proposed setback comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">GSB (Garis Sempadan Bangunan)</td>
                 <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinGsb || 5} m</td>
                 <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedGsb !== undefined && sub.verifiedGsb !== null ? `${sub.verifiedGsb} m` : '-'}</td>
               </tr>
+
+              {/* Row 5: RTH proposed absolute green area and ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">RTH (Ruang Terbuka Hijau)</td>
                 <td className="px-3 py-2 border-r border-border font-mono">
@@ -69,7 +88,7 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
         </div>
       </div>
 
-      {/* Rendering kondisional parameter berdasarkan kategori aktual permohonan */}
+      {/* STREAMING_CHUNK:Rendering category specific physical parameters */}
       {(!sub.submissionDetails?.category || sub.submissionDetails.category === 'PERUMAHAN') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
           <div>
@@ -106,28 +125,12 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
             <span className="text-xs font-bold text-slate-700 block">{sub.technical?.buildingBlocks ? `${sub.technical.buildingBlocks} blok` : '-'}</span>
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Koefisien Dasar Bangunan (KDB)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.kdb ? `${sub.technical.kdb} %` : '-'}</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Koefisien Lantai Bangunan (KLB)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.klb || '-'}</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Koefisien Dasar Hijau (KDH)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.kdh ? `${sub.technical.kdh} %` : '-'}</span>
-          </div>
-          <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Kapasitas Tempat Parkir (SRP)</span>
             <span className="text-xs font-bold text-slate-700 block">{sub.technical?.parkingCapacity ? `${sub.technical.parkingCapacity} satuan` : '-'}</span>
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Jumlah Lantai Maksimal Rencana</span>
             <span className="text-xs font-bold text-slate-700 block">{sub.technical?.maxFloors ? `${sub.technical.maxFloors} lantai` : '-'}</span>
-          </div>
-          <div className="md:col-span-2">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Total Luas Lantai Keseluruhan (GFA)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.totalFloorArea ? `${sub.technical.totalFloorArea.toLocaleString('id-ID')} m²` : '-'}</span>
           </div>
         </div>
       )}

@@ -1,14 +1,5 @@
-/**
- * ============================================================================
- * GEOSIPAS DETIL & COCKPIT VERIFIKASI — [SubmissionDetailPage.tsx] (REVISED v3)
- * ============================================================================
- * Peran: Layar utama verifikasi dinas lintas OPD dan dasbor scorecard pemohon.
- *        Mengintegrasikan 13 aspek checklist toggle, tabel komparasi tiga sisi,
- *        SLA tracking dinamis, andalalin/AMDAL check, dan tanda tangan digital.
- * ============================================================================
- */
-
-import { useState, useMemo, useRef, useEffect } from 'react';
+/* STREAMING_CHUNK:Configuring imports and base constants */
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
@@ -76,6 +67,7 @@ function calculateCentroid(polygon: [number, number][]): [number, number] {
 }
 
 export default function SubmissionDetailPage() {
+  /* STREAMING_CHUNK:Initializing page queries and mutations */
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -154,6 +146,7 @@ export default function SubmissionDetailPage() {
   }, [sub]);
 
   const mutation = useMutation({
+    /* STREAMING_CHUNK:Configuring admin and technical action states */
     mutationFn: async ({
       status,
       notes,
@@ -424,7 +417,7 @@ export default function SubmissionDetailPage() {
       {/* ─── SEKSI 2: CORE WORKSPACE GRID (SPLIT 2/3 DAN 1/3) ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Kolom Kiri (2/3): Informasi Proyek & Berkas Laporan */}
+        {/* STREAMING_CHUNK:Rendering main view and summary layout */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Tab Navigation Menu */}
@@ -596,7 +589,7 @@ export default function SubmissionDetailPage() {
             </div>
           )}
 
-          {/* Consent Compliance Modal (GRASP: Protected Variations) */}
+          {/* STREAMING_CHUNK:Rendering consent and TTE sign widgets */}
           {isVerificationConsentOpen && (
             <div className="fixed inset-0 z-[999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white border-2 border-primary max-w-lg w-full p-6 space-y-5 text-left animate-in fade-in zoom-in-95 duration-200">
@@ -836,3 +829,4 @@ export default function SubmissionDetailPage() {
     </div>
   );
 }
+

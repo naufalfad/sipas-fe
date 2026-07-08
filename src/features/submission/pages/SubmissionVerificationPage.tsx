@@ -1,3 +1,4 @@
+/* STREAMING_CHUNK:Configuring imports and verification schemas */
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
@@ -8,7 +9,7 @@ import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, Loader2, UploadCloud,
   FileSignature, AlertTriangle, ShieldCheck,
-  ChevronDown, Check, X, Trash2, Info
+  ChevronDown, Trash2, Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -16,19 +17,19 @@ import { uploadFileToBackend } from '@/features/submission/utils/upload';
 import { VERIFICATION_ASPECTS } from '../constants/verificationAspects';
 
 const getDocCategoryLabel = (key?: string) => {
-  if (key === 'legalDoc') return 'Sertifikat Tanah & KTP (Langkah 3)';
-  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD (Langkah 6)';
-  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT (Langkah 5)';
-  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)';
-  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)';
-  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf) (Langkah 4)';
+  if (key === 'legalDoc') return 'Sertifikat Tanah & KTP';
+  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD';
+  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT';
+  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3';
+  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf)';
   return 'Dokumen Lampiran Pendukung';
 };
 
-const inputClass = "w-full px-3 py-2 bg-white border border-slate-300 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-800 transition-all font-sans text-xs rounded-none";
 const labelClass = "block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider";
 
 export default function SubmissionVerificationPage() {
+  /* STREAMING_CHUNK:Initializing react state and queries */
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -60,6 +61,7 @@ export default function SubmissionVerificationPage() {
     enabled: !!id,
   });
 
+  /* STREAMING_CHUNK:Syncing baseline parameters from database schema */
   useEffect(() => {
     if (sub) {
       if (sub.kkprVerdict) setKkprVerdict(sub.kkprVerdict);
@@ -120,6 +122,7 @@ export default function SubmissionVerificationPage() {
   const verified_gsb_final = useMemo(() => (verifiedGsb === '' ? undefined : verifiedGsb), [verifiedGsb]);
   const verified_rth_area_final = useMemo(() => (verifiedRthArea === '' ? undefined : verifiedRthArea), [verifiedRthArea]);
 
+  /* STREAMING_CHUNK:Configuring status transition and save mutations */
   const mutation = useMutation({
     mutationFn: async ({
       status,
@@ -182,11 +185,11 @@ export default function SubmissionVerificationPage() {
     }));
   };
 
+  /* STREAMING_CHUNK:Handling physical attachment uploads for technical checklist */
   const handleAspectAttachmentUpload = async (code: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 20MB
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -308,125 +311,131 @@ export default function SubmissionVerificationPage() {
         </div>
       </div>
 
-      {/* Section: Sandingan Metrik Tapak - Full Width */}
-      <div className="space-y-4">
-        <div className="border-b border-slate-300 pb-2">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
-          <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
-        </div>
-
-        <div className="w-full border border-slate-300 bg-white rounded-none">
-          <table className="w-full text-xs font-sans text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
-                <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
-                <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
-                <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
-                  {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
-                  {sub.landArea && sub.technical?.applicantBuildingArea ? (
-                    <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
-                  ) : ''}
-                </td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={verifiedKdb}
-                      onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="KDB"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.klb || '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={verifiedKlb}
-                    onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="KLB"
-                    className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={verifiedKdh}
-                      onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="KDH"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={verifiedGsb}
-                      onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="GSB"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      value={verifiedRthArea}
-                      onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="RTH"
-                      className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        {/* KOLOM KIRI: FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
+        {/* KOLOM KIRI: METRIK perbandingan, FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
         <div className="lg:col-span-5 space-y-8">
+
+          {/* Section: Sandingan Metrik Tapak */}
+          <div className="space-y-4">
+            <div className="border-b border-slate-300 pb-2">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
+            </div>
+
+            <div className="w-full overflow-x-auto border border-slate-300 bg-white rounded-none">
+              <table className="w-full min-w-[500px] text-xs font-sans text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
+                    <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
+                    <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
+                    <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                      {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
+                      {sub.landArea && sub.technical?.applicantBuildingArea ? (
+                        <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
+                      ) : ''}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={verifiedKdb}
+                          onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="KDB"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                      {sub.technical?.totalFloorArea ? `${sub.technical.totalFloorArea.toLocaleString('id-ID')} m²` : '-'}
+                      {sub.technical?.klb ? ` (${Number(sub.technical.klb).toFixed(2)}x)` : ''}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={verifiedKlb}
+                        onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="KLB"
+                        className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                      {sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}
+                      {sub.technical?.kdh ? ` (${Number(sub.technical.kdh).toFixed(1)}%)` : ''}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={verifiedKdh}
+                          onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="KDH"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={verifiedGsb}
+                          onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="GSB"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          value={verifiedRthArea}
+                          onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="RTH"
+                          className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* Section: Keputusan Akhir */}
           <div className="space-y-4 pt-4 border-t border-slate-300">
@@ -460,7 +469,7 @@ export default function SubmissionVerificationPage() {
             </div>
           </div>
 
-          {/* Section: Ringkasan Pengajuan */}
+          {/* Section: Detail Pendaftaran */}
           <div className="space-y-4 pt-4 border-t border-slate-300">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Detail Pendaftaran</h2>
             <div className="divide-y divide-slate-200 text-xs">
@@ -478,9 +487,7 @@ export default function SubmissionVerificationPage() {
               </div>
               <div className="py-2.5 flex justify-between gap-4">
                 <span className="text-slate-500">Lokasi Tapak</span>
-                <span className="text-slate-700 text-right font-medium" title={sub.locationDetails?.fullAddress}>
-                  {sub.locationDetails?.village || '-'}, {sub.locationDetails?.district || '-'}
-                </span>
+                <span className="text-slate-700 text-right font-medium" title={sub.locationDetails?.fullAddress}>{sub.locationDetails?.village || '-'}, {sub.locationDetails?.district || '-'}</span>
               </div>
             </div>
           </div>
@@ -561,33 +568,23 @@ export default function SubmissionVerificationPage() {
                     </button>
 
                     <div className="flex items-center gap-3 shrink-0">
-                      {/* Segmented Flat Control (Instead of Rounded Switch Toggle) */}
-                      <div className="flex border border-slate-300 rounded-none overflow-hidden text-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleAspect(aspect.code, 'Sesuai')}
+                      {/* STREAMING_CHUNK:Rendering dynamic checklist items */}
+                      {/* Segmented Toggle Control (Custom Pill Switch Toggle) */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAspect(aspect.code, isSesuai ? 'Tidak Sesuai' : 'Sesuai')}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2",
+                          isSesuai ? "bg-emerald-500" : "bg-slate-300"
+                        )}
+                      >
+                        <span
                           className={cn(
-                            "px-2.5 py-1 font-bold uppercase tracking-wider transition-all border-none cursor-pointer rounded-none",
-                            isSesuai
-                              ? "bg-slate-900 text-white"
-                              : "bg-white text-slate-400 hover:bg-slate-50"
+                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                            isSesuai ? "translate-x-5" : "translate-x-0"
                           )}
-                        >
-                          Sesuai
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleAspect(aspect.code, 'Tidak Sesuai')}
-                          className={cn(
-                            "px-2.5 py-1 font-bold uppercase tracking-wider transition-all border-none cursor-pointer rounded-none",
-                            !isSesuai
-                              ? "bg-rose-700 text-white"
-                              : "bg-white text-slate-400 hover:bg-slate-50"
-                          )}
-                        >
-                          Tidak
-                        </button>
-                      </div>
+                        />
+                      </button>
 
                       <button
                         type="button"

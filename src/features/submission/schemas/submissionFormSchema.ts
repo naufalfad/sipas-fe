@@ -1,13 +1,4 @@
-/**
- * ============================================================================
- * GEOSIPAS SYSTEM SCHEMAS — [src/features/submission/schemas/submissionFormSchema.ts]
- * ============================================================================
- * Peran: Skema validasi formulir terpadu menggunakan Zod.
- *        Diperbarui penuh untuk mendukung metrik usulan pemohon (proposed)
- *        pada Tahap 6 serta tipe data string hasil Direct Upload dokumen/foto.
- * ============================================================================
- */
-
+/* STREAMING_CHUNK:Configuring imports and base schema properties */
 import * as z from 'zod';
 
 // ─── PURE FABRICATION: HELPER PREPROSES DATA NUMERIK ────────────────────────
@@ -16,6 +7,7 @@ const numericPreprocess = (val: unknown) => {
   return Number(val);
 };
 
+/* STREAMING_CHUNK:Defining applicant and submission schemas */
 export const applicantSchema = z.object({
   type: z.enum(['PERORANGAN', 'BADAN_USAHA']),
   name: z.string().min(3, 'Nama wajib diisi'),
@@ -34,6 +26,7 @@ export const submissionDataSchema = z.object({
   category: z.enum(['PERUMAHAN', 'NON_PERUMAHAN', 'FASUM', 'INDUSTRI']),
 });
 
+/* STREAMING_CHUNK:Defining location and coordinate transformation schemas */
 export const locationSchema = z.object({
   locationName: z.string().min(3, 'Nama lokasi wajib diisi'),
   village: z.string().min(3, 'Desa/Kelurahan wajib diisi'),
@@ -41,15 +34,18 @@ export const locationSchema = z.object({
   city: z.string().min(3, 'Kabupaten/Kota wajib diisi'),
   province: z.string().min(3, 'Provinsi wajib diisi'),
   fullAddress: z.string().min(10, 'Alamat lengkap wajib diisi'),
-  landArea: z.number().positive('Luas lahan harus lebih besar dari 0'),
+  landArea: z.preprocess(
+    numericPreprocess,
+    z.number().positive('Luas lahan harus lebih besar dari 0')
+  ),
   ownershipStatus: z.enum(['SHM', 'HGB', 'HAK_PAKAI', 'LAINNYA']),
   certificateNumber: z.string().min(3, 'Nomor sertifikat wajib diisi'),
   certificateOwner: z.string().min(3, 'Nama pemilik sertifikat wajib diisi'),
 });
 
 export const coordinateSchema = z.object({
-  polygon: z.any().optional(), // Untuk menyimpan koordinat poligon georeferenced bumi nyata
-  coordinatesText: z.string().optional(), // Untuk menyimpan penulisan manual teks GeoJSON koordinat
+  polygon: z.any().optional(), // Menyimpan koordinat poligon georeferenced bumi nyata
+  coordinatesText: z.string().optional(), // Menyimpan penulisan manual teks GeoJSON koordinat
 
   // ─── PARAMETER TRANSFORMASI CAD HELMERT 2D (SINKRONISASI SPASIAL) [Jakarta 5] ───
   cadFileName: z.string().optional(),       // Nama file CAD (.dwg / .dxf) asal
@@ -61,10 +57,14 @@ export const coordinateSchema = z.object({
   cadRotation: z.number().optional(),       // Sudut rotasi spasial (theta) dalam satuan radian
 });
 
+/* STREAMING_CHUNK:Defining spatial and technical specification schemas */
 export const spatialSchema = z.object({
   kkprNumber: z.string().min(3, 'Nomor KKPR wajib diisi'),
   landUse: z.string().min(3, 'Peruntukan lahan wajib diisi'),
-  greenArea: z.number().min(0, 'Luas PSU/RTH tidak boleh negatif'),
+  greenArea: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, 'Luas PSU/RTH tidak boleh negatif')
+  ),
 });
 
 export const technicalSchema = z.object({
@@ -144,7 +144,7 @@ export const technicalSchema = z.object({
   roadPlan: z.string().optional(),
   drainagePlan: z.string().optional(),
 
-  // ─── BARU (REVISI): METRIK USULAN PEMOHON (PROPOSED METRICS) ───
+  // ─── REVISI: METRIK USULAN PEMOHON (PROPOSED METRICS) ───
   applicantBuildingArea: z.preprocess(
     numericPreprocess,
     z.number().positive("Luas bangunan wajib diisi")
@@ -159,6 +159,7 @@ export const technicalSchema = z.object({
   )
 });
 
+/* STREAMING_CHUNK:Defining consultant, document, photo, and statement schemas */
 export const consultantSchema = z.object({
   consultantName: z.string().min(3, 'Nama konsultan wajib diisi'),
   companyName: z.string().min(3, 'Nama perusahaan wajib diisi'),
@@ -191,6 +192,7 @@ export const statementSchema = z.object({
   })
 });
 
+/* STREAMING_CHUNK:Consolidating unified submission schema and type declarations */
 export const fullSubmissionSchema = z.object({
   id_permohonan: z.string().optional(),
   applicant: applicantSchema,

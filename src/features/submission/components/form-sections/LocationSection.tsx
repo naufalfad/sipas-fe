@@ -6,7 +6,7 @@ import bogorRegions from '../../data/bogorRegions.json';
 import { LabelWithInfo } from './LabelWithInfo';
 import { FormattedInput } from './FormattedInput';
 import { ContextualUploadBox } from './ContextualUploadBox';
-import { inputClass, labelClass } from './styles';
+import { inputClass } from './styles';
 
 export const LocationSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
