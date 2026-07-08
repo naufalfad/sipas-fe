@@ -81,6 +81,7 @@ export const technicalSchema = z.object({
   roadRowMain: z.string().optional(),      // Lebar ROW Jalan Utama
   roadRowLocal: z.string().optional(),     // Lebar ROW Jalan Lingkungan
   waterSystem: z.string().optional(),      // Sistem Penyediaan Air Bersih
+  waterSource: z.string().optional(),      // Sumber Air Bersih
 
   // --- KATEGORI 2: NON_PERUMAHAN ---
   buildingBlocks: z.preprocess(

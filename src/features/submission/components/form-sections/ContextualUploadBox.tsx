@@ -31,6 +31,16 @@ export const ContextualUploadBox = ({
         return;
       }
 
+      // Check allowed extensions if accept is provided
+      if (accept) {
+        const allowedExtensions = accept.split(',').map(ext => ext.trim().toLowerCase());
+        const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+        if (!allowedExtensions.includes(fileExtension)) {
+          toast.error(`Format berkas tidak valid! Hanya menerima format: ${accept}`);
+          return;
+        }
+      }
+
       try {
         setLoading(true);
         const res = await uploadFileToBackend(file);

@@ -144,9 +144,10 @@ export const LocationSection = () => {
         {/* ─── DYNAMIC UPLOAD: Sertifikat Hak Lahan (SHM/HGB) ─── */}
         <div className="md:col-span-2 pt-2 border-t border-slate-100">
           <ContextualUploadBox
-            label="Unggah Scan Dokumen Sertifikat Tanah (SHM/HGB)"
+            label="Unggah Dokumen Sertifikat Tanah (SHM/HGB)"
             fieldKey="document.legalDoc"
-            helpText="Unggah scan dokumen sertifikat kepemilikan tanah asli BPN untuk validasi data administratif."
+            accept=".pdf"
+            helpText="Unggah scan dokumen sertifikat kepemilikan tanah asli BPN untuk validasi data administratif (Format PDF)."
           />
         </div>
       </div>

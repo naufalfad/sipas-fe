@@ -108,6 +108,7 @@ export default function SubmissionCreatePage() {
           roadRowMain: existingSub.technical?.roadRowMain || undefined,
           roadRowLocal: existingSub.technical?.roadRowLocal || undefined,
           waterSystem: existingSub.technical?.waterSystem || undefined,
+          waterSource: existingSub.technical?.waterSource || undefined,
           buildingBlocks: existingSub.technical?.buildingBlocks || undefined,
           kdb: existingSub.technical?.kdb || undefined,
           klb: existingSub.technical?.klb || undefined,

@@ -215,8 +215,8 @@ export const TechnicalSection = () => {
       {category === 'PERUMAHAN' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
           <div className="flex flex-col justify-between h-full">
-            <LabelWithInfo label="Jumlah Kaveling Efektif" helpText="Jumlah total unit kaveling hunian efektif yang akan dibangun pada rencana tapak." />
-            <FormattedInput name="technical.lotCount" placeholder="Contoh: 150" unit="Kaveling" />
+            <LabelWithInfo label="Jumlah Unit Efektif" helpText="Jumlah total unit hunian efektif yang akan dibangun pada rencana tapak." />
+            <FormattedInput name="technical.lotCount" placeholder="Contoh: 150" unit="Unit" />
             {errors.technical?.lotCount && <p className="text-xs text-rose-500 mt-1">{errors.technical.lotCount.message}</p>}
           </div>
           <div className="flex flex-col justify-between h-full">
@@ -230,7 +230,7 @@ export const TechnicalSection = () => {
 
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border border-[#DAE4DB] bg-[#f4f7f4]/20 p-4">
             <div className="flex flex-col justify-between h-full">
-              <LabelWithInfo label="Luas Kaveling Makam / TPU Rencana (m²)" helpText={`Penyediaan area makam fisik / TPU rencana (wajib minimal 2% dari total luas lahan perumahan: ${landArea > 0 ? (landArea * 0.02).toLocaleString('id-ID') : '0'} m²).`} />
+              <LabelWithInfo label="Luas Unit Makam / TPU Rencana (m²)" helpText={`Penyediaan area makam fisik / TPU rencana (wajib minimal 2% dari total luas lahan perumahan: ${landArea > 0 ? (landArea * 0.02).toLocaleString('id-ID') : '0'} m²).`} />
               <FormattedInput name="technical.cemeteryArea" placeholder="Penyediaan 2% dari luas total" unit="m²" onChangeCustom={handleCemeteryLuasChangeVal} />
               {errors.technical?.cemeteryArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.cemeteryArea.message}</p>}
             </div>
@@ -267,12 +267,19 @@ export const TechnicalSection = () => {
             <input {...register('technical.roadRowMain')} type="text" className={inputClass} placeholder="Contoh: ROW 8 Meter" />
           </div>
           <div className="flex flex-col justify-between h-full">
-            <LabelWithInfo label="Lebar ROW Jalan Lingkungan (m)" helpText="Lebar ruang milik jalan penghubung antar kaveling hunian (misal: ROW 6 Meter)." />
+            <LabelWithInfo label="Lebar ROW Jalan Lingkungan (m)" helpText="Lebar ruang milik jalan penghubung antar unit hunian (misal: ROW 6 Meter)." />
             <input {...register('technical.roadRowLocal')} type="text" className={inputClass} placeholder="Contoh: ROW 6 Meter" />
           </div>
           <div className="flex flex-col justify-between h-full">
-            <LabelWithInfo label="Sistem Distribusi Air Bersih" helpText="Sistem penyediaan air minum bagi warga kawasan tapak perumahan." />
-            <input {...register('technical.waterSystem')} type="text" className={inputClass} placeholder="Contoh: PDAM / Sumur Bor Komunal" />
+            <LabelWithInfo label="Sistem Distribusi Air Bersih (SPAM)" helpText="Sistem penyediaan air minum bagi warga kawasan tapak perumahan." />
+            <select {...register('technical.waterSystem')} className={inputClass}>
+              <option value="ADA">Ada</option>
+              <option value="TIDAK_ADA">Tidak Ada</option>
+            </select>
+          </div>
+          <div className="flex flex-col justify-between h-full">
+            <LabelWithInfo label="Sumber Air Bersih" helpText="Sumber penyediaan air minum bagi warga kawasan tapak perumahan." />
+            <input {...register('technical.waterSource')} type="text" className={inputClass} placeholder="Contoh: PDAM / Sumur Bor Komunal" />
           </div>
 
           {/* ─── DYNAMIC UPLOAD: Dokumen Rencana PSU ─── */}
