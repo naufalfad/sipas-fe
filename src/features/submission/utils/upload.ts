@@ -1,9 +1,11 @@
+import { API_BASE_URL } from '@/config';
+
 export const uploadFileToBackend = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
 
   const token = localStorage.getItem('token');
-  const response = await fetch('http://localhost:8000/api/v1/submissions/upload', {
+  const response = await fetch(`${API_BASE_URL}/api/v1/submissions/upload`, {
     method: 'POST',
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),

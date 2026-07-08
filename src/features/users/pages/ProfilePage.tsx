@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { API_BASE_URL } from '@/config';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
@@ -55,7 +56,7 @@ export default function ProfilePage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/v1/auth/profile', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

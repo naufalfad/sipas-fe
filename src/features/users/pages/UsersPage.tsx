@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { mockUsers } from '@/mock/users/users';
 import { toast } from 'sonner';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import { API_BASE_URL } from '@/config';
 import {
   UserCog,
   Plus,
@@ -27,7 +28,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/v1/auth/users', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -79,7 +80,7 @@ export default function UsersPage() {
       const toastId = toast.loading('Memproses penonaktifan akun...');
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8000/api/v1/auth/users/${username}/status`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/users/${username}/status`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
