@@ -1,9 +1,12 @@
 /**
  * ============================================================================
- * SIPAS MAP — Immersive 3D GIS Canvas [MODULARIZED v3.0]
+ * SIPAS MAP — Immersive 3D GIS Canvas [MODULARIZED v3.1]
  * ============================================================================
  * Engine  : MapLibre GL JS (WebGL, open-source)
  * Wrapper : react-map-gl v7
+ * Peran   : Merender visualisasi peta 3D, memuat model bangunan 3D, serta
+ *           menampilkan batas lahan kompensasi dan benturan spasial (clash geometry)
+ *           yang ditarik dari database PostGIS di backend [Buku 2 21, Bogor 3].
  * ============================================================================
  */
 
@@ -26,7 +29,7 @@ import { SpatialGeoJSONLayers } from './layers/SpatialGeoJSONLayers';
 import { useSipasMapData, type ProcessedSubmission } from '../hooks/useSipasMapData';
 import { useCustom3DLayer } from '../hooks/useCustom3DLayer';
 
-// ─── Konstanta ─────────────────────────────────────────────────────────────────
+// ─── Konstanta Geografis Kabupaten Bogor ──────────────────────────────────────
 const BOGOR_LNG = 106.8560;
 const BOGOR_LAT = -6.4816;
 
@@ -45,7 +48,7 @@ const REGIONAL_BOUNDS: [[number, number], [number, number]] = [
   [150.0, 15.0],   // NE: Pasifik timur Filipina
 ];
 
-// ─── Basemap Style Factory ─────────────────────────────────────────────────────
+// ─── Basemap Style Factory (Anti-Redundant Styles Cache) ───────────────────────
 const styleCache = new globalThis.Map<string, StyleSpecification>();
 
 function buildRasterStyle(tileUrl: string, attribution: string): StyleSpecification {
@@ -95,12 +98,13 @@ function getMapStyle(activeBaseMap: string): StyleSpecification {
   }
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Spasial Helpers (Information Expert) ──────────────────────────────────────
 function calculateCentroid(polygon: [number, number][]): [number, number] {
   let totalLng = 0;
   let totalLat = 0;
   polygon.forEach((coord) => {
     const [a, b] = coord;
+    // Deteksi otomatis pertukaran koordinat Leaflet vs OGC Standard [lat, lng] <-> [lng, lat]
     if (a >= -15 && a <= 10 && b >= 90 && b <= 145) {
       totalLng += b;
       totalLat += a;
@@ -185,7 +189,7 @@ export default function SipasMap() {
     };
   }, [activeBaseMap, customUser3DLayer]);
 
-  // Handle terrain configuration updates
+  // Handle terrain configuration updates (3D Dem Elevation)
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!map) return;
@@ -570,6 +574,8 @@ export default function SipasMap() {
           submissionsGeoJSON={mapData.submissionsGeoJSON}
           subPolygonsGeoJSON={mapData.subPolygonsGeoJSON}
           compensationGeoJSON={mapData.compensationGeoJSON}
+
+          // ─── MODIFIKASI: GUNAKAN GEOMETRI CLASH DINAMIS HASIL AUDIT POSTGIS BACKEND ───
           clashGeoJSON={mapData.clashGeoJSON}
         />
 
@@ -618,7 +624,7 @@ export default function SipasMap() {
             />
           ))}
 
-        {/* Sonar Ripple Pins for Conflicts */}
+        {/* Sonar Ripple Pins for Conflicts (Sidak Lapangan & Drone-Mapping) [Bogor 8] */}
         {spatialConflicts.map((conflict) => (
           <Marker
             key={conflict.id}

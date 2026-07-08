@@ -354,6 +354,9 @@ function App() {
 
 export default App
 
+--- FILE: src\config.ts ---
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 --- FILE: src\index.css ---
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
 
@@ -1150,6 +1153,7 @@ export const useGisUIStore = create<GisUIState>((set) => ({
 --- FILE: src\app\store\useUIStore.ts ---
 import { create } from 'zustand';
 import { useAuthStore } from './useAuthStore';
+import { API_BASE_URL } from '@/config';
 
 // ─── DEFINISI TIPE & ANTARMUKA MODULAR ──────────────────────────────────────────
 
@@ -1287,7 +1291,7 @@ export const useUIStore = create<UIState>((set) => ({
     else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/token', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -3131,6 +3135,7 @@ export default function ReportsPage() {
 --- FILE: src\features\auth\pages\LoginPage.tsx ---
 import { useForm } from 'react-hook-form';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { API_BASE_URL } from '@/config';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
@@ -3170,7 +3175,7 @@ export default function LoginPage() {
     const toastId = toast.loading('Sedang mengautentikasi...');
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/token', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -3311,6 +3316,7 @@ export default function LoginPage() {
 --- FILE: src\features\auth\pages\RegisterPage.tsx ---
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
+import { API_BASE_URL } from '@/config';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
@@ -3362,7 +3368,7 @@ export default function RegisterPage() {
     const toastId = toast.loading('Sedang mendaftarkan akun...');
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -6789,6 +6795,7 @@ export default function CompensationPanel() {
 }
 
 --- FILE: src\features\gis\components\panels\DetailSubmissionPanel.tsx ---
+/* STREAMING_CHUNK:Configuring imports and base validation schema interfaces */
 import { useMemo, useState, useEffect } from 'react';
 import {
     MapPin, CheckCircle2,
@@ -6811,7 +6818,19 @@ interface ValidationRow {
     status: 'LOLOS' | 'REVISI';
 }
 
+const getStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case 'Disetujui':
+      return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
+    case 'Ditolak':
+      return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
+    default:
+      return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
+  }
+};
+
 export default function DetailSubmissionPanel({ submissionData }: DetailSubmissionPanelProps) {
+    /* STREAMING_CHUNK:Initializing hooks and clear clash triggers */
     const navigate = useNavigate();
     const { validateRiverBuffer, isProcessing: isChecking } = useSpatialValidator();
     const [auditResult, setAuditResult] = useState<any>(null);
@@ -6829,24 +6848,57 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         };
     }, []);
 
-    // --- MATRIKS VALIDASI STANDAR DAERAH (KABUPATEN BOGOR) ---
-    // Memetakan hasil kalkulasi sistem vs standar perda (Slide 6)
+    /* STREAMING_CHUNK:Resolving proposed metrics and bylaws dynamically from API */
     const validationMatrix = useMemo<ValidationRow[]>(() => {
         if (!submissionData) return [];
-        const kdbPercent = submissionData.kdbPercent || 60.5; // Dummy fallback jika data db kosong
-        const klbValue = submissionData.klbValue || 3.2;
-        const kdhPercent = submissionData.kdhPercent || 12.1;
-        const rthArea = submissionData.rthArea || 1500;
-        const psuArea = submissionData.psuArea || 500;
-        const roadArea = submissionData.roadArea || 250;
+
+        const tech = submissionData.technical || {};
+
+        // Match proposed inputs with safe ratiometrics computed by the form
+        const kdb = tech.kdb !== undefined ? tech.kdb : (submissionData.kdbPercent || 0);
+        const klb = tech.klb !== undefined ? tech.klb : (submissionData.klbValue || 0);
+        const kdh = tech.kdh !== undefined ? tech.kdh : (submissionData.kdhPercent || 0);
+        const gsb = tech.applicantGsb !== undefined ? tech.applicantGsb : 0;
+        const rth = tech.applicantRthArea !== undefined ? tech.applicantRthArea : (submissionData.rthArea || 0);
+
+        // Dynamically resolve bylaws bounds with safe system level fallbacks
+        const maxKdb = submissionData.bylawMaxKdb !== undefined ? submissionData.bylawMaxKdb : 60.0;
+        const maxKlb = submissionData.bylawMaxKlb !== undefined ? submissionData.bylawMaxKlb : 3.5;
+        const minKdh = submissionData.bylawMinKdh !== undefined ? submissionData.bylawMinKdh : 10.0;
+        const minGsb = submissionData.bylawMinGsb !== undefined ? submissionData.bylawMinGsb : 5.0;
+        const minRth = submissionData.bylawMinRthArea !== undefined ? submissionData.bylawMinRthArea : 1400.0;
 
         return [
-            { parameter: "KDB (Koefisien Dasar Bangunan)", hasilSistem: `${kdbPercent}%`, standarPerda: "Maks 60%", status: kdbPercent <= 60 ? "LOLOS" : "REVISI" },
-            { parameter: "KLB (Koefisien Lantai Bangunan)", hasilSistem: String(klbValue), standarPerda: "Maks 3.5", status: klbValue <= 3.5 ? "LOLOS" : "REVISI" },
-            { parameter: "KDH (Koefisien Dasar Hijau)", hasilSistem: `${kdhPercent}%`, standarPerda: "Min 10%", status: kdhPercent >= 10 ? "LOLOS" : "REVISI" },
-            { parameter: "RTH (Ruang Terbuka Hijau)", hasilSistem: `${rthArea.toLocaleString('id-ID')} m²`, standarPerda: "Min 1.400 m²", status: rthArea >= 1400 ? "LOLOS" : "REVISI" },
-            { parameter: "Luas PSU (Fasilitas Umum)", hasilSistem: `${psuArea.toLocaleString('id-ID')} m²`, standarPerda: "Min 400 m²", status: psuArea >= 400 ? "LOLOS" : "REVISI" },
-            { parameter: "Luas Jalan & Saluran", hasilSistem: `${roadArea.toLocaleString('id-ID')} m²`, standarPerda: "Min 200 m²", status: roadArea >= 200 ? "LOLOS" : "REVISI" },
+            {
+                parameter: "KDB (Koefisien Dasar Bangunan)",
+                hasilSistem: kdb > 0 ? `${kdb.toFixed(1)}%` : "-",
+                standarPerda: `Maks ${maxKdb}%`,
+                status: kdb > 0 ? (kdb <= maxKdb ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "KLB (Koefisien Lantai Bangunan)",
+                hasilSistem: klb > 0 ? `${klb.toFixed(2)}x` : "-",
+                standarPerda: `Maks ${maxKlb}`,
+                status: klb > 0 ? (klb <= maxKlb ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "KDH (Koefisien Dasar Hijau)",
+                hasilSistem: kdh > 0 ? `${kdh.toFixed(1)}%` : "-",
+                standarPerda: `Min ${minKdh}%`,
+                status: kdh > 0 ? (kdh >= minKdh ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "GSB (Garis Sempadan Bangunan)",
+                hasilSistem: gsb > 0 ? `${gsb} m` : "-",
+                standarPerda: `Min ${minGsb} m`,
+                status: gsb > 0 ? (gsb >= minGsb ? "LOLOS" : "REVISI") : "REVISI"
+            },
+            {
+                parameter: "RTH (Ruang Terbuka Hijau)",
+                hasilSistem: rth > 0 ? `${rth.toLocaleString('id-ID')} m²` : "-",
+                standarPerda: `Min ${minRth.toLocaleString('id-ID')} m²`,
+                status: rth > 0 ? (rth >= minRth ? "LOLOS" : "REVISI") : "REVISI"
+            },
         ];
     }, [submissionData]);
 
@@ -6858,10 +6910,9 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         );
     }
 
-    // Cek apakah ada parameter yang bertentangan dengan perda (Status Revisi)
     const isRevisionRequired = validationMatrix.some(row => row.status === "REVISI");
 
-    // --- SINKRONISASI PEMANGGILAN TURF.JS PASCA-KLIK [Bogor 11] ---
+    /* STREAMING_CHUNK:Executing spatial validator via Turf.js multi-layer engine */
     const handleRunLiveAudit = async () => {
         if (!submissionData.location?.polygon || submissionData.location.polygon.length === 0) {
             toast.error('Geometri polygon batas lahan tidak ditemukan di berkas.');
@@ -6901,7 +6952,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         <div className="flex flex-col h-full w-full bg-white relative font-sans text-slate-800">
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0 text-left">
 
-                {/* SECTION 1: HEADER SUMMARY BLOCK */}
+                {/* STREAMING_CHUNK:Rendering header summary blocks */}
                 <div className="px-4 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-start gap-3 select-none shrink-0">
                     <div className="space-y-1.5">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Nomor Berkas</span>
@@ -6909,16 +6960,14 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         <h4 className="text-xs font-black text-slate-900 leading-tight uppercase mt-2">{submissionData.housingName}</h4>
                     </div>
                     <span className={cn(
-                        "rounded-none text-[8px] font-black tracking-widest px-2.5 py-1 uppercase leading-none shrink-0",
-                        submissionData.status === 'Disetujui' ? 'bg-emerald-50 text-emerald-700' :
-                            submissionData.status === 'Ditolak' ? 'bg-rose-50 text-rose-700' :
-                                'bg-amber-50 text-amber-700'
+                        "rounded-none text-[8px] font-black tracking-widest px-2.5 py-1 uppercase leading-none shrink-0 border",
+                        getStatusBadgeClass(submissionData.status)
                     )}>
                         {submissionData.status}
                     </span>
                 </div>
 
-                {/* SECTION 2: ADAPTIVE PERDA COMPLIANCE BANNER */}
+                {/* STREAMING_CHUNK:Rendering adaptive compliance warning banner */}
                 <div className={cn(
                     "px-4 py-3.5 border-b text-[11px] font-semibold leading-relaxed text-left flex items-start gap-2.5",
                     isRevisionRequired
@@ -6937,7 +6986,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </p>
                 </div>
 
-                {/* SECTION 3: CORE PARAMETERS CARD GRID */}
+                {/* STREAMING_CHUNK:Rendering core parameters metadata card grid */}
                 <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 text-left">
                     <div className="bg-white p-4">
                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none mb-1.5">
@@ -6952,7 +7001,8 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         <span className="text-sm font-black text-slate-800 font-mono leading-none">60.5% KDB</span>
                     </div>
                 </div>
-                {/* --- TOMBOL LIVE AUDIT SPASIAL MULTI-LAYER (TURF.JS CLIENT-SIDE) --- */}
+
+                {/* STREAMING_CHUNK:Rendering live audit checking action boxes */}
                 <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/40 space-y-3">
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 leading-none">
@@ -6965,7 +7015,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         type="button"
                         disabled={isChecking || !submissionData.location?.polygon}
                         onClick={handleRunLiveAudit}
-                        className="w-full h-10 bg-teal-50 hover:bg-teal-100 text-teal-700 font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-teal-200 transition-all cursor-pointer outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
+                        className="w-full h-10 bg-teal-50 hover:bg-teal-100 text-teal-700 font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-teal-200 transition-all cursor-pointer outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
                     >
                         {isChecking ? (
                             <Loader2 className="h-4.5 w-4.5 animate-spin" />
@@ -6982,8 +7032,8 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                             <div className={cn(
                                 "p-3 text-[11px] leading-relaxed border text-left flex items-start gap-2",
                                 auditResult.verdict === 'TIDAK_LAYAK' ? "bg-rose-50 text-rose-700 border-rose-200" :
-                                auditResult.verdict === 'PERLU_REVISI' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                "bg-teal-50 text-teal-700 border-teal-200"
+                                    auditResult.verdict === 'PERLU_REVISI' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                        "bg-teal-50 text-teal-700 border-teal-200"
                             )}>
                                 <div className="flex-1">
                                     <div className="font-black text-xs uppercase tracking-tight flex items-center gap-1.5 mb-0.5">
@@ -7058,7 +7108,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </button>
                 </div>
 
-                {/* SECTION 4: HIGH-DENSITY PERDA VALIDATION MATRIX (Slide 6) */}
+                {/* STREAMING_CHUNK:Rendering high-density loss parameters comparison ledger */}
                 <div className="text-left">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 leading-none">
@@ -10555,7 +10605,6 @@ export const PhotosTab = ({ sub }: PhotosTabProps) => {
 };
 
 --- FILE: src\features\submission\components\detail-tabs\SummaryTab.tsx ---
-import { Link } from 'react-router-dom';
 import { File, MapPin } from 'lucide-react';
 
 // ─── PURE FABRICATION: RESOLVER LABEL DOKUMEN BERSIH (Decoupled from Steps) ───
@@ -10653,6 +10702,7 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
 };
 
 --- FILE: src\features\submission\components\detail-tabs\TechnicalTab.tsx ---
+/* STREAMING_CHUNK:Configuring imports and award icon */
 import { Award } from 'lucide-react';
 
 interface TechnicalTabProps {
@@ -10662,6 +10712,7 @@ interface TechnicalTabProps {
 export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-200 text-left">
+      {/* STREAMING_CHUNK:Rendering dynamic technical category header block */}
       <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4 flex items-center gap-1.5">
         <Award className="h-4.5 w-4.5 text-primary" />
         Parameter Teknis Kategori: {sub.submissionDetails?.category || 'PERUMAHAN'}
@@ -10672,6 +10723,8 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
           Sandingan Metrik Tiga Sisi (Proposed vs Bylaws vs Verified)
         </span>
+
+        {/* STREAMING_CHUNK:Rendering unified comparison ledger table grid */}
         <div className="overflow-x-auto border border-border">
           <table className="min-w-full divide-y divide-border text-[11px] font-sans">
             <thead className="bg-slate-50 font-bold text-slate-500 text-left">
@@ -10683,6 +10736,7 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-white text-slate-700">
+              {/* Row 1: KDB proposed absolute area and dynamic ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">KDB (Koefisien Dasar Bangunan)</td>
                 <td className="px-3 py-2 border-r border-border font-mono">
@@ -10692,24 +10746,38 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKdb || 60}%</td>
                 <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKdb !== undefined && sub.verifiedKdb !== null ? `${sub.verifiedKdb}%` : '-'}</td>
               </tr>
+
+              {/* Row 2: KLB proposed absolute floor area and dynamic multiplier ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">KLB (Koefisien Lantai Bangunan)</td>
-                <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.klb || '-'}</td>
+                <td className="px-3 py-2 border-r border-border font-mono">
+                  {sub.technical?.totalFloorArea ? `${sub.technical.totalFloorArea.toLocaleString('id-ID')} m²` : '-'}
+                  {sub.technical?.klb ? ` (${Number(sub.technical.klb).toFixed(2)}x)` : ''}
+                </td>
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Maks {sub.bylawMaxKlb || 3.5}</td>
-                <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKlb !== undefined && sub.verifiedKlb !== null ? sub.verifiedKlb : '-'}</td>
+                <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKlb !== undefined && sub.verifiedKlb !== null ? `${Number(sub.verifiedKlb).toFixed(2)}x` : '-'}</td>
               </tr>
+
+              {/* Row 3: KDH proposed absolute absorption area and dynamic ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">KDH (Koefisien Dasar Hijau)</td>
-                <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
+                <td className="px-3 py-2 border-r border-border font-mono">
+                  {sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}
+                  {sub.technical?.kdh ? ` (${Number(sub.technical.kdh).toFixed(1)}%)` : ''}
+                </td>
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinKdh || 10}%</td>
                 <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedKdh !== undefined && sub.verifiedKdh !== null ? `${sub.verifiedKdh}%` : '-'}</td>
               </tr>
+
+              {/* Row 4: GSB proposed setback comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">GSB (Garis Sempadan Bangunan)</td>
                 <td className="px-3 py-2 border-r border-border font-mono">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
                 <td className="px-3 py-2 border-r border-border text-slate-500 font-medium">Min {sub.bylawMinGsb || 5} m</td>
                 <td className="px-3 py-2 font-mono font-bold text-teal-700">{sub.verifiedGsb !== undefined && sub.verifiedGsb !== null ? `${sub.verifiedGsb} m` : '-'}</td>
               </tr>
+
+              {/* Row 5: RTH proposed absolute green area and ratio comparison */}
               <tr>
                 <td className="px-3 py-2 border-r border-border font-semibold">RTH (Ruang Terbuka Hijau)</td>
                 <td className="px-3 py-2 border-r border-border font-mono">
@@ -10724,7 +10792,7 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
         </div>
       </div>
 
-      {/* Rendering kondisional parameter berdasarkan kategori aktual permohonan */}
+      {/* STREAMING_CHUNK:Rendering category specific physical parameters */}
       {(!sub.submissionDetails?.category || sub.submissionDetails.category === 'PERUMAHAN') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
           <div>
@@ -10761,28 +10829,12 @@ export const TechnicalTab = ({ sub }: TechnicalTabProps) => {
             <span className="text-xs font-bold text-slate-700 block">{sub.technical?.buildingBlocks ? `${sub.technical.buildingBlocks} blok` : '-'}</span>
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Koefisien Dasar Bangunan (KDB)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.kdb ? `${sub.technical.kdb} %` : '-'}</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Koefisien Lantai Bangunan (KLB)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.klb || '-'}</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Koefisien Dasar Hijau (KDH)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.kdh ? `${sub.technical.kdh} %` : '-'}</span>
-          </div>
-          <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Kapasitas Tempat Parkir (SRP)</span>
             <span className="text-xs font-bold text-slate-700 block">{sub.technical?.parkingCapacity ? `${sub.technical.parkingCapacity} satuan` : '-'}</span>
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Jumlah Lantai Maksimal Rencana</span>
             <span className="text-xs font-bold text-slate-700 block">{sub.technical?.maxFloors ? `${sub.technical.maxFloors} lantai` : '-'}</span>
-          </div>
-          <div className="md:col-span-2">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Total Luas Lantai Keseluruhan (GFA)</span>
-            <span className="text-xs font-bold text-slate-700 block">{sub.technical?.totalFloorArea ? `${sub.technical.totalFloorArea.toLocaleString('id-ID')} m²` : '-'}</span>
           </div>
         </div>
       )}
@@ -12137,7 +12189,7 @@ import bogorRegions from '../../data/bogorRegions.json';
 import { LabelWithInfo } from './LabelWithInfo';
 import { FormattedInput } from './FormattedInput';
 import { ContextualUploadBox } from './ContextualUploadBox';
-import { inputClass, labelClass } from './styles';
+import { inputClass } from './styles';
 
 export const LocationSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
@@ -12618,6 +12670,7 @@ export const SubmissionSection = () => {
 };
 
 --- FILE: src\features\submission\components\form-sections\TechnicalSection.tsx ---
+/* STREAMING_CHUNK:Configuring imports and schema types */
 import { useState, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { CheckCircle2, Layers } from 'lucide-react';
@@ -12629,6 +12682,7 @@ import { cn } from '@/lib/utils';
 import { inputClass } from './styles';
 
 export const TechnicalSection = () => {
+  /* STREAMING_CHUNK:Initializing state and react hook form context */
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   const category = watch('submission.category') || 'PERUMAHAN';
   const landArea = watch('location.landArea') || 0;
@@ -12636,6 +12690,7 @@ export const TechnicalSection = () => {
   const cemeteryAreaVal = watch('technical.cemeteryArea');
   const [cemeteryPercent, setCemeteryPercent] = useState<string>('');
 
+  /* STREAMING_CHUNK:Defining cemetery ratio calculation handlers */
   const handleCemeteryLuasChangeVal = (val: number | undefined) => {
     if (landArea > 0 && val !== undefined && !isNaN(val)) {
       setCemeteryPercent(((val / landArea) * 100).toFixed(1));
@@ -12658,31 +12713,45 @@ export const TechnicalSection = () => {
     }
   }, [landArea, cemeteryAreaVal]);
 
-  // ─── REVISI: KALKULATOR KDB MANDIRI LIVE UNTUK PEMOHON ───
+  /* STREAMING_CHUNK:Watching proposed metrics raw inputs for reactive auto calculation */
   const applicantBuildingAreaVal = watch('technical.applicantBuildingArea');
+  const totalFloorAreaVal = watch('technical.totalFloorArea');
+  const applicantRthAreaVal = watch('technical.applicantRthArea');
   const applicantGsbVal = watch('technical.applicantGsb');
-  const applicantRthAreaVal = watch('technical.applicantRthArea') || 0;
-  const [computedKdbPercent, setComputedKdbPercent] = useState<string>('');
 
-  const computedRthPercent = landArea > 0 ? ((applicantRthAreaVal / landArea) * 100).toFixed(1) : '';
+  // Watch calculated ratios directly from react-hook-form to bypass local state delay
+  const kdbVal = watch('technical.kdb');
+  const klbVal = watch('technical.klb');
+  const kdhVal = watch('technical.kdh');
 
-  const handleBuildingAreaChange = (val: number | undefined) => {
-    if (landArea > 0 && val !== undefined && !isNaN(val)) {
-      const calculated = (val / landArea) * 100;
-      setValue('technical.kdb', Math.round(calculated * 100) / 100);
-      setComputedKdbPercent(calculated.toFixed(1));
-    } else {
-      setValue('technical.kdb', undefined);
-      setComputedKdbPercent('');
-    }
-  };
-
+  /* STREAMING_CHUNK:Running reactive calculations for KDB, KLB, and KDH ratios */
   useEffect(() => {
-    if (landArea > 0 && applicantBuildingAreaVal) {
-      const calculated = (applicantBuildingAreaVal / landArea) * 100;
-      setComputedKdbPercent(calculated.toFixed(1));
+    if (landArea > 0) {
+      // 1. Auto-Calculate proposed KDB ratio
+      if (applicantBuildingAreaVal !== undefined && !isNaN(Number(applicantBuildingAreaVal))) {
+        const kdbCalculated = (Number(applicantBuildingAreaVal) / landArea) * 100;
+        setValue('technical.kdb', Math.round(kdbCalculated * 10) / 10, { shouldValidate: true });
+      } else {
+        setValue('technical.kdb', undefined);
+      }
+
+      // 2. Auto-Calculate proposed KLB ratio
+      if (totalFloorAreaVal !== undefined && !isNaN(Number(totalFloorAreaVal))) {
+        const klbCalculated = Number(totalFloorAreaVal) / landArea;
+        setValue('technical.klb', Math.round(klbCalculated * 100) / 100, { shouldValidate: true });
+      } else {
+        setValue('technical.klb', undefined);
+      }
+
+      // 3. Auto-Calculate proposed KDH ratio
+      if (applicantRthAreaVal !== undefined && !isNaN(Number(applicantRthAreaVal))) {
+        const kdhCalculated = (Number(applicantRthAreaVal) / landArea) * 100;
+        setValue('technical.kdh', Math.round(kdhCalculated * 10) / 10, { shouldValidate: true });
+      } else {
+        setValue('technical.kdh', undefined);
+      }
     }
-  }, [landArea, applicantBuildingAreaVal]);
+  }, [landArea, applicantBuildingAreaVal, totalFloorAreaVal, applicantRthAreaVal, setValue]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -12701,36 +12770,42 @@ export const TechnicalSection = () => {
       <div className="border border-primary/25 bg-[#e8f2ea]/20 p-5 space-y-4 text-left">
         <h4 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
           <Layers className="h-4 w-4" />
-          Deklarasi Mandiri Kesesuaian Tata Ruang (Proposed Metrics)
+          Deklarasi Mandiri Rencana Tapak (Proposed Metrics)
         </h4>
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          Tuliskan estimasi dimensi teknis yang Anda rencanakan pada site plan. Nilai ini akan dihitung ulang secara manual oleh dinas menggunakan berkas CAD yang Anda unggah.
+          Tuliskan dimensi teknis yang Anda rencanakan pada site plan ($m^2$ atau meter). Sistem akan otomatis menghitung rasio KDB, KLB, dan KDH secara real-time untuk divalidasi oleh dinas.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <LabelWithInfo label="Luas Lantai Dasar Bangunan (m²)" helpText="Total luasan lantai dasar bangunan rencana untuk kalkulasi KDB." />
-            <FormattedInput name="technical.applicantBuildingArea" placeholder="Contoh: 6000" unit="m²" onChangeCustom={handleBuildingAreaChange} />
+        {/* 4-Column Raw Inputs Grid with Vertical Justification for Consistent Alignment */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex flex-col justify-between h-full">
+            <LabelWithInfo label="Luas Lantai Dasar (m²)" helpText="Total luasan tapak lantai dasar bangunan rencana untuk kalkulasi KDB." />
+            <FormattedInput name="technical.applicantBuildingArea" placeholder="Contoh: 6000" />
           </div>
 
-          <div>
-            <LabelWithInfo label="Garis Sempadan Bangunan (GSB - m)" helpText="Batas penarikan mundur minimal dinding bangunan dari tepi rencana jalan." />
+          <div className="flex flex-col justify-between h-full">
+            <LabelWithInfo label="Total Luas Lantai (m²)" helpText="Akumulasi luas seluruh lantai bangunan (Lantai 1 + Lantai 2 + dst) untuk kalkulasi KLB." />
+            <FormattedInput name="technical.totalFloorArea" placeholder="Contoh: 12000" />
+          </div>
+
+          <div className="flex flex-col justify-between h-full">
+            <LabelWithInfo label="Luas Hijau Resapan (RTH - m²)" helpText="Total luasan pekarangan hijau alami (tanpa semen/perkerasan) untuk kalkulasi KDH." />
+            <FormattedInput name="technical.applicantRthArea" placeholder="Contoh: 1500" />
+          </div>
+
+          <div className="flex flex-col justify-between h-full">
+            <LabelWithInfo label="Garis Sempadan (GSB - m)" helpText="Batas penarikan mundur minimal dinding bangunan terluar dari rencana as jalan." />
             <FormattedInput name="technical.applicantGsb" placeholder="Contoh: 5" unit="meter" />
-          </div>
-
-          <div>
-            <LabelWithInfo label="Luas Hijau Resapan Rencana (RTH - m²)" helpText="Total luasan area pekarangan hijau penyerap air hujan yang akan dibangun." />
-            <FormattedInput name="technical.applicantRthArea" placeholder="Contoh: 1500" unit="m²" />
           </div>
         </div>
 
-        {/* Real-time calculated proposed indicators with Perda references */}
+        {/* STREAMING_CHUNK:Rendering real-time calculated ratios comparison scorecard */}
         <div className="pt-3.5 border-t border-primary/10 space-y-2.5">
           <div className="text-[9px] font-black text-primary uppercase tracking-widest leading-none mb-1">
             Uji Mandiri Parameter Kepatuhan Perda (Standard Acuan Kab. Bogor)
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-semibold text-slate-700">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs font-semibold text-slate-700">
             {/* Reference Land Area */}
             <div className="p-2.5 bg-white border border-slate-200">
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Luas Lahan Acuan</span>
@@ -12739,15 +12814,49 @@ export const TechnicalSection = () => {
 
             {/* KDB Proposed */}
             <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Estimasi KDB Usulan (Maks 60%)</span>
-              {computedKdbPercent ? (
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">KDB Usulan (Maks 60%)</span>
+              {kdbVal !== undefined ? (
                 <span className={cn(
                   "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
-                  Number(computedKdbPercent) <= 60.0
+                  kdbVal <= 60.0
                     ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
                     : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
                 )}>
-                  {computedKdbPercent}% {Number(computedKdbPercent) <= 60.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                  {kdbVal.toFixed(1)}% {kdbVal <= 60.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                </span>
+              ) : (
+                <span className="text-slate-400 font-medium text-[11px]">-</span>
+              )}
+            </div>
+
+            {/* KLB Proposed */}
+            <div className="p-2.5 bg-white border border-slate-200">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">KLB Usulan (Maks 3.5)</span>
+              {klbVal !== undefined ? (
+                <span className={cn(
+                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                  klbVal <= 3.5
+                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                )}>
+                  {klbVal.toFixed(2)}x {klbVal <= 3.5 ? "✓ Lolos" : "⚠ Melanggar"}
+                </span>
+              ) : (
+                <span className="text-slate-400 font-medium text-[11px]">-</span>
+              )}
+            </div>
+
+            {/* KDH Proposed */}
+            <div className="p-2.5 bg-white border border-slate-200">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">KDH Usulan (Min 10%)</span>
+              {kdhVal !== undefined ? (
+                <span className={cn(
+                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                  kdhVal >= 10.0
+                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                )}>
+                  {kdhVal.toFixed(1)}% {kdhVal >= 10.0 ? "✓ Lolos" : "⚠ Melanggar"}
                 </span>
               ) : (
                 <span className="text-slate-400 font-medium text-[11px]">-</span>
@@ -12760,28 +12869,11 @@ export const TechnicalSection = () => {
               {applicantGsbVal !== undefined && applicantGsbVal > 0 ? (
                 <span className={cn(
                   "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
-                  Number(applicantGsbVal) >= 5.0
+                  applicantGsbVal >= 5.0
                     ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
                     : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
                 )}>
-                  {applicantGsbVal} meter {Number(applicantGsbVal) >= 5.0 ? "✓ Lolos" : "⚠ Melanggar"}
-                </span>
-              ) : (
-                <span className="text-slate-400 font-medium text-[11px]">-</span>
-              )}
-            </div>
-
-            {/* RTH Proposed */}
-            <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Porsi RTH Usulan (Min 10%)</span>
-              {computedRthPercent ? (
-                <span className={cn(
-                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
-                  Number(computedRthPercent) >= 10.0
-                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
-                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
-                )}>
-                  {computedRthPercent}% {Number(computedRthPercent) >= 10.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                  {applicantGsbVal} meter {applicantGsbVal >= 5.0 ? "✓ Lolos" : "⚠ Melanggar"}
                 </span>
               ) : (
                 <span className="text-slate-400 font-medium text-[11px]">-</span>
@@ -12791,14 +12883,15 @@ export const TechnicalSection = () => {
         </div>
       </div>
 
+      {/* STREAMING_CHUNK:Rendering conditional fields based on submission category */}
       {category === 'PERUMAHAN' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Jumlah Kaveling Efektif" helpText="Jumlah total unit kaveling hunian efektif yang akan dibangun pada rencana tapak." />
             <FormattedInput name="technical.lotCount" placeholder="Contoh: 150" unit="Kaveling" />
             {errors.technical?.lotCount && <p className="text-xs text-rose-500 mt-1">{errors.technical.lotCount.message}</p>}
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Tipe Perumahan" helpText="Klasifikasi jenis pembangunan perumahan (Komersil, MBR/Subsidi, atau Campuran)." />
             <select {...register('technical.housingType')} className={inputClass}>
               <option value="NON_SUBSIDI">Komersil / Non-Subsidi</option>
@@ -12808,13 +12901,13 @@ export const TechnicalSection = () => {
           </div>
 
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border border-[#DAE4DB] bg-[#f4f7f4]/20 p-4">
-            <div>
+            <div className="flex flex-col justify-between h-full">
               <LabelWithInfo label="Luas Kaveling Makam / TPU Rencana (m²)" helpText={`Penyediaan area makam fisik / TPU rencana (wajib minimal 2% dari total luas lahan perumahan: ${landArea > 0 ? (landArea * 0.02).toLocaleString('id-ID') : '0'} m²).`} />
               <FormattedInput name="technical.cemeteryArea" placeholder="Penyediaan 2% dari luas total" unit="m²" onChangeCustom={handleCemeteryLuasChangeVal} />
               {errors.technical?.cemeteryArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.cemeteryArea.message}</p>}
             </div>
 
-            <div>
+            <div className="flex flex-col justify-between h-full">
               <LabelWithInfo label="Kalkulator Persentase TPU (%)" helpText={`Masukkan target persentase atau hitung otomatis. Luas Lahan Aktif: ${landArea.toLocaleString('id-ID')} m².`} />
               <div className="relative">
                 <input
@@ -12841,15 +12934,15 @@ export const TechnicalSection = () => {
             </div>
           </div>
 
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Lebar ROW Jalan Utama (m)" helpText="Lebar ruang milik jalan utama kawasan tapak perumahan (misal: ROW 8 Meter)." />
             <input {...register('technical.roadRowMain')} type="text" className={inputClass} placeholder="Contoh: ROW 8 Meter" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Lebar ROW Jalan Lingkungan (m)" helpText="Lebar ruang milik jalan penghubung antar kaveling hunian (misal: ROW 6 Meter)." />
             <input {...register('technical.roadRowLocal')} type="text" className={inputClass} placeholder="Contoh: ROW 6 Meter" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Sistem Distribusi Air Bersih" helpText="Sistem penyediaan air minum bagi warga kawasan tapak perumahan." />
             <input {...register('technical.waterSystem')} type="text" className={inputClass} placeholder="Contoh: PDAM / Sumur Bor Komunal" />
           </div>
@@ -12865,36 +12958,20 @@ export const TechnicalSection = () => {
         </div>
       )}
 
+      {/* STREAMING_CHUNK:Rendering NON_PERUMAHAN fields with elevated proposed metrics removed */}
       {category === 'NON_PERUMAHAN' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Jumlah Blok / Unit Gedung" helpText="Jumlah total unit blok gedung utama atau ruko komersial yang direncanakan." />
             <FormattedInput name="technical.buildingBlocks" placeholder="Contoh: 5 Blok" unit="Blok" />
           </div>
-          <div>
-            <LabelWithInfo label="Koefisien Dasar Bangunan (KDB - %)" helpText="Persentase luas lantai dasar bangunan terhadap total luas lahan." />
-            <FormattedInput name="technical.kdb" placeholder="Contoh: 60" unit="%" />
-            {errors.technical?.kdb && <p className="text-xs text-rose-500 mt-1">{errors.technical.kdb.message}</p>}
-          </div>
-          <div>
-            <LabelWithInfo label="Koefisien Lantai Bangunan (KLB)" helpText="Angka perbandingan luas seluruh lantai bangunan terhadap total luas lahan." />
-            <FormattedInput name="technical.klb" placeholder="Contoh: 2.4" unit="" isDecimal={true} />
-          </div>
-          <div>
-            <LabelWithInfo label="Koefisien Dasar Hijau (KDH - %)" helpText="Persentase ruang terbuka luar bangunan yang ditumbuhi tanaman/hijau minimal." />
-            <FormattedInput name="technical.kdh" placeholder="Contoh: 20" unit="%" />
-          </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Kapasitas Satuan Ruang Parkir (SRP)" helpText="Kapasitas total Satuan Ruang Parkir (SRP) kendaraan yang disediakan di dalam area tapak." />
             <FormattedInput name="technical.parkingCapacity" placeholder="Contoh: 50 Mobil" unit="SRP" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Jumlah Lantai Bangunan Maksimum" helpText="Jumlah lantai gedung maksimum yang direncanakan." />
             <FormattedInput name="technical.maxFloors" placeholder="Contoh: 4 Lantai" unit="Lantai" />
-          </div>
-          <div className="md:col-span-2">
-            <LabelWithInfo label="Total Luas Lantai Bangunan (m²)" helpText="Akumulasi luas seluruh lantai bangunan yang direncanakan (m²)." />
-            <FormattedInput name="technical.totalFloorArea" placeholder="Contoh: 4500" unit="m²" />
           </div>
 
           {/* ─── DYNAMIC UPLOAD: Dokumen Andalalin ─── */}
@@ -12910,7 +12987,7 @@ export const TechnicalSection = () => {
 
       {category === 'FASUM' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Jenis Layanan Fasilitas" helpText="Fokus utama fungsi pelayanan publik yang akan diselenggarakan." />
             <select {...register('technical.facilityType')} className={inputClass}>
               <option value="PERIBADATAN">Fasilitas Peribadatan (Masjid/Gereja)</option>
@@ -12919,11 +12996,11 @@ export const TechnicalSection = () => {
               <option value="SOSIAL_BUDAYA">Fasilitas Sosial / Balai Warga</option>
             </select>
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Kapasitas Daya Tampung (Pengunjung/Siswa/Jemaah)" helpText="Kapasitas daya tampung maksimum dalam sekali pelayanan." />
             <FormattedInput name="technical.capacity" placeholder="Contoh: 300 Jiwa" unit="Jiwa" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Aksesibilitas Difabel (Ramp/Guiding Block)" helpText="Penyediaan infrastruktur ramah penyandang disabilitas (tata jalan pemandu/ramp kursi roda)." />
             <select {...register('technical.disabledAccess')} className={inputClass}>
               <option value="LENGKAP">Tersedia Lengkap</option>
@@ -12931,7 +13008,7 @@ export const TechnicalSection = () => {
               <option value="TIDAK_ADA">Tidak Tersedia</option>
             </select>
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Ketersediaan Parkir Khusus (Ambulans/Bus)" helpText="Akses parkir/tunggu khusus kendaraan darurat pelayanan umum." />
             <select {...register('technical.specialParking')} className={inputClass}>
               <option value="ADA">Tersedia Drop-off Khusus</option>
@@ -12956,27 +13033,27 @@ export const TechnicalSection = () => {
 
       {category === 'INDUSTRI' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left animate-in fade-in duration-300">
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Jumlah Unit Gudang / Pabrik" helpText="Jumlah total bangunan unit pabrik atau gudang logistik penyimpanan." />
             <FormattedInput name="technical.warehouseCount" placeholder="Contoh: 12 Unit" unit="Unit" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Muatan Sumbu Terberat Kelas Jalan (MST - Ton)" helpText="Kekuatan muatan maksimal jalan masuk ke kawasan industri untuk truk logistik." />
             <input {...register('technical.roadLoadMst')} type="text" className={inputClass} placeholder="Contoh: MST 8 Ton / Kelas III-A" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Daya Listrik Industri Terpasang" helpText="Total suplai daya listrik dari PLN yang dialokasikan bagi aktivitas industri." />
             <input {...register('technical.electricityPower')} type="text" className={inputClass} placeholder="Contoh: 150 kVA" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Kapasitas Pengolahan IPAL Terencana (m³/hari)" helpText="Daya pengolahan air limbah kawasan industri per hari sebelum dibuang ke saluran kota." />
             <input {...register('technical.ipalCapacity')} type="text" className={inputClass} placeholder="Contoh: 50 m3/hari" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Luas Sabuk Penyangga Hijau (Green Buffer - m²)" helpText="Luas area hijau penyangga pembatas aktivitas polusi industri dengan kawasan pemukiman." />
             <FormattedInput name="technical.greenBufferArea" placeholder="Contoh: 2500" unit="m²" />
           </div>
-          <div>
+          <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Penyediaan Tempat Pembuangan Sementara B3" helpText="Ketersediaan tempat penyimpanan sementara khusus untuk limbah Bahan Berbahaya dan Beracun (B3)." />
             <select {...register('technical.tpsB3Provision')} className={inputClass}>
               <option value="YA">Ya, Disediakan TPS Khusus B3 Berizin</option>
@@ -14108,17 +14185,8 @@ export default function SubmissionCreatePage() {
 }
 
 --- FILE: src\features\submission\pages\SubmissionDetailPage.tsx ---
-/**
- * ============================================================================
- * GEOSIPAS DETIL & COCKPIT VERIFIKASI — [SubmissionDetailPage.tsx] (REVISED v3)
- * ============================================================================
- * Peran: Layar utama verifikasi dinas lintas OPD dan dasbor scorecard pemohon.
- *        Mengintegrasikan 13 aspek checklist toggle, tabel komparasi tiga sisi,
- *        SLA tracking dinamis, andalalin/AMDAL check, dan tanda tangan digital.
- * ============================================================================
- */
-
-import { useState, useMemo, useRef, useEffect } from 'react';
+/* STREAMING_CHUNK:Configuring imports and base constants */
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
@@ -14186,6 +14254,7 @@ function calculateCentroid(polygon: [number, number][]): [number, number] {
 }
 
 export default function SubmissionDetailPage() {
+  /* STREAMING_CHUNK:Initializing page queries and mutations */
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -14264,6 +14333,7 @@ export default function SubmissionDetailPage() {
   }, [sub]);
 
   const mutation = useMutation({
+    /* STREAMING_CHUNK:Configuring admin and technical action states */
     mutationFn: async ({
       status,
       notes,
@@ -14534,7 +14604,7 @@ export default function SubmissionDetailPage() {
       {/* ─── SEKSI 2: CORE WORKSPACE GRID (SPLIT 2/3 DAN 1/3) ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Kolom Kiri (2/3): Informasi Proyek & Berkas Laporan */}
+        {/* STREAMING_CHUNK:Rendering main view and summary layout */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Tab Navigation Menu */}
@@ -14706,7 +14776,7 @@ export default function SubmissionDetailPage() {
             </div>
           )}
 
-          {/* Consent Compliance Modal (GRASP: Protected Variations) */}
+          {/* STREAMING_CHUNK:Rendering consent and TTE sign widgets */}
           {isVerificationConsentOpen && (
             <div className="fixed inset-0 z-[999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white border-2 border-primary max-w-lg w-full p-6 space-y-5 text-left animate-in fade-in zoom-in-95 duration-200">
@@ -14946,6 +15016,7 @@ export default function SubmissionDetailPage() {
     </div>
   );
 }
+
 
 --- FILE: src\features\submission\pages\SubmissionListPage.tsx ---
 import { useState } from 'react';
@@ -15214,6 +15285,7 @@ export default function SubmissionListPage() {
 }
 
 --- FILE: src\features\submission\pages\SubmissionVerificationPage.tsx ---
+/* STREAMING_CHUNK:Configuring imports and verification schemas */
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
@@ -15224,7 +15296,7 @@ import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, Loader2, UploadCloud,
   FileSignature, AlertTriangle, ShieldCheck,
-  ChevronDown, Check, X, Trash2, Info
+  ChevronDown, Trash2, Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -15232,19 +15304,19 @@ import { uploadFileToBackend } from '@/features/submission/utils/upload';
 import { VERIFICATION_ASPECTS } from '../constants/verificationAspects';
 
 const getDocCategoryLabel = (key?: string) => {
-  if (key === 'legalDoc') return 'Sertifikat Tanah & KTP (Langkah 3)';
-  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD (Langkah 6)';
-  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT (Langkah 5)';
-  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3 (Langkah 6)';
-  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek (Langkah 7)';
-  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf) (Langkah 4)';
+  if (key === 'legalDoc') return 'Sertifikat Tanah & KTP';
+  if (key === 'technicalDoc') return 'Gambar Rencana Teknis CAD';
+  if (key === 'supportDoc') return 'SK KKPR Awal / IPPT';
+  if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3';
+  if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf)';
   return 'Dokumen Lampiran Pendukung';
 };
 
-const inputClass = "w-full px-3 py-2 bg-white border border-slate-300 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-800 transition-all font-sans text-xs rounded-none";
 const labelClass = "block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider";
 
 export default function SubmissionVerificationPage() {
+  /* STREAMING_CHUNK:Initializing react state and queries */
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -15276,6 +15348,7 @@ export default function SubmissionVerificationPage() {
     enabled: !!id,
   });
 
+  /* STREAMING_CHUNK:Syncing baseline parameters from database schema */
   useEffect(() => {
     if (sub) {
       if (sub.kkprVerdict) setKkprVerdict(sub.kkprVerdict);
@@ -15336,6 +15409,7 @@ export default function SubmissionVerificationPage() {
   const verified_gsb_final = useMemo(() => (verifiedGsb === '' ? undefined : verifiedGsb), [verifiedGsb]);
   const verified_rth_area_final = useMemo(() => (verifiedRthArea === '' ? undefined : verifiedRthArea), [verifiedRthArea]);
 
+  /* STREAMING_CHUNK:Configuring status transition and save mutations */
   const mutation = useMutation({
     mutationFn: async ({
       status,
@@ -15398,11 +15472,11 @@ export default function SubmissionVerificationPage() {
     }));
   };
 
+  /* STREAMING_CHUNK:Handling physical attachment uploads for technical checklist */
   const handleAspectAttachmentUpload = async (code: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 20MB
     const MAX_FILE_SIZE = 20 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Berkas terlalu besar! Batas ukuran maksimal adalah 20MB.');
@@ -15524,125 +15598,131 @@ export default function SubmissionVerificationPage() {
         </div>
       </div>
 
-      {/* Section: Sandingan Metrik Tapak - Full Width */}
-      <div className="space-y-4">
-        <div className="border-b border-slate-300 pb-2">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
-          <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
-        </div>
-
-        <div className="w-full border border-slate-300 bg-white rounded-none">
-          <table className="w-full text-xs font-sans text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
-                <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
-                <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
-                <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
-                  {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
-                  {sub.landArea && sub.technical?.applicantBuildingArea ? (
-                    <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
-                  ) : ''}
-                </td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={verifiedKdb}
-                      onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="KDB"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.klb || '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={verifiedKlb}
-                    onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="KLB"
-                    className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.kdh ? `${sub.technical.kdh}%` : '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={verifiedKdh}
-                      onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="KDH"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={verifiedGsb}
-                      onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="GSB"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      value={verifiedRthArea}
-                      onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="RTH"
-                      className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        {/* KOLOM KIRI: FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
+        {/* KOLOM KIRI: METRIK perbandingan, FORM KEPUTUSAN, DETAIL PENGAJUAN (col-span-5) */}
         <div className="lg:col-span-5 space-y-8">
+
+          {/* Section: Sandingan Metrik Tapak */}
+          <div className="space-y-4">
+            <div className="border-b border-slate-300 pb-2">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
+            </div>
+
+            <div className="w-full overflow-x-auto border border-slate-300 bg-white rounded-none">
+              <table className="w-full min-w-[500px] text-xs font-sans text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
+                    <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
+                    <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
+                    <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                      {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
+                      {sub.landArea && sub.technical?.applicantBuildingArea ? (
+                        <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
+                      ) : ''}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={verifiedKdb}
+                          onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="KDB"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                      {sub.technical?.totalFloorArea ? `${sub.technical.totalFloorArea.toLocaleString('id-ID')} m²` : '-'}
+                      {sub.technical?.klb ? ` (${Number(sub.technical.klb).toFixed(2)}x)` : ''}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={verifiedKlb}
+                        onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="KLB"
+                        className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                      {sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}
+                      {sub.technical?.kdh ? ` (${Number(sub.technical.kdh).toFixed(1)}%)` : ''}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={verifiedKdh}
+                          onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="KDH"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={verifiedGsb}
+                          onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="GSB"
+                          className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
+                    <td className="px-3 py-2 bg-slate-50/30">
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="number"
+                          value={verifiedRthArea}
+                          onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
+                          placeholder="RTH"
+                          className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
+                        />
+                        <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* Section: Keputusan Akhir */}
           <div className="space-y-4 pt-4 border-t border-slate-300">
@@ -15676,7 +15756,7 @@ export default function SubmissionVerificationPage() {
             </div>
           </div>
 
-          {/* Section: Ringkasan Pengajuan */}
+          {/* Section: Detail Pendaftaran */}
           <div className="space-y-4 pt-4 border-t border-slate-300">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Detail Pendaftaran</h2>
             <div className="divide-y divide-slate-200 text-xs">
@@ -15694,9 +15774,7 @@ export default function SubmissionVerificationPage() {
               </div>
               <div className="py-2.5 flex justify-between gap-4">
                 <span className="text-slate-500">Lokasi Tapak</span>
-                <span className="text-slate-700 text-right font-medium" title={sub.locationDetails?.fullAddress}>
-                  {sub.locationDetails?.village || '-'}, {sub.locationDetails?.district || '-'}
-                </span>
+                <span className="text-slate-700 text-right font-medium" title={sub.locationDetails?.fullAddress}>{sub.locationDetails?.village || '-'}, {sub.locationDetails?.district || '-'}</span>
               </div>
             </div>
           </div>
@@ -15777,33 +15855,23 @@ export default function SubmissionVerificationPage() {
                     </button>
 
                     <div className="flex items-center gap-3 shrink-0">
-                      {/* Segmented Flat Control (Instead of Rounded Switch Toggle) */}
-                      <div className="flex border border-slate-300 rounded-none overflow-hidden text-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleAspect(aspect.code, 'Sesuai')}
+                      {/* STREAMING_CHUNK:Rendering dynamic checklist items */}
+                      {/* Segmented Toggle Control (Custom Pill Switch Toggle) */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAspect(aspect.code, isSesuai ? 'Tidak Sesuai' : 'Sesuai')}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2",
+                          isSesuai ? "bg-emerald-500" : "bg-slate-300"
+                        )}
+                      >
+                        <span
                           className={cn(
-                            "px-2.5 py-1 font-bold uppercase tracking-wider transition-all border-none cursor-pointer rounded-none",
-                            isSesuai
-                              ? "bg-slate-900 text-white"
-                              : "bg-white text-slate-400 hover:bg-slate-50"
+                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                            isSesuai ? "translate-x-5" : "translate-x-0"
                           )}
-                        >
-                          Sesuai
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleAspect(aspect.code, 'Tidak Sesuai')}
-                          className={cn(
-                            "px-2.5 py-1 font-bold uppercase tracking-wider transition-all border-none cursor-pointer rounded-none",
-                            !isSesuai
-                              ? "bg-rose-700 text-white"
-                              : "bg-white text-slate-400 hover:bg-slate-50"
-                          )}
-                        >
-                          Tidak
-                        </button>
-                      </div>
+                        />
+                      </button>
 
                       <button
                         type="button"
@@ -15919,16 +15987,7 @@ export default function SubmissionVerificationPage() {
 }
 
 --- FILE: src\features\submission\schemas\submissionFormSchema.ts ---
-/**
- * ============================================================================
- * GEOSIPAS SYSTEM SCHEMAS — [src/features/submission/schemas/submissionFormSchema.ts]
- * ============================================================================
- * Peran: Skema validasi formulir terpadu menggunakan Zod.
- *        Diperbarui penuh untuk mendukung metrik usulan pemohon (proposed)
- *        pada Tahap 6 serta tipe data string hasil Direct Upload dokumen/foto.
- * ============================================================================
- */
-
+/* STREAMING_CHUNK:Configuring imports and base schema properties */
 import * as z from 'zod';
 
 // ─── PURE FABRICATION: HELPER PREPROSES DATA NUMERIK ────────────────────────
@@ -15937,6 +15996,7 @@ const numericPreprocess = (val: unknown) => {
   return Number(val);
 };
 
+/* STREAMING_CHUNK:Defining applicant and submission schemas */
 export const applicantSchema = z.object({
   type: z.enum(['PERORANGAN', 'BADAN_USAHA']),
   name: z.string().min(3, 'Nama wajib diisi'),
@@ -15955,6 +16015,7 @@ export const submissionDataSchema = z.object({
   category: z.enum(['PERUMAHAN', 'NON_PERUMAHAN', 'FASUM', 'INDUSTRI']),
 });
 
+/* STREAMING_CHUNK:Defining location and coordinate transformation schemas */
 export const locationSchema = z.object({
   locationName: z.string().min(3, 'Nama lokasi wajib diisi'),
   village: z.string().min(3, 'Desa/Kelurahan wajib diisi'),
@@ -15962,15 +16023,18 @@ export const locationSchema = z.object({
   city: z.string().min(3, 'Kabupaten/Kota wajib diisi'),
   province: z.string().min(3, 'Provinsi wajib diisi'),
   fullAddress: z.string().min(10, 'Alamat lengkap wajib diisi'),
-  landArea: z.number().positive('Luas lahan harus lebih besar dari 0'),
+  landArea: z.preprocess(
+    numericPreprocess,
+    z.number().positive('Luas lahan harus lebih besar dari 0')
+  ),
   ownershipStatus: z.enum(['SHM', 'HGB', 'HAK_PAKAI', 'LAINNYA']),
   certificateNumber: z.string().min(3, 'Nomor sertifikat wajib diisi'),
   certificateOwner: z.string().min(3, 'Nama pemilik sertifikat wajib diisi'),
 });
 
 export const coordinateSchema = z.object({
-  polygon: z.any().optional(), // Untuk menyimpan koordinat poligon georeferenced bumi nyata
-  coordinatesText: z.string().optional(), // Untuk menyimpan penulisan manual teks GeoJSON koordinat
+  polygon: z.any().optional(), // Menyimpan koordinat poligon georeferenced bumi nyata
+  coordinatesText: z.string().optional(), // Menyimpan penulisan manual teks GeoJSON koordinat
 
   // ─── PARAMETER TRANSFORMASI CAD HELMERT 2D (SINKRONISASI SPASIAL) [Jakarta 5] ───
   cadFileName: z.string().optional(),       // Nama file CAD (.dwg / .dxf) asal
@@ -15982,10 +16046,14 @@ export const coordinateSchema = z.object({
   cadRotation: z.number().optional(),       // Sudut rotasi spasial (theta) dalam satuan radian
 });
 
+/* STREAMING_CHUNK:Defining spatial and technical specification schemas */
 export const spatialSchema = z.object({
   kkprNumber: z.string().min(3, 'Nomor KKPR wajib diisi'),
   landUse: z.string().min(3, 'Peruntukan lahan wajib diisi'),
-  greenArea: z.number().min(0, 'Luas PSU/RTH tidak boleh negatif'),
+  greenArea: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, 'Luas PSU/RTH tidak boleh negatif')
+  ),
 });
 
 export const technicalSchema = z.object({
@@ -16065,7 +16133,7 @@ export const technicalSchema = z.object({
   roadPlan: z.string().optional(),
   drainagePlan: z.string().optional(),
 
-  // ─── BARU (REVISI): METRIK USULAN PEMOHON (PROPOSED METRICS) ───
+  // ─── REVISI: METRIK USULAN PEMOHON (PROPOSED METRICS) ───
   applicantBuildingArea: z.preprocess(
     numericPreprocess,
     z.number().positive("Luas bangunan wajib diisi")
@@ -16080,6 +16148,7 @@ export const technicalSchema = z.object({
   )
 });
 
+/* STREAMING_CHUNK:Defining consultant, document, photo, and statement schemas */
 export const consultantSchema = z.object({
   consultantName: z.string().min(3, 'Nama konsultan wajib diisi'),
   companyName: z.string().min(3, 'Nama perusahaan wajib diisi'),
@@ -16112,6 +16181,7 @@ export const statementSchema = z.object({
   })
 });
 
+/* STREAMING_CHUNK:Consolidating unified submission schema and type declarations */
 export const fullSubmissionSchema = z.object({
   id_permohonan: z.string().optional(),
   applicant: applicantSchema,
@@ -16141,8 +16211,9 @@ export type FullSubmissionFormValues = z.infer<typeof fullSubmissionSchema>;
 
 import type { Submission, SubmissionStatus, EvaluationChecklistItem } from '../types';
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
+import { API_BASE_URL as API_BASE_URL_CONFIG } from '@/config';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1/submissions';
+const API_BASE_URL = `${API_BASE_URL_CONFIG}/api/v1/submissions`;
 
 const getAuthHeaders = (extraHeaders?: Record<string, string>) => {
   const token = localStorage.getItem('token');
@@ -16580,12 +16651,14 @@ export interface Submission {
 }
 
 --- FILE: src\features\submission\utils\upload.ts ---
+import { API_BASE_URL } from '@/config';
+
 export const uploadFileToBackend = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
 
   const token = localStorage.getItem('token');
-  const response = await fetch('http://localhost:8000/api/v1/submissions/upload', {
+  const response = await fetch(`${API_BASE_URL}/api/v1/submissions/upload`, {
     method: 'POST',
     headers: {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -16606,6 +16679,7 @@ export const uploadFileToBackend = async (file: File) => {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { API_BASE_URL } from '@/config';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
@@ -16660,7 +16734,7 @@ export default function ProfilePage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/v1/auth/profile', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -17214,6 +17288,7 @@ import { useState, useEffect } from 'react';
 import { mockUsers } from '@/mock/users/users';
 import { toast } from 'sonner';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import { API_BASE_URL } from '@/config';
 import {
   UserCog,
   Plus,
@@ -17239,7 +17314,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/v1/auth/users', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -17291,7 +17366,7 @@ export default function UsersPage() {
       const toastId = toast.loading('Memproses penonaktifan akun...');
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8000/api/v1/auth/users/${username}/status`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/users/${username}/status`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

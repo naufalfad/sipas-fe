@@ -1,145 +1,107 @@
 /**
  * ============================================================================
- * SPATIAL CHECK PANEL [PERFORMANCE-OPTIMIZED v2]
+ * SPATIAL CHECK PANEL [REACT QUERY INTEGRATED v3]
  * ============================================================================
- *
- * OPTIMASI KRITIS yang diimplementasikan:
- *
- * [OPT-DEBOUNCE] Debounce 600ms untuk validateRiverBuffer
- *   Sebelumnya: useEffect memanggil validateRiverBuffer() langsung.
- *   Jika submissionData berubah cepat (polygon sedang diedit di peta),
- *   Turf.js akan berjalan setiap milidetik → browser macet total.
- *
- *   Sesudahnya: Kalkulasi ditunda 600ms setelah perubahan terakhir.
- *   Selama 600ms tersebut, kalkulasi sebelumnya dibatalkan via AbortController-
- *   style cleanup (isMounted flag + clearTimeout). Ini mengurangi beban CPU
- *   dari potensial ratusan kalkulasi → 1 kalkulasi per "selesai edit".
- *
- * [OPT-CANCEL] Cancellable async operation
- *   isMounted flag memastikan result yang datang terlambat (setelah komponen
- *   unmount atau setelah data berubah lagi) tidak memperbarui state.
- *   Mencegah race condition "stale closure" pada async Turf.js.
- *
- * [OPT-STABLE-DEP] Stable dependency pada useEffect
- *   Hanya memantau submissionData.id (string) dan hash koordinat,
- *   bukan reference object polygon (yang bisa berubah setiap render).
- *   Ini mencegah infinite re-computation loop.
+ * Peran: Menampilkan indikator, visualisasi, dan laporan kepatuhan spasial
+ *        multi-layer secara real-time yang ditarik dari PostGIS server [Buku 2 21].
+ * 
+ * Desain: 1. Menggunakan @tanstack/react-query untuk manajemen status caching,
+ *            pemuatan (isLoading), dan pembatalan transaksi spasial stale [sipas-fe.txt].
+ *         2. Memetakan response model fisik database (snake_case) ke objek 
+ *            logis UI (camelCase) secara lokal (Adapter Pattern) [sipas-fe.txt].
  * ============================================================================
  */
 
-import { useEffect, useState, useRef, useMemo } from 'react';
-import { Loader2, Crosshair, HelpCircle, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Loader2, Crosshair, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useSpatialValidator, type SpatialAuditResult } from '../../hooks/useSpatialValidator';
+import { SubmissionService } from '@/features/submission/services/submission.service';
+import type { SpatialAuditResult } from '../../hooks/useSpatialValidator';
 import { toast } from 'sonner';
-
-// ─── Konstanta ─────────────────────────────────────────────────────────────────
-
-/** Waktu tunggu debounce sebelum Turf.js dieksekusi (ms). */
-const DEBOUNCE_DELAY_MS = 600;
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Membuat "fingerprint" string dari array koordinat poligon.
- * Digunakan sebagai dependency useEffect yang stabil.
- *
- * Tanpa ini, reference array koordinat baru setiap render (akibat object spread
- * di parent) akan menyebabkan useEffect berjalan terus-menerus walau data sama.
- */
-function hashPolygon(polygon: [number, number][] | null | undefined): string {
-    if (!polygon || polygon.length === 0) return '';
-    // Ambil 3 titik pertama, terakhir, dan tengah sebagai fingerprint cepat
-    const idx   = [0, Math.floor(polygon.length / 2), polygon.length - 1];
-    return idx.map((i) => `${polygon[i]?.[0].toFixed(6)},${polygon[i]?.[1].toFixed(6)}`).join('|');
-}
-
-// ─── Komponen ──────────────────────────────────────────────────────────────────
 
 interface SpatialCheckPanelProps {
     submissionData: any;
 }
 
 export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelProps) {
-    const { validateRiverBuffer, isProcessing } = useSpatialValidator();
-    const [auditResult, setAuditResult] = useState<SpatialAuditResult | null>(null);
 
-    // Ref ke debounce timer — tetap stabil antar render tanpa menyebabkan re-render
-    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // ─── TAHAP 1: DEFINISI STATE REACT QUERY (PostGIS Server-Side Fetcher) ───
+    const {
+        data: auditData,
+        isLoading: isProcessing,
+        isError,
+        refetch
+    } = useQuery({
+        // QueryKey diikat ke ID permohonan agar cache terisolasi per berkas [sipas-fe.txt]
+        queryKey: ['spatial-audit', submissionData?.id],
+        queryFn: () => SubmissionService.getSpatialAudit(submissionData.id),
+        enabled: !!submissionData?.id,
+        staleTime: 5 * 60 * 1000, // Caching otomatis hasil audit selama 5 menit
+        retry: false,
+    });
 
-    // [OPT-STABLE-DEP] Hitung fingerprint koordinat agar useEffect stabil
-    const polygonHash = useMemo(
-        () => hashPolygon(submissionData?.location?.polygon),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [submissionData?.id, submissionData?.location?.polygon]
-    );
+    // ─── TAHAP 2: INTEGRASI ADAPTER PATTERN (snake_case -> camelCase) ───
+    const auditResult = useMemo<SpatialAuditResult | null>(() => {
+        if (!auditData) return null;
 
+        try {
+            return {
+                isClashing: auditData.is_clashing,
+                clashGeometry: auditData.clash_geometry || null,
+                clashAreaSqm: auditData.clash_area_sqm,
+                zoningScore: auditData.zoning_score,
+                verdict: auditData.verdict as SpatialAuditResult['verdict'],
+                details: (auditData.details || []).map((detail: any) => ({
+                    layerId: detail.layer_id,
+                    layerName: detail.layer_name,
+                    clashAreaSqm: detail.clash_area_sqm,
+                    description: detail.description,
+                    severity: detail.severity as any,
+                    zoningNote: detail.zoning_note || undefined
+                }))
+            };
+        } catch (e) {
+            console.error("[SpatialCheckPanel] Gagal memetakan model spasial server-side:", e);
+            return null;
+        }
+    }, [auditData]);
+
+    // ─── TAHAP 3: SINKRONISASI VISUALISASI CLASH DI PETA (Event-Driven Map) ───
     useEffect(() => {
-        // Guard: hapus timer sebelumnya jika ada (debounce cancel)
-        if (debounceTimer.current) {
-            clearTimeout(debounceTimer.current);
-        }
+        if (!submissionData?.id) return;
 
-        if (!submissionData || !submissionData.location?.polygon) {
-            setAuditResult(null);
+        if (auditResult?.isClashing && auditResult?.clashGeometry) {
+            // Kirim custom event ke SipasMap untuk menggambar poligon merah transparan [sipas-fe.txt]
+            window.dispatchEvent(
+                new CustomEvent('map-render-clash', {
+                    detail: {
+                        clashGeometry: auditResult.clashGeometry,
+                        submissionId: submissionData.id,
+                    },
+                })
+            );
+            toast.warning('Deteksi Spasial: Rencana site plan menabrak area lindung/zona terlarang!');
+        } else {
             window.dispatchEvent(new Event('map-clear-clash'));
-            return;
         }
 
-        // [OPT-CANCEL] Flag untuk membatalkan hasil stale setelah unmount / re-trigger
-        let isMounted = true;
-
-        // [OPT-DEBOUNCE] Tunda eksekusi 600ms — jika submissionData berubah lagi
-        // dalam 600ms, timer ini dibatalkan dan tidak ada Turf.js yang berjalan.
-        debounceTimer.current = setTimeout(async () => {
-            if (!isMounted) return;
-
-            const polygonCoords = submissionData.location.polygon as [number, number][];
-            const category = submissionData?.submissionDetails?.category || 'PERUMAHAN';
-            const result = await validateRiverBuffer(polygonCoords, category);
-
-            if (!isMounted) return; // Guard lagi setelah await (bisa berlangsung 100-500ms)
-
-            setAuditResult(result);
-
-            if (result.isClashing && result.clashGeometry) {
-                window.dispatchEvent(
-                    new CustomEvent('map-render-clash', {
-                        detail: {
-                            clashGeometry: result.clashGeometry,
-                            submissionId: submissionData.id,
-                        },
-                    })
-                );
-                toast.warning('Deteksi Spasial: Rencana site plan menabrak area lindung/zona terlarang!');
-            } else {
-                window.dispatchEvent(new Event('map-clear-clash'));
-            }
-        }, DEBOUNCE_DELAY_MS);
-
-        // Cleanup: batalkan timer dan tandai komponen sebagai unmounted
+        // Cleanup: Bersihkan gambar benturan di peta jika tab panel ditutup
         return () => {
-            isMounted = false;
-            if (debounceTimer.current) {
-                clearTimeout(debounceTimer.current);
-                debounceTimer.current = null;
-            }
             window.dispatchEvent(new Event('map-clear-clash'));
         };
-    // [OPT-STABLE-DEP] Gunakan polygonHash (string) bukan reference object
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [submissionData?.id, polygonHash, validateRiverBuffer]);
+    }, [auditResult, submissionData?.id]);
 
-    // ── Empty State ────────────────────────────────────────────────────────────
+    // ── Empty State ──
     if (!submissionData) {
         return (
-            <div className="p-6 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+            <div className="p-6 text-center text-xs font-bold text-slate-400 uppercase tracking-widest leading-normal select-none">
                 Pilih berkas pengajuan pada peta untuk mengaktifkan audit spasial.
             </div>
         );
     }
 
-    // ── Handler: Sorot area clash di peta ─────────────────────────────────────
+    // ── Handler: Sorot area clash di peta ──
     const handleHighlightClash = () => {
         if (!submissionData?.location) return;
         const { lat, lng } = submissionData.location;
@@ -147,12 +109,38 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
         toast.info('Kamera peta diarahkan ke area benturan spasial.');
     };
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Handler: Memicu ulang kueri PostGIS secara manual ──
+    const handleRunLiveAudit = async () => {
+        try {
+            await refetch();
+            toast.success('Audit spasial server-side berhasil diperbarui!');
+        } catch {
+            toast.error('Gagal memperbarui kalkulasi spasial.');
+        }
+    };
+
     return (
         <div className="flex flex-col h-full w-full bg-white relative font-sans text-slate-800 rounded-none border-slate-200">
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0 text-left">
 
-                {/* ── Verdict Banner ─────────────────────────────────────────── */}
+                {/* ── Tombol Pemicu Audit Manual Terintegrasi ── */}
+                <div className="p-4 bg-slate-50 border-b border-slate-200">
+                    <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={handleRunLiveAudit}
+                        className="w-full h-10 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-black uppercase tracking-widest rounded-none flex items-center justify-center gap-2 transition-all cursor-pointer outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
+                    >
+                        {isProcessing ? (
+                            <Loader2 className="h-4.5 w-4.5 animate-spin text-teal-600" />
+                        ) : (
+                            <RefreshCw className="h-4 w-4 text-teal-600" />
+                        )}
+                        <span>{isProcessing ? 'MEMPROSES DI POSTGIS...' : 'JALANKAN ULANG AUDIT SPASIAL'}</span>
+                    </button>
+                </div>
+
+                {/* ── Verdict Banner ── */}
                 {isProcessing ? (
                     <div className="px-4 py-4 border-b border-slate-200 bg-slate-50 text-slate-500 flex items-center justify-center gap-2.5 select-none">
                         <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
@@ -160,12 +148,19 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                             Menganalisis Zonasi Spasial Multi-Layer...
                         </span>
                     </div>
+                ) : isError ? (
+                    <div className="px-4 py-4 border-b border-rose-200 bg-rose-50 text-rose-700 flex items-center gap-2 select-none">
+                        <ShieldX className="shrink-0 text-rose-600" size={15} />
+                        <span className="text-[11px] font-bold uppercase tracking-wider">
+                            Gagal menghubungi PostGIS server.
+                        </span>
+                    </div>
                 ) : auditResult ? (
                     <div className={cn(
                         'border-b px-4 py-3.5 select-none animate-in fade-in duration-300',
                         auditResult.verdict === 'TIDAK_LAYAK' ? 'bg-rose-50 border-rose-200' :
-                        auditResult.verdict === 'PERLU_REVISI' ? 'bg-amber-50 border-amber-200' :
-                        'bg-teal-50 border-teal-200'
+                            auditResult.verdict === 'PERLU_REVISI' ? 'bg-amber-50 border-amber-200' :
+                                'bg-teal-50 border-teal-200'
                     )}>
                         <div className="flex items-start gap-2.5 mb-2">
                             {auditResult.verdict === 'TIDAK_LAYAK'
@@ -173,12 +168,12 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                                 : auditResult.verdict === 'PERLU_REVISI'
                                     ? <ShieldAlert className="shrink-0 text-amber-600 mt-0.5" size={15} />
                                     : <ShieldCheck className="shrink-0 text-teal-600 mt-0.5" size={15} />}
-                            <div className="flex-1">
+                            <div className="flex-1 text-left">
                                 <p className={cn(
                                     'text-[11px] font-black leading-none mb-1',
                                     auditResult.verdict === 'TIDAK_LAYAK' ? 'text-rose-700' :
-                                    auditResult.verdict === 'PERLU_REVISI' ? 'text-amber-700' :
-                                    'text-teal-700'
+                                        auditResult.verdict === 'PERLU_REVISI' ? 'text-amber-700' :
+                                            'text-teal-700'
                                 )}>
                                     {auditResult.verdict === 'TIDAK_LAYAK'
                                         ? 'TIDAK LAYAK — Pelanggaran Kritis Terdeteksi'
@@ -189,8 +184,8 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                                 <p className={cn(
                                     'text-[10px] font-medium leading-snug',
                                     auditResult.verdict === 'TIDAK_LAYAK' ? 'text-rose-600' :
-                                    auditResult.verdict === 'PERLU_REVISI' ? 'text-amber-600' :
-                                    'text-teal-600'
+                                        auditResult.verdict === 'PERLU_REVISI' ? 'text-amber-600' :
+                                            'text-teal-600'
                                 )}>
                                     {auditResult.verdict === 'TIDAK_LAYAK'
                                         ? `Benturan spasial ${auditResult.clashAreaSqm.toLocaleString('id-ID')} m² pada zona dilindungi. Berkas wajib direvisi.`
@@ -204,7 +199,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                                 <span className={cn(
                                     'text-[18px] font-black tabular-nums leading-none',
                                     auditResult.zoningScore >= 80 ? 'text-teal-700' :
-                                    auditResult.zoningScore >= 50 ? 'text-amber-600' : 'text-rose-700'
+                                        auditResult.zoningScore >= 50 ? 'text-amber-600' : 'text-rose-700'
                                 )}>{auditResult.zoningScore}</span>
                                 <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">SKOR</span>
                             </div>
@@ -215,7 +210,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                                 className={cn(
                                     'h-full transition-all duration-700 rounded-none',
                                     auditResult.zoningScore >= 80 ? 'bg-teal-500' :
-                                    auditResult.zoningScore >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                                        auditResult.zoningScore >= 50 ? 'bg-amber-500' : 'bg-rose-500'
                                 )}
                                 style={{ width: `${auditResult.zoningScore}%` }}
                             />
@@ -223,7 +218,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                     </div>
                 ) : null}
 
-                {/* ── Laporan Indikator ──────────────────────────────────────── */}
+                {/* ── Laporan Indikator ── */}
                 <div className="">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 select-none">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">
@@ -234,7 +229,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                         {isProcessing ? (
                             <div className="px-4 py-6 text-center text-xs text-slate-400">
                                 <Loader2 className="h-4 w-4 animate-spin inline mr-2 text-teal-600" />
-                                Menjalankan audit spasial multi-layer...
+                                Menghubungi PostGIS server...
                             </div>
                         ) : auditResult?.details && auditResult.details.length > 0 ? (
                             auditResult.details.map((detail) => {
@@ -308,13 +303,13 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                             })
                         ) : (
                             <div className="px-4 py-6 text-center text-xs text-slate-400">
-                                Jalankan analisis untuk memuat indikator spasial.
+                                Pilih pengajuan untuk melihat indikator spasial.
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* ── Keterangan Metode ──────────────────────────────────────── */}
+                {/* ── Keterangan Metode ── */}
                 <div className="px-4 py-3.5 bg-slate-50 border-t border-slate-200 flex items-start gap-2.5 text-left select-none">
                     <HelpCircle className="text-slate-400 shrink-0 mt-0.5" size={14} />
                     <div className="space-y-1">
@@ -323,8 +318,7 @@ export default function SpatialCheckPanel({ submissionData }: SpatialCheckPanelP
                         </h5>
                         <p className="text-[9px] font-semibold leading-normal text-slate-400 text-left">
                             Pemeriksaan spasial dijalankan otomatis via point-in-polygon overlay menggunakan
-                            data acuan RTRW dan RDTR resmi Kabupaten Bogor tahun 2025 dengan Turf.js murni.
-                            Hasil kalkulasi di-debounce 600ms untuk efisiensi CPU.
+                            data acuan RTRW dan RDTR resmi Kabupaten Bogor tahun 2025 di database PostGIS tingkat server.
                         </p>
                     </div>
                 </div>

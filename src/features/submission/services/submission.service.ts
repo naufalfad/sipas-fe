@@ -3,7 +3,8 @@
  * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts]
  * ============================================================================
  * Peran: Menangani seluruh komunikasi HTTP REST API dengan server backend.
- *        Diperbarui penuh untuk mendukung payload metrik usulan pemohon (proposed)
+ *        Diperbarui penuh untuk mendukung pemanggilan audit spasial PostGIS 
+ *        server-side, payload metrik usulan pemohon (proposed), 
  *        dan pengiriman hasil audit dinas beserta dynamic checklist (verified).
  * ============================================================================
  */
@@ -204,5 +205,22 @@ export const SubmissionService = {
       console.warn(`[SubmissionService] Gagal memuat detail geometri spasial ID ${id_permohonan} dari API backend:`, err);
       return undefined;
     }
+  },
+
+  /**
+   * ─── BARU: SINKRONISASI AUDIT SPASIAL SERVERSIDE POSTGIS (Fase 2) ───
+   * Mengirimkan permintaan audit spasial langsung ke PostGIS dan mengembalikan
+   * hasil kalkulasi overlay, area benturan, dan detail pelanggaran [Buku 2 21].
+   */
+  getSpatialAudit: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/spatial-audit`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memproses audit spasial di server (HTTP ${response.status})`);
+    }
+    return await response.json();
   }
 };
