@@ -1,9 +1,9 @@
+// --- FILE: src/features/submission/pages/SubmissionVerificationPage.tsx ---
 /* STREAMING_CHUNK:Configuring imports and verification schemas */
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/app/store/useAuthStore';
-import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import { useAuthStore, AppPermission } from '@/app/store/useAuthStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { SubmissionStatus } from '../types';
 import {
@@ -34,9 +34,8 @@ export default function SubmissionVerificationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { user: userProfile } = useAuthStore();
+  const { user: userProfile, hasPermission } = useAuthStore();
   const activeRole = userProfile?.role || '';
-  const effectiveRole = normalizeRole(activeRole);
 
   const [kkprVerdict, setKkprVerdict] = useState<string>('Sesuai');
   const [verifiedKdb, setVerifiedKdb] = useState<number | ''>('');
@@ -293,8 +292,9 @@ export default function SubmissionVerificationPage() {
     );
   }
 
-  const isVerifier = effectiveRole === 'Tim Teknis' || effectiveRole === 'Kepala Bidang' || effectiveRole === 'Super Admin';
-  if (!isVerifier || sub.status !== 'Verifikasi Teknis') {
+  // REVISI: Gerbang Masuk Halaman Menggunakan Permission-Based Access Control (PBAC) [Pylance & SoD Enforcer]
+  const isAuthorizedVerifier = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL);
+  if (!isAuthorizedVerifier || sub.status !== 'Verifikasi Teknis') {
     return (
       <div className="p-8 text-left bg-white border border-slate-300 max-w-md mx-auto mt-12 rounded-none space-y-4">
         <ShieldCheck className="h-8 w-8 text-amber-600" />

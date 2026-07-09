@@ -1,3 +1,4 @@
+// --- FILE: src/app/router/index.tsx ---
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
 
@@ -98,7 +99,8 @@ export const router = createBrowserRouter([
           {
             path: 'verifikasi/:id',
             element: (
-              <ProtectedRoute allowedRoles={['Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+              // REVISI: Pembatasan ketat fungsional SoD. Kabid dilarang keras memproses lembar input verifikasi teknis.
+              <ProtectedRoute allowedRoles={['Tim Teknis', 'Super Admin']}>
                 <SubmissionVerificationPage />
               </ProtectedRoute>
             ),
@@ -134,9 +136,9 @@ export const router = createBrowserRouter([
       {
         path: 'verifikasi',
         element: (
-          // SOD: Super Admin dikecualikan. Hanya pejabat fungsional yang berwenang
-          // melakukan verifikasi administrasi, teknis, dan persetujuan TTE.
-          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang']}>
+          // SOD REVISI: Kabid diarahkan langsung ke Detail Page dan tidak menggunakan antrean input evaluasi.
+          // Hanya menyisakan Admin SIPAS (administrasi) dan Tim Teknis (koordinat/spasial).
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis']}>
             <VerificationPage />
           </ProtectedRoute>
         ),

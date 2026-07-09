@@ -1,9 +1,10 @@
+// --- FILE: src/features/submission/pages/SubmissionDetailPage.tsx ---
 /* STREAMING_CHUNK:Configuring imports and base constants */
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
-import { useAuthStore } from '@/app/store/useAuthStore';
+import { useAuthStore, AppPermission } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import { useGisUIStore, type LahanKompensasi } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
@@ -61,7 +62,7 @@ export default function SubmissionDetailPage() {
   const navigate = useNavigate(); // Perbaikan: navigate digunakan secara aktif pada aksi kembali
 
   const { activeRole: uiActiveRole, userProfile: uiUserProfile } = useUIStore();
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore(); // Memanfaatkan hasPermission dari store tepercaya
 
   const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
   const activeRole = effectiveRole;
@@ -251,8 +252,8 @@ export default function SubmissionDetailPage() {
   const showKabidPanel = isKabidActive && subData.status === 'Menunggu Rekomendasi';
   const showKadisPanel = isKadisActive && subData.status === 'Menunggu Persetujuan';
 
-  const isTeknisActive = effectiveRole === 'Tim Teknis' || effectiveRole === 'Super Admin' || effectiveRole === 'Kepala Bidang';
-  const showTeknisPanel = isTeknisActive && subData.status === 'Verifikasi Teknis';
+  // REVISI: Pengkondisian panel diputuskan tepercaya murni dari otorisasi PBAC, bukan hardcoded role strings
+  const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && subData.status === 'Verifikasi Teknis';
 
   const allAdminChecked = Object.values(adminChecks).every(Boolean);
 
@@ -290,7 +291,7 @@ export default function SubmissionDetailPage() {
         aspekCode: 'supportDoc',
         aspekLabel: 'Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Terlampir',
         statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Dokumen KKPR terlampir dan sesuai.',
+        catatanVerifikator: 'Dokumen KKPR terlampir and sesuai.',
         verifiedById: user?.id,
         verifiedAt: new Date().toISOString()
       },
@@ -432,7 +433,7 @@ export default function SubmissionDetailPage() {
     });
   };
 
-  // ─── SEKSI BARU: HASIL EVALUASI TEKNIS & TELAAH STAF (Type Safe Argument Method) ───
+  // ─── SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ───
   const renderTelaahStafSection = (data: Submission) => {
     const hasTechnicalResult = data.kkprVerdict || data.telaahStaf;
     if (!hasTechnicalResult) return null;
@@ -448,9 +449,9 @@ export default function SubmissionDetailPage() {
           </div>
           <span className={cn(
             "rounded-none text-[8.5px] font-black tracking-widest px-2.5 py-1 uppercase leading-none border shrink-0",
-            verdictLabel === 'Sesuai' || verdictLabel === 'Sesuai / Dapat Disetujui' ? "bg-emerald-50 text-emerald-800 border-emerald-200" :
-              verdictLabel === 'Sesuai Bersyarat' || verdictLabel === 'Sesuai Bersyarat / Ketentuan Khusus' ? "bg-amber-50 text-amber-800 border-amber-200" :
-                "bg-rose-50 text-rose-800 border-rose-200"
+            verdictLabel === 'Sesuai' || verdictLabel === 'Sesuai / Dapat Disetujui' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+              verdictLabel === 'Sesuai Bersyarat' || verdictLabel === 'Sesuai Bersyarat / Ketentuan Khusus' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                "bg-rose-50 text-rose-700 border-rose-200"
           )}>
             {verdictLabel}
           </span>
@@ -849,8 +850,6 @@ export default function SubmissionDetailPage() {
             </div>
           </div>
 
-
-
         </div>
 
       </div>
@@ -913,7 +912,7 @@ export default function SubmissionDetailPage() {
                 }}
                 className={cn(
                   "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-slate-500",
-                  isVetoModeActive ? "bg-amber-500" : "bg-slate-200"
+                  isVetoModeActive ? "bg-amber-50" : "bg-slate-200"
                 )}
               >
                 <span className={cn(
