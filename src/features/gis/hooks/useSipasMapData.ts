@@ -54,6 +54,7 @@ export function useSipasMapData(localZoom: number) {
     roadPolygons?: number[][][];
     rthPolygons?: number[][][];
     psuPolygons?: number[][][];
+    kavlingPolygons?: number[][][];
   } | null>(null);
 
   const { data: submissions = [] } = useQuery<Submission[]>({
@@ -271,7 +272,16 @@ export function useSipasMapData(localZoom: number) {
       const addPoly = (rings: number[][][], color: string, type: string) => {
         rings.forEach((ring) => {
           try {
-            const geoJSONRing = leafletRingToGeoJSON(ring as [number, number][]);
+            // Sejak koordinat dari activeGeometries (API PostGIS) sudah dalam format [Lng, Lat],
+            // kita gunakan langsung dan pastikan ring tertutup tanpa Lng/Lat Swap.
+            const geoJSONRing = [...ring] as [number, number][];
+            if (geoJSONRing.length > 0) {
+              const first = geoJSONRing[0];
+              const last = geoJSONRing[geoJSONRing.length - 1];
+              if (first[0] !== last[0] || first[1] !== last[1]) {
+                geoJSONRing.push([first[0], first[1]]);
+              }
+            }
 
             features.push({
               type: 'Feature',
@@ -319,6 +329,7 @@ export function useSipasMapData(localZoom: number) {
       if (activeGeometries.roadPolygons) addPoly(activeGeometries.roadPolygons, '#cbd5e1', 'road');
       if (activeGeometries.rthPolygons) addPoly(activeGeometries.rthPolygons, '#10b981', 'rth');
       if (activeGeometries.psuPolygons) addPoly(activeGeometries.psuPolygons, '#14b8a6', 'psu');
+      if (activeGeometries.kavlingPolygons) addPoly(activeGeometries.kavlingPolygons, '#64748b', 'kavling');
     } else {
       processedSubmissions.forEach((sub) => {
         const loc = sub.location;

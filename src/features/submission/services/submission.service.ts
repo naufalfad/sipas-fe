@@ -193,6 +193,7 @@ export const SubmissionService = {
     roadPolygons?: number[][][];
     rthPolygons?: number[][][];
     psuPolygons?: number[][][];
+    kavlingPolygons?: number[][][];
   } | undefined> => {
     try {
       const response = await fetch(`${API_BASE_URL}/${id_permohonan}/geometries`, {
