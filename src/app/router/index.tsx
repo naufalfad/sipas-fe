@@ -8,7 +8,9 @@ import SubmissionListPage from '@/features/submission/pages/SubmissionListPage';
 import SubmissionCreatePage from '@/features/submission/pages/SubmissionCreatePage';
 import SubmissionDetailPage from '@/features/submission/pages/SubmissionDetailPage';
 import SubmissionVerificationPage from '@/features/submission/pages/SubmissionVerificationPage';
-import SubmissionPreviewTelaahPage from '@/features/submission/pages/SubmissionPreviewTelaahPage'; // Halaman Baru (Fase 2)
+import SubmissionPreviewTelaahPage from '@/features/submission/pages/SubmissionPreviewTelaahPage'; // Halaman (Fase 2)
+import SubmissionKabidReviewPage from '@/features/submission/pages/SubmissionKabidReviewPage';       // BARU TAHAP 2 (Kabid)
+import SubmissionKadisSignPage from '@/features/submission/pages/SubmissionKadisSignPage';         // BARU TAHAP 2 (Kadis)
 import SitePlanListPage from '@/features/siteplan/pages/SitePlanListPage';
 import SitePlanDetailPage from '@/features/siteplan/pages/SitePlanDetailPage';
 import VerificationPage from '@/features/verification/pages/VerificationPage';
@@ -105,12 +107,30 @@ export const router = createBrowserRouter([
               </ProtectedRoute>
             ),
           },
-          // ─── BARU: HALAMAN PREVIEW & SUBMIT TELAAH STAF (Fase 2) ───
+          // ─── HALAMAN PREVIEW & SUBMIT TELAAH STAF (Fase 2) ───
           {
             path: 'verifikasi/:id/preview-telaah',
             element: (
               <ProtectedRoute allowedRoles={['Tim Teknis', 'Super Admin']}>
                 <SubmissionPreviewTelaahPage />
+              </ProtectedRoute>
+            ),
+          },
+          // ─── BARU TAHAP 2: HALAMAN TINJAUAN & PARAFI DRAF SK OLEH KABID (SO-D GATEWAY) ───
+          {
+            path: 'verifikasi/:id/tinjau-kabid',
+            element: (
+              <ProtectedRoute allowedRoles={['Kepala Bidang', 'Super Admin']}>
+                <SubmissionKabidReviewPage />
+              </ProtectedRoute>
+            ),
+          },
+          // ─── BARU TAHAP 2: HALAMAN PERSIDANGAN TTE SK FINAL OLEH KEPALA DINAS (KADIS SECURE TTE) ───
+          {
+            path: 'verifikasi/:id/sahkan-kadis',
+            element: (
+              <ProtectedRoute allowedRoles={['Kadis', 'Super Admin']}>
+                <SubmissionKadisSignPage />
               </ProtectedRoute>
             ),
           },

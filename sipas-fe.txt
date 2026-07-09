@@ -42,27 +42,26 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@geoman-io/leaflet-geoman-free": "^2.20.0",
     "@hookform/resolvers": "^5.4.0",
-    "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@tanstack/react-query": "^5.101.1",
     "@turf/turf": "^6.5.0",
-    "@types/mapbox__mapbox-gl-draw": "^1.4.9",
+    "@types/leaflet": "^1.9.21",
     "@types/supercluster": "^7.1.3",
     "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.21.0",
-    "maplibre-gl": "^5.24.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.80.0",
-    "react-map-gl": "^8.1.1",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.18.0",
     "sonner": "^2.0.7",
     "supercluster": "^8.0.1",
     "tailwind-merge": "^3.6.0",
-    "three": "^0.184.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
@@ -70,7 +69,6 @@
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.1",
     "oxlint": "^1.69.0",
@@ -558,6 +556,41 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
   animation: sonar-wave-expand 1.2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
 }
 
+/* ─── LEAFLET OVERRIDES ─────────────────────────────────────────────────────── */
+
+/* Remove default Leaflet attribution bottom-right box clutter */
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  opacity: 0.6;
+}
+
+/* Custom Leaflet popup — remove default chrome (tip, padding, border) */
+.leaflet-popup-content-wrapper {
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18) !important;
+  border: none !important;
+}
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4;
+}
+.leaflet-popup-tip-container {
+  display: none !important;
+}
+.leaflet-popup-close-button {
+  display: none !important;
+}
+.sipas-popup .leaflet-popup-content-wrapper {
+  overflow: hidden;
+}
+
+/* Sonar animation for conflict divIcon HTML */
+@keyframes sonarRipple {
+  0%   { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
 --- FILE: src\main.tsx ---
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -991,8 +1024,6 @@ export interface FlyToTarget {
     longitude: number;
     latitude: number;
     zoom?: number;
-    pitch?: number;
-    bearing?: number;
 }
 
 /** Representasi Data Konflik Spasial hasil Sidak Lapangan & Drone Mapping [Bogor 8] */
@@ -1025,7 +1056,6 @@ interface GisUIState {
     mapOpacity: number;
     maskOpacity: number;
     activeBaseMap: string;
-    isTerrainActive: boolean;
 
     // ── Layer Drone (Orthophoto) & Deteksi Konflik ───────────────────────────
     isDroneLayerActive: boolean;
@@ -1040,11 +1070,8 @@ interface GisUIState {
     mapZoom: number;
     /** Format [latitude, longitude] — tetap dipertahankan untuk kompatibilitas komponen lain */
     mapCenter: [number, number];
-    mapPitch: number;
-    mapBearing: number;
-    is3DMode: boolean;
 
-    /** Posisi kursor mouse aktif di peta (koordinat + elevasi dari DEM) */
+    /** Posisi kursor mouse aktif di peta (koordinat 2D, elevation selalu null di Leaflet) */
     cursorCoords: { lat: number; lng: number; elevation: number | null } | null;
 
     // ── Panel Orchestrator ───────────────────────────────────────────────────
@@ -1064,7 +1091,6 @@ interface GisUIState {
     setMapOpacity: (opacity: number) => void;
     setMaskOpacity: (opacity: number) => void;
     setActiveBaseMap: (baseMap: string) => void;
-    toggleTerrain: () => void;
     toggleDroneLayer: () => void;
     setDroneLayerOpacity: (opacity: number) => void;
     setClashGeoJson: (geoJson: any | null) => void;
@@ -1077,10 +1103,6 @@ interface GisUIState {
     // ── Actions: Kamera ──────────────────────────────────────────────────────
     setMapZoom: (zoom: number) => void;
     setMapCenter: (center: [number, number]) => void;
-    setMapPitch: (pitch: number) => void;
-    setMapBearing: (bearing: number) => void;
-    /** Toggle antara mode 3D (pitch=45) dan flat (pitch=0) */
-    toggle3DMode: () => void;
     /** Perintahkan SipasMap untuk terbang ke koordinat tertentu */
     flyTo: (target: FlyToTarget) => void;
     /** Dipanggil oleh SipasMap setelah flyTo dieksekusi */
@@ -1112,12 +1134,8 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     selectedCompanyId: null,
     activeKompensasi: null,
     mapZoom: 11,
-    mapCenter: [-6.4816, 106.8560],   // [lat, lng] — format Leaflet historis
-    mapPitch: 45,                      // Default 3D immersive view
-    mapBearing: -10,                   // Sedikit rotasi kompas untuk estetika
-    is3DMode: true,
+    mapCenter: [-6.4816, 106.8560],   // [lat, lng] — format Leaflet
     cursorCoords: null,
-    isTerrainActive: true,
     activeBaseMap: 'voyager',
     activePanels: [],
     flyToTarget: null,
@@ -1145,10 +1163,6 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     setMaskOpacity: (maskOpacity) => set({ maskOpacity }),
     setActiveBaseMap: (activeBaseMap) => set({ activeBaseMap }),
 
-    toggleTerrain: () => set((state) => ({
-        isTerrainActive: !state.isTerrainActive
-    })),
-
     toggleDroneLayer: () => set((state) => ({
         isDroneLayerActive: !state.isDroneLayerActive
     })),
@@ -1172,17 +1186,6 @@ export const useGisUIStore = create<GisUIState>((set) => ({
 
     setMapZoom: (mapZoom) => set({ mapZoom }),
     setMapCenter: (mapCenter) => set({ mapCenter }),
-    setMapPitch: (mapPitch) => set({ mapPitch }),
-    setMapBearing: (mapBearing) => set({ mapBearing }),
-
-    toggle3DMode: () => set((state) => {
-        const newIs3D = !state.is3DMode;
-        return {
-            is3DMode: newIs3D,
-            mapPitch: newIs3D ? 45 : 0,
-            mapBearing: newIs3D ? -10 : 0, // 2D = top-down (0°) | 3D = estetis (-10°)
-        };
-    }),
 
     flyTo: (flyToTarget) => set({ flyToTarget }),
 
@@ -1935,27 +1938,23 @@ export default function CADGeoreferenceWizard({
 --- FILE: src\components\maps\GISDrawingMap.tsx ---
 /**
  * ============================================================================
- * GIS DRAWING MAP — Alat Gambar Poligon Interaktif
+ * GIS DRAWING MAP — Alat Gambar Poligon Interaktif (Leaflet + Geoman)
  * ============================================================================
- * Engine   : @mapbox/mapbox-gl-draw (100% compatible dengan MapLibre GL JS)
- * Container: Komponen ini HARUS dirender sebagai children dari <Map> react-map-gl
- *
- * Migrasi dari: @geoman-io/leaflet-geoman-free + react-leaflet
- * Migrasi ke  : @mapbox/mapbox-gl-draw + react-map-gl/maplibre
+ * Engine   : @geoman-io/leaflet-geoman-free
+ * Container: Komponen ini HARUS dirender sebagai children dari
+ *            <MapContainer> (GISMapContainer atau komponen lain).
  *
  * Output Koordinat:
- *   @mapbox/mapbox-gl-draw mengeluarkan koordinat dalam format GeoJSON
- *   standar: [longitude, latitude].
- *   Prop `onShapeChange` menerima format yang sama.
- *   Jika konsumen (form) masih menggunakan format Leaflet [lat,lng],
- *   gunakan `geoJSONRingToLeaflet` dari geoUtils.
+ *   Format GeoJSON standar: [longitude, latitude]
+ *   Sesuai dengan Leaflet conventions setelah konversi [lat,lng] → [lng,lat].
  * ============================================================================
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useMap } from 'react-map-gl/maplibre';
-import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import { useMap } from 'react-leaflet';
+import L from 'leaflet';
+import '@geoman-io/leaflet-geoman-free';
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 
 // ─── Tipe ──────────────────────────────────────────────────────────────────────
 
@@ -1985,68 +1984,6 @@ interface GISDrawingMapProps {
     initialGeoJson?: any;
 }
 
-// ─── Kustomisasi Tema Draw ──────────────────────────────────────────────────────
-// Sesuaikan warna dengan desain sistem GEOSIPAS (teal/slate palette)
-
-const DRAW_STYLES = [
-    // Polygon fill saat menggambar (active)
-    {
-        id: 'gl-draw-polygon-fill-inactive',
-        type: 'fill',
-        filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
-        paint: { 'fill-color': '#14b8a6', 'fill-outline-color': '#14b8a6', 'fill-opacity': 0.15 },
-    },
-    {
-        id: 'gl-draw-polygon-fill-active',
-        type: 'fill',
-        filter: ['all', ['==', 'active', 'true'], ['==', '$type', 'Polygon']],
-        paint: { 'fill-color': '#0d9488', 'fill-outline-color': '#0d9488', 'fill-opacity': 0.25 },
-    },
-    // Polygon outline
-    {
-        id: 'gl-draw-polygon-stroke-inactive',
-        type: 'line',
-        filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#14b8a6', 'line-width': 2 },
-    },
-    {
-        id: 'gl-draw-polygon-stroke-active',
-        type: 'line',
-        filter: ['all', ['==', 'active', 'true'], ['==', '$type', 'Polygon']],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#0d9488', 'line-width': 2.5, 'line-dasharray': [0.2, 2] },
-    },
-    // Midpoint vertex
-    {
-        id: 'gl-draw-polygon-midpoint',
-        type: 'circle',
-        filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'midpoint']],
-        paint: { 'circle-radius': 4, 'circle-color': '#0d9488' },
-    },
-    // Vertex points
-    {
-        id: 'gl-draw-polygon-and-line-vertex-inactive',
-        type: 'circle',
-        filter: ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point'], ['!=', 'mode', 'static']],
-        paint: { 'circle-radius': 5, 'circle-color': '#fff', 'circle-stroke-color': '#14b8a6', 'circle-stroke-width': 2 },
-    },
-    {
-        id: 'gl-draw-polygon-and-line-vertex-active',
-        type: 'circle',
-        filter: ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point'], ['==', 'active', 'true']],
-        paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#0d9488', 'circle-stroke-width': 2.5 },
-    },
-    // Line guide saat menggambar
-    {
-        id: 'gl-draw-line',
-        type: 'line',
-        filter: ['all', ['==', '$type', 'LineString'], ['!=', 'mode', 'static']],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#0d9488', 'line-dasharray': [0.2, 2], 'line-width': 2 },
-    },
-] as any[];
-
 // ─── KOMPONEN ──────────────────────────────────────────────────────────────────
 
 export default function GISDrawingMap({
@@ -2055,139 +1992,156 @@ export default function GISDrawingMap({
     allowMultiple = false,
     initialGeoJson,
 }: GISDrawingMapProps) {
-    const { current: map } = useMap();
-    const drawRef = useRef<MapboxDraw | null>(null);
-    // Simpan reference ke callback agar event listener tidak perlu di-rebind
+    const map = useMap();
+    const layerGroupRef = useRef<L.LayerGroup | null>(null);
     const onShapeChangeRef = useRef(onShapeChange);
     useEffect(() => { onShapeChangeRef.current = onShapeChange; }, [onShapeChange]);
 
     /**
-     * Kumpulkan semua koordinat dari semua fitur yang sedang digambar,
+     * Kumpulkan semua koordinat dari layer group,
+     * konversi dari format Leaflet [lat,lng] ke GeoJSON [lng,lat],
      * lalu kirim ke callback parent.
      */
     const collectAndEmit = useCallback(() => {
-        if (!drawRef.current) return;
+        if (!layerGroupRef.current) return;
         try {
-            const data = drawRef.current.getAll();
-            const allCoords: DrawnPolygonCoords = data.features
-                .filter((f) => f.geometry.type === 'Polygon')
-                .map((f) => (f.geometry as GeoJSON.Polygon).coordinates[0] as [number, number][]);
+            const allCoords: DrawnPolygonCoords = [];
+            layerGroupRef.current.eachLayer((layer) => {
+                if (layer instanceof L.Polygon) {
+                    const latlngs = layer.getLatLngs()[0] as L.LatLng[];
+                    const ring: [number, number][] = latlngs.map(
+                        (ll) => [ll.lng, ll.lat]
+                    );
+                    allCoords.push(ring);
+                }
+            });
             onShapeChangeRef.current(allCoords);
         } catch (err) {
             console.error('[GISDrawingMap] Gagal mengumpulkan koordinat:', err);
         }
     }, []);
 
-    // ── Setup MapboxDraw saat map siap ─────────────────────────────────────────
+    // ── Setup Geoman saat map siap ─────────────────────────────────────────────
     useEffect(() => {
         if (!map) return;
 
-        const mapInstance = map.getMap(); // Ambil instance MapLibre native
+        // Buat layer group untuk menampung semua drawn shapes
+        const layerGroup = L.layerGroup().addTo(map);
+        layerGroupRef.current = layerGroup;
 
-        const draw = new MapboxDraw({
-            displayControlsDefault: false,
-            controls: {
-                polygon:   false,
-                trash:     false,
-            },
-            styles: DRAW_STYLES,
-            // Batasi ke satu poligon jika allowMultiple = false
-            // (diimplementasikan via event handler di bawah)
+        // Konfigurasi geoman
+        map.pm.addControls({
+            position: 'topleft',
+            drawCircle: false,
+            drawCircleMarker: false,
+            drawPolyline: false,
+            drawRectangle: false,
+            drawMarker: false,
+            drawText: false,
+            editMode: true,
+            dragMode: false,
+            cutPolygon: false,
+            removalMode: true,
+            rotateMode: false,
         });
 
-        try {
-            mapInstance.addControl(draw as any, 'top-left');
-            drawRef.current = draw;
-        } catch (err) {
-            console.error('[GISDrawingMap] Gagal menambahkan kontrol gambar:', err);
-            return;
-        }
+        // Styling geoman
+        map.pm.setGlobalOptions({
+            pathOptions: {
+                color: '#0d9488',
+                fillColor: '#14b8a6',
+                fillOpacity: 0.2,
+                weight: 2,
+            },
+            templineStyle: { color: '#0d9488', weight: 2 },
+            hintlineStyle: { color: '#0d9488', weight: 2, dashArray: '5, 5' },
+        });
 
-        // ── Handler Event Draw ─────────────────────────────────────────────────
-
-        const handleCreate = () => {
-            // Jika tidak boleh multi-polygon, hapus yang lama sebelum menambah yang baru
-            if (!allowMultiple) {
-                const all = draw.getAll();
-                if (all.features.length > 1) {
-                    // Hapus semua kecuali yang terakhir ditambahkan
-                    const toDelete = all.features.slice(0, -1).map((f) => f.id as string);
-                    draw.delete(toDelete);
-                }
-            }
-            collectAndEmit();
-        };
-
-        const handleUpdate = () => collectAndEmit();
-        const handleDelete = () => collectAndEmit();
-
-        mapInstance.on('draw.create', handleCreate);
-        mapInstance.on('draw.update', handleUpdate);
-        mapInstance.on('draw.delete', handleDelete);
-
-        // ── Load nilai awal jika ada ───────────────────────────────────────────
+        // Load nilai awal
         if (initialValue && initialValue.length > 0) {
             try {
-                const features: GeoJSON.Feature<GeoJSON.Polygon>[] = initialValue.map((ring, i) => ({
-                    id: `init-${i}`,
-                    type: 'Feature',
-                    geometry: { type: 'Polygon', coordinates: [ring] },
-                    properties: {},
-                }));
-                draw.set({ type: 'FeatureCollection', features });
+                initialValue.forEach((ring) => {
+                    const latlngs = ring.map(([lng, lat]) => L.latLng(lat, lng));
+                    const polygon = L.polygon(latlngs, {
+                        color: '#0d9488',
+                        fillColor: '#14b8a6',
+                        fillOpacity: 0.2,
+                        weight: 2,
+                    });
+                    polygon.addTo(layerGroup);
+                    (polygon as any).pm?.enable?.();
+                });
             } catch (err) {
                 console.warn('[GISDrawingMap] Gagal memuat nilai awal:', err);
             }
         }
 
-        // ── Cleanup saat unmount ───────────────────────────────────────────────
-        return () => {
-            try {
-                mapInstance.off('draw.create', handleCreate);
-                mapInstance.off('draw.update', handleUpdate);
-                mapInstance.off('draw.delete', handleDelete);
-                mapInstance.removeControl(draw as any);
-            } catch {
-                // Map mungkin sudah di-destroy, abaikan error cleanup
+        // Event handlers
+        const handleCreate = (e: any) => {
+            const layer = e.layer;
+            if (!allowMultiple) {
+                // Hapus semua layer lama kecuali yang baru saja digambar
+                const toRemove: L.Layer[] = [];
+                layerGroup.eachLayer((l) => {
+                    if (l !== layer) toRemove.push(l);
+                });
+                toRemove.forEach((l) => layerGroup.removeLayer(l));
             }
-            drawRef.current = null;
+            layer.addTo(layerGroup);
+            collectAndEmit();
         };
+
+        const handleEdit = () => collectAndEmit();
+        const handleRemove = () => collectAndEmit();
+
+        map.on('pm:create', handleCreate);
+        map.on('pm:edit', handleEdit);
+        map.on('pm:remove', handleRemove);
+
+        return () => {
+            map.off('pm:create', handleCreate);
+            map.off('pm:edit', handleEdit);
+            map.off('pm:remove', handleRemove);
+            try {
+                map.pm.removeControls();
+                layerGroup.clearLayers();
+                layerGroup.remove();
+            } catch {
+                // ignore cleanup errors
+            }
+            layerGroupRef.current = null;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [map, allowMultiple, collectAndEmit]);
-    // CATATAN: `initialValue` sengaja dikecualikan dari deps array.
-    // Nilai awal hanya dimuat sekali saat mount, bukan setiap kali prop berubah.
 
-    // ── Load GeoJSON baru saat initialGeoJson berubah ────────────────────────
+    // ── Load GeoJSON baru saat initialGeoJson berubah ─────────────────────────
     useEffect(() => {
-        if (!map || !drawRef.current || !initialGeoJson) return;
+        if (!map || !layerGroupRef.current || !initialGeoJson) return;
         try {
-            drawRef.current.set(initialGeoJson);
-            // Kumpulkan koordinat dan emit
-            const all = drawRef.current.getAll();
-            const allCoords: DrawnPolygonCoords = all.features
-                .filter((f) => f.geometry.type === 'Polygon')
-                .map((f) => (f.geometry as GeoJSON.Polygon).coordinates[0] as [number, number][]);
-            onShapeChangeRef.current(allCoords);
-
-            // Fit bounds ke peta
-            if (all.features.length > 0) {
-                const firstFeature = all.features[0];
-                if (firstFeature.geometry.type === 'Polygon') {
-                    const coords = firstFeature.geometry.coordinates[0];
-                    const lngs = coords.map(c => c[0]);
-                    const lats = coords.map(c => c[1]);
-                    const bounds: [number, number, number, number] = [
-                        Math.min(...lngs),
-                        Math.min(...lats),
-                        Math.max(...lngs),
-                        Math.max(...lats)
-                    ];
-                    map.getMap().fitBounds(bounds, { padding: 50, duration: 1000 });
+            layerGroupRef.current.clearLayers();
+            const geoLayer = L.geoJSON(initialGeoJson, {
+                style: { color: '#0d9488', fillColor: '#14b8a6', fillOpacity: 0.2, weight: 2 },
+            });
+            geoLayer.eachLayer((l) => {
+                if (l instanceof L.Polygon) {
+                    l.addTo(layerGroupRef.current!);
                 }
+            });
+            collectAndEmit();
+
+            // Fit bounds
+            try {
+                const bounds = geoLayer.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [50, 50], animate: true });
+                }
+            } catch {
+                // ignore bounds error
             }
         } catch (err) {
             console.warn('[GISDrawingMap] Gagal memuat GeoJSON dari prop:', err);
         }
-    }, [map, initialGeoJson]);
+    }, [map, initialGeoJson, collectAndEmit]);
 
     // Komponen ini hanya mengatur logika imperatif, tidak merender elemen HTML
     return null;
@@ -2215,40 +2169,17 @@ export default function GISLayerControl() {
 --- FILE: src\components\maps\GISMapContainer.tsx ---
 /**
  * ============================================================================
- * GIS MAP CONTAINER — MapLibre GL JS Wrapper
+ * GIS MAP CONTAINER — Leaflet Wrapper
  * ============================================================================
- * Migrasi dari: react-leaflet MapContainer
- * Migrasi ke  : react-map-gl/maplibre Map
- *
- * Komponen pembungkus peta generik. Digunakan oleh form pengajuan dan
- * komponen lain yang membutuhkan peta embedding ringan (bukan GISPage utama).
+ * Komponen pembungkus peta generik berbasis Leaflet.
+ * Digunakan oleh form pengajuan dan komponen lain yang membutuhkan
+ * peta embedding ringan (bukan GISPage utama).
  * ============================================================================
  */
 
-import React, { useRef, useEffect } from 'react';
-import Map, { type MapRef } from 'react-map-gl/maplibre';
-import type { StyleSpecification } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
-const DEFAULT_STYLE: StyleSpecification = {
-    version: 8,
-    sources: {
-        'osm': {
-            type: 'raster',
-            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors',
-            maxzoom: 18,
-        },
-    },
-    layers: [{ id: 'osm-layer', type: 'raster', source: 'osm' }],
-    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-} as StyleSpecification;
-
-const REGIONAL_BOUNDS: [[number, number], [number, number]] = [
-    [90.0, -15.0], // Southwest: [lng, lat]
-    [150.0, 15.0], // Northeast: [lng, lat]
-];
+import React from 'react';
+import { MapContainer, TileLayer } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface GISMapContainerProps {
     /** Pusat awal peta dalam format [latitude, longitude] */
@@ -2264,40 +2195,25 @@ export default function GISMapContainer({
     children,
     className = 'w-full h-full rounded-xl shadow-inner border border-slate-200',
 }: GISMapContainerProps) {
-    const mapRef = useRef<MapRef>(null);
-
-    // ── WebGL Context Cleanup ──
-    // Memanggil map.remove() secara eksplisit saat unmount untuk membebaskan WebGL context secara instan.
-    useEffect(() => {
-        return () => {
-            try {
-                mapRef.current?.getMap()?.remove();
-            } catch {
-                // Abaikan jika map sudah dihancurkan oleh React
-            }
-        };
-    }, []);
-
     return (
         <div className={className} style={{ width: '100%', height: '100%' }}>
-            <Map
-                ref={mapRef}
-                id="gis-map-container"
-                mapLib={import('maplibre-gl')}
-                mapStyle={DEFAULT_STYLE}
-                initialViewState={{
-                    longitude: center[1], // GeoJSON format: [lng, lat]
-                    latitude: center[0],
-                    zoom,
-                }}
-                style={{ width: '100%', height: '100%' }}
+            <MapContainer
+                center={center}
+                zoom={zoom}
+                minZoom={4}
                 maxZoom={22}
-                pitchWithRotate={false}
-                renderWorldCopies={false}
-                maxBounds={REGIONAL_BOUNDS}
+                zoomControl={false}
+                style={{ width: '100%', height: '100%' }}
+                maxBounds={[[-15, 90], [15, 150]]}
+                maxBoundsViscosity={1.0}
             >
+                <TileLayer
+                    url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                    maxZoom={18}
+                />
                 {children}
-            </Map>
+            </MapContainer>
         </div>
     );
 }
@@ -2305,22 +2221,20 @@ export default function GISMapContainer({
 --- FILE: src\components\maps\GISMarkerLayer.tsx ---
 /**
  * ============================================================================
- * GIS MARKER LAYER — MapLibre Wrapper
+ * GIS MARKER LAYER — Leaflet Wrapper
  * ============================================================================
- * Migrasi dari: react-leaflet Marker + Popup
- * Migrasi ke  : react-map-gl/maplibre Marker + Popup
- *
- * Komponen generik untuk merender sekumpulan marker di atas peta.
- * HARUS dirender sebagai children dari <Map> (GISMapContainer atau SipasMap).
+ * Komponen generik untuk merender sekumpulan marker di atas peta Leaflet.
+ * HARUS dirender sebagai children dari <MapContainer> atau GISMapContainer.
  * ============================================================================
  */
 
-import { Marker, Popup } from 'react-map-gl/maplibre';
+import { Marker, Popup } from 'react-leaflet';
 import { useState } from 'react';
+import L from 'leaflet';
 
 export interface GISMarkerData {
     id: string;
-    /** Format [latitude, longitude] — konsisten dengan data historis */
+    /** Format [latitude, longitude] */
     position: [number, number];
     housingName: string;
     developerName: string;
@@ -2338,55 +2252,43 @@ export default function GISMarkerLayer({ data, markerColor = '#14b8a6' }: GISMar
     return (
         <>
             {data.map((marker) => {
-                const [lat, lng] = marker.position; // Konversi dari format [lat,lng] ke MapLibre
+                const [lat, lng] = marker.position;
+                const icon = L.divIcon({
+                    className: '',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 24],
+                    html: `<div style="
+                        width:24px;height:24px;
+                        background:${markerColor};
+                        border:3px solid #fff;
+                        border-radius:50% 50% 50% 0;
+                        transform:rotate(-45deg);
+                        box-shadow:0 2px 8px rgba(0,0,0,0.3);
+                        cursor:pointer;
+                    "></div>`,
+                });
+
                 return (
                     <Marker
                         key={marker.id}
-                        longitude={lng}
-                        latitude={lat}
-                        anchor="bottom"
-                        onClick={(e) => {
-                            e.originalEvent.stopPropagation();
-                            setActiveId(marker.id === activeId ? null : marker.id);
+                        position={[lat, lng]}
+                        icon={icon}
+                        eventHandlers={{
+                            click: () => setActiveId(marker.id === activeId ? null : marker.id),
                         }}
                     >
-                        <div
-                            style={{
-                                width: 24,
-                                height: 24,
-                                background: markerColor,
-                                border: '3px solid #fff',
-                                borderRadius: '50% 50% 50% 0',
-                                transform: 'rotate(-45deg)',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                                cursor: 'pointer',
-                            }}
-                        />
+                        {activeId === marker.id && (
+                            <Popup onClose={() => setActiveId(null)}>
+                                <div className="p-1 space-y-1 text-xs min-w-[160px]">
+                                    <h4 className="font-bold text-slate-800 text-sm leading-tight">{marker.housingName}</h4>
+                                    <p className="text-slate-500 font-medium">{marker.developerName}</p>
+                                    <p className="text-slate-400 leading-relaxed mt-1 max-w-[180px]">{marker.address}</p>
+                                </div>
+                            </Popup>
+                        )}
                     </Marker>
                 );
             })}
-
-            {activeId && (() => {
-                const m = data.find(d => d.id === activeId);
-                if (!m) return null;
-                const [lat, lng] = m.position;
-                return (
-                    <Popup
-                        longitude={lng}
-                        latitude={lat}
-                        anchor="bottom"
-                        offset={[0, -28]}
-                        onClose={() => setActiveId(null)}
-                        closeButton={true}
-                    >
-                        <div className="p-1 space-y-1 text-xs min-w-[160px]">
-                            <h4 className="font-bold text-slate-800 text-sm leading-tight">{m.housingName}</h4>
-                            <p className="text-slate-500 font-medium">{m.developerName}</p>
-                            <p className="text-slate-400 leading-relaxed mt-1 max-w-[180px]">{m.address}</p>
-                        </div>
-                    </Popup>
-                );
-            })()}
         </>
     );
 }
@@ -2394,17 +2296,14 @@ export default function GISMarkerLayer({ data, markerColor = '#14b8a6' }: GISMar
 --- FILE: src\components\maps\GISPolygonLayer.tsx ---
 /**
  * ============================================================================
- * GIS POLYGON LAYER — MapLibre Wrapper
+ * GIS POLYGON LAYER — Leaflet Wrapper
  * ============================================================================
- * Migrasi dari: react-leaflet Polygon + Popup
- * Migrasi ke  : react-map-gl/maplibre Source + Layer
- *
- * Komponen generik untuk merender sekumpulan poligon di atas peta.
- * HARUS dirender sebagai children dari <Map> (GISMapContainer atau SipasMap).
+ * Komponen generik untuk merender sekumpulan poligon di atas peta Leaflet.
+ * HARUS dirender sebagai children dari <MapContainer> atau GISMapContainer.
  * ============================================================================
  */
 
-import { Source, Layer, Popup } from 'react-map-gl/maplibre';
+import { GeoJSON, Popup } from 'react-leaflet';
 import { useState, useMemo } from 'react';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 
@@ -2468,33 +2367,29 @@ export default function GISPolygonLayer({ data }: GISPolygonLayerProps) {
 
     return (
         <>
-            <Source id="gis-polygons" type="geojson" data={geojson as any} generateId={true}>
-                <Layer
-                    id="gis-polygon-fill"
-                    type="fill"
-                    paint={{
-                        'fill-color': ['get', 'color'],
-                        'fill-opacity': 0.25,
-                    }}
-                />
-                <Layer
-                    id="gis-polygon-outline"
-                    type="line"
-                    paint={{
-                        'line-color': ['get', 'color'],
-                        'line-width': 2.5,
-                        'line-opacity': 1,
-                    }}
-                />
-            </Source>
+            <GeoJSON
+                key={JSON.stringify(data.map(d => d.id))}
+                data={geojson as any}
+                style={(feature) => ({
+                    color: feature?.properties?.color || '#0d9488',
+                    fillColor: feature?.properties?.color || '#0d9488',
+                    fillOpacity: 0.25,
+                    weight: 2.5,
+                    opacity: 1,
+                })}
+                onEachFeature={(feature, layer) => {
+                    layer.on('click', () => {
+                        setActiveId(
+                            feature.properties?.id === activeId ? null : feature.properties?.id
+                        );
+                    });
+                }}
+            />
 
             {activePolygon && centroid && (
                 <Popup
-                    longitude={centroid.lng}
-                    latitude={centroid.lat}
-                    anchor="top"
+                    position={[centroid.lat, centroid.lng]}
                     onClose={() => setActiveId(null)}
-                    closeButton={true}
                 >
                     <div className="p-1 space-y-1.5 text-xs min-w-[160px]">
                         <h4 className="font-bold text-slate-800 text-sm leading-tight">
@@ -4489,7 +4384,7 @@ export default function GisSidebar() {
 --- FILE: src\features\gis\components\MapHUD.tsx ---
 import { useState, useEffect, useMemo } from "react";
 import {
-    Plus, Minus, Maximize2, Map as MapIcon, Mountain,
+    Plus, Minus, Maximize2, Map as MapIcon,
     ChevronDown, ChevronUp, Crosshair, Navigation
 } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
@@ -4505,8 +4400,7 @@ import { cn } from "@/lib/utils";
  */
 export default function MapHUD() {
     const {
-        activeLayers, mapZoom, mapPitch, mapBearing,
-        is3DMode, toggle3DMode, isTerrainActive, toggleTerrain,
+        activeLayers, mapZoom,
         cursorCoords
     } = useGisUIStore();
 
@@ -4555,13 +4449,6 @@ export default function MapHUD() {
     const triggerZoomIn = () => window.dispatchEvent(new Event("map-zoom-in"));
     const triggerZoomOut = () => window.dispatchEvent(new Event("map-zoom-out"));
     const triggerResetView = () => window.dispatchEvent(new Event("map-reset-view"));
-
-    // Konversi bearing ke arah kompas
-    const bearingToCompass = (b: number) => {
-        const dirs = ["U", "TL", "T", "TG", "S", "BD", "B", "BL"];
-        const norm = ((b % 360) + 360) % 360;
-        return dirs[Math.round(norm / 45) % 8];
-    };
 
     const zoomLabel = mapZoom < 10 ? "KAB." : mapZoom < 14 ? "KEC." : "DETAIL";
 
@@ -4649,11 +4536,11 @@ export default function MapHUD() {
                     )}
                 </Panel>
 
-                {/* 2. PANEL KOORDINAT KURSOR + ELEVASI (collapsible) */}
+                {/* 2. PANEL KOORDINAT KURSOR (collapsible) */}
                 <Panel className="w-full">
                     <PanelHeader
                         icon={<Crosshair size={11} className="text-indigo-600" />}
-                        label="Koordinat & Elevasi"
+                        label="Koordinat Kursor"
                         isOpen={isCoordsOpen}
                         onToggle={() => setIsCoordsOpen(v => !v)}
                     />
@@ -4673,22 +4560,6 @@ export default function MapHUD() {
                                     </span>
                                 </div>
                             </div>
-                            <div className="px-3 py-2 flex items-center gap-2">
-                                <Mountain size={11} className="text-teal-600 shrink-0" />
-                                <div className="flex flex-col gap-0.5 flex-1">
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Elevasi / Ketinggian</span>
-                                    <span className={cn(
-                                        "text-[12px] font-mono font-black tabular-nums leading-none",
-                                        cursorCoords?.elevation !== null && cursorCoords?.elevation !== undefined
-                                            ? "text-teal-700"
-                                            : "text-slate-400"
-                                    )}>
-                                        {cursorCoords?.elevation !== null && cursorCoords?.elevation !== undefined
-                                            ? `${Math.round(cursorCoords.elevation)} mdpl`
-                                            : "Arahkan kursor ke peta"}
-                                    </span>
-                                </div>
-                            </div>
                         </div>
                     )}
                 </Panel>
@@ -4703,25 +4574,15 @@ export default function MapHUD() {
                     />
                     {isStatusOpen && (
                         <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+                            <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100">
                                 <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
                                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Zoom</span>
                                     <span className="text-[12px] font-black text-slate-800 tabular-nums">{Math.round(mapZoom)}</span>
                                 </div>
                                 <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Pitch</span>
-                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{Math.round(mapPitch)}°</span>
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Skala</span>
+                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{zoomLabel}</span>
                                 </div>
-                                <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Arah</span>
-                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{bearingToCompass(mapBearing)}</span>
-                                </div>
-                            </div>
-                            <div className="px-3 py-1.5 flex items-center justify-between">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{zoomLabel}</span>
-                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                                    {Math.round(((mapBearing % 360) + 360) % 360)}° KOMPAS
-                                </span>
                             </div>
                         </div>
                     )}
@@ -4751,26 +4612,6 @@ export default function MapHUD() {
                     title="Perkecil (Zoom Out)"
                 >
                     <Minus size={18} strokeWidth={2.5} />
-                </button>
-                <button
-                    onClick={toggle3DMode}
-                    className={`w-10 h-10 flex items-center justify-center transition-colors active:bg-slate-200 rounded-none outline-none ${is3DMode
-                            ? 'bg-teal-600 text-white hover:bg-teal-700'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-teal-700'
-                        }`}
-                    title={is3DMode ? 'Beralih ke Tampilan Flat 2D' : 'Beralih ke Tampilan 3D Imersif'}
-                >
-                    <span className="text-[11px] font-black tracking-wider leading-none">3D</span>
-                </button>
-                <button
-                    onClick={toggleTerrain}
-                    className={`w-10 h-10 flex items-center justify-center transition-colors active:bg-slate-200 rounded-none outline-none ${isTerrainActive
-                            ? 'bg-teal-600 text-white hover:bg-teal-700'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-teal-700'
-                        }`}
-                    title={isTerrainActive ? 'Nonaktifkan 3D Terrain' : 'Aktifkan 3D Terrain'}
-                >
-                    <Mountain size={18} strokeWidth={2.5} />
                 </button>
             </div>
 
@@ -4987,476 +4828,115 @@ export default function PanelOrchestrator() {
 --- FILE: src\features\gis\components\SipasMap.tsx ---
 /**
  * ============================================================================
- * SIPAS MAP — Immersive 3D GIS Canvas [MODULARIZED v3.0]
+ * SIPAS MAP — Kanvas Geospasial 2D [Leaflet v2.0]
  * ============================================================================
- * Engine  : MapLibre GL JS (WebGL, open-source)
- * Wrapper : react-map-gl v7
+ * Engine  : Leaflet JS (open-source, ringan, 2D murni)
+ * Wrapper : react-leaflet v4
  * ============================================================================
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import Map, {
-  Source,
-  Marker,
+import { useEffect, useCallback, useRef } from 'react';
+import {
+  MapContainer,
+  TileLayer,
   Popup,
-  type MapRef,
-  type MapLayerMouseEvent,
-  type ViewStateChangeEvent,
-} from 'react-map-gl/maplibre';
-import type { StyleSpecification } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
+import type { Map as LeafletMap, LatLngBounds } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { toast } from 'sonner';
 
 import { useGisUIStore } from '@/app/store/useGisUIStore';
 import { ClusterMarker, PinMarker } from './markers';
 import { SpatialGeoJSONLayers } from './layers/SpatialGeoJSONLayers';
 import { useSipasMapData, type ProcessedSubmission } from '../hooks/useSipasMapData';
-import { useCustom3DLayer } from '../hooks/useCustom3DLayer';
+import ConflictMarkers from './markers/ConflictMarkers';
 
 // ─── Konstanta ─────────────────────────────────────────────────────────────────
-const BOGOR_LNG = 106.8560;
 const BOGOR_LAT = -6.4816;
+const BOGOR_LNG = 106.8560;
+const INITIAL_CENTER: [number, number] = [BOGOR_LAT, BOGOR_LNG];
+const INITIAL_ZOOM = 11;
 
-const INITIAL_VIEW_STATE = {
-  longitude: BOGOR_LNG,
-  latitude: BOGOR_LAT,
-  zoom: 11,
-  pitch: 45,
-  bearing: -10,
-};
-
-type MapViewState = typeof INITIAL_VIEW_STATE;
-
-const REGIONAL_BOUNDS: [[number, number], [number, number]] = [
-  [90.0, -15.0],   // SW: Samudra Hindia selatan Jawa
-  [150.0, 15.0],   // NE: Pasifik timur Filipina
-];
-
-// ─── Basemap Style Factory ─────────────────────────────────────────────────────
-const styleCache = new globalThis.Map<string, StyleSpecification>();
-
-function buildRasterStyle(tileUrl: string, attribution: string): StyleSpecification {
-  const cached = styleCache.get(tileUrl);
-  if (cached) return cached;
-
-  const style: StyleSpecification = {
-    version: 8,
-    sources: {
-      'raster-base': {
-        type: 'raster',
-        tiles: [tileUrl],
-        tileSize: 256,
-        attribution,
-        maxzoom: 18,
-      },
-    },
-    layers: [
-      {
-        id: 'raster-base-layer',
-        type: 'raster',
-        source: 'raster-base',
-        paint: { 'raster-opacity': 1 },
-      },
-    ],
-    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-  } as StyleSpecification;
-
-  styleCache.set(tileUrl, style);
-  return style;
-}
-
-function getMapStyle(activeBaseMap: string): StyleSpecification {
+// ─── Basemap URL Factory ───────────────────────────────────────────────────────
+function getBasemapUrl(activeBaseMap: string): string {
   switch (activeBaseMap) {
     case 'dark':
-      return buildRasterStyle('https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', '© CartoDB');
+      return 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
     case 'satellite':
-      return buildRasterStyle(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        '© Esri'
-      );
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
     case 'street':
-      return buildRasterStyle('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', '© Google');
+      return 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+    case 'osm':
+      return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     case 'voyager':
     default:
-      return buildRasterStyle('https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', '© CartoDB');
+      return 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
   }
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-function calculateCentroid(polygon: [number, number][]): [number, number] {
-  let totalLng = 0;
-  let totalLat = 0;
-  polygon.forEach((coord) => {
-    const [a, b] = coord;
-    if (a >= -15 && a <= 10 && b >= 90 && b <= 145) {
-      totalLng += b;
-      totalLat += a;
-    } else {
-      totalLng += a;
-      totalLat += b;
-    }
-  });
-  return [totalLng / polygon.length, totalLat / polygon.length];
+function getBasemapAttribution(activeBaseMap: string): string {
+  switch (activeBaseMap) {
+    case 'dark':
+    case 'voyager':
+      return '&copy; <a href="https://carto.com/">CartoDB</a>';
+    case 'satellite':
+      return '&copy; <a href="https://www.esri.com/">Esri</a>';
+    case 'street':
+      return '&copy; Google';
+    case 'osm':
+      return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+    default:
+      return '&copy; CartoDB';
+  }
 }
 
-// ─── KOMPONEN UTAMA ────────────────────────────────────────────────────────────
-export default function SipasMap() {
-  // ── Zustand State Subscriptions ──
-  const activeLayers = useGisUIStore((s) => s.activeLayers);
-  const activeBaseMap = useGisUIStore((s) => s.activeBaseMap);
-  const mapOpacity = useGisUIStore((s) => s.mapOpacity);
-  const selectedCompanyId = useGisUIStore((s) => s.selectedCompanyId);
-  const is3DMode = useGisUIStore((s) => s.is3DMode);
-  const isTerrainActive = useGisUIStore((s) => s.isTerrainActive);
-  const flyToTarget = useGisUIStore((s) => s.flyToTarget);
-  const mapPitch = useGisUIStore((s) => s.mapPitch);
-  const mapBearing = useGisUIStore((s) => s.mapBearing);
-  const isDroneLayerActive = useGisUIStore((s) => s.isDroneLayerActive);
-  const droneLayerOpacity = useGisUIStore((s) => s.droneLayerOpacity);
-  const spatialConflicts = useGisUIStore((s) => s.spatialConflicts);
+// ─── INNER MAP CONTROLLER (akses useMap hook di dalam MapContainer) ────────────
+interface MapControllerProps {
+  mapData: ReturnType<typeof useSipasMapData>;
+  localZoom: number;
+  setLocalZoom: (z: number) => void;
+  selectedCompanyId: string | null;
+  opacity: number;
+  activeLayers: string[];
+  isDroneLayerActive: boolean;
+  droneLayerOpacity: number;
+  spatialConflicts: any[];
+  activeBaseMap: string;
+  flyToTarget: any;
+  clearFlyTo: () => void;
+  setMapZoom: (z: number) => void;
+  setMapCenter: (c: [number, number]) => void;
+  setCursorCoords: (c: { lat: number; lng: number; elevation: null } | null) => void;
+  onMarkerClick: (sub: ProcessedSubmission) => void;
+  onClusterExpand: (clusterId: number, lng: number, lat: number, currentZoom: number) => void;
+}
 
-  const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
-  const setMapZoom = useGisUIStore((s) => s.setMapZoom);
-  const setMapCenter = useGisUIStore((s) => s.setMapCenter);
-  const setMapPitch = useGisUIStore((s) => s.setMapPitch);
-  const setMapBearing = useGisUIStore((s) => s.setMapBearing);
-  const setCursorCoords = useGisUIStore((s) => s.setCursorCoords);
-  const openPanel = useGisUIStore((s) => s.openPanel);
-  const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
-  const clearFlyTo = useGisUIStore((s) => s.clearFlyTo);
+function MapController({
+  mapData,
+  localZoom,
+  setLocalZoom,
+  selectedCompanyId,
+  opacity,
+  activeLayers,
+  isDroneLayerActive,
+  droneLayerOpacity,
+  spatialConflicts,
+  activeBaseMap,
+  flyToTarget,
+  clearFlyTo,
+  setMapZoom,
+  setMapCenter,
+  setCursorCoords,
+  onMarkerClick,
+  onClusterExpand,
+}: MapControllerProps) {
+  const map = useMap();
+  const mapRef = useRef<LeafletMap>(map);
+  mapRef.current = map;
 
-  const mapRef = useRef<MapRef>(null);
-  const [localViewState, setLocalViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
-  const localZoom = localViewState.zoom;
-
-  // Custom Modular Hooks
-  const mapData = useSipasMapData(localZoom);
-  const { customUser3DLayer, customUser3DLayerRef } = useCustom3DLayer();
-
-  const handleMouseMove = useCallback((e: any) => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    const { lng, lat } = e.lngLat;
-    let elevation: number | null = null;
-    try {
-      elevation = map.queryTerrainElevation([lng, lat]);
-    } catch {
-      // ignore
-    }
-    setCursorCoords({ lng, lat, elevation });
-  }, [setCursorCoords]);
-
-  // Load custom 3D model layers
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const mapNative = map.getMap();
-
-    const handleStyleData = () => {
-      if (mapNative && !mapNative.getLayer('user-3d-model-layer')) {
-        try {
-          mapNative.addLayer(customUser3DLayer);
-        } catch (e) {
-          console.warn('[THREE-BIM] Failed to add layer:', e);
-        }
-      }
-    };
-
-    mapNative.on('styledata', handleStyleData);
-    handleStyleData();
-
-    return () => {
-      if (mapNative) {
-        mapNative.off('styledata', handleStyleData);
-      }
-    };
-  }, [activeBaseMap, customUser3DLayer]);
-
-  // Handle terrain configuration updates
-  useEffect(() => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-
-    const applyTerrain = () => {
-      const hasSource = map.getSource('aws-terrain-source');
-      if (isTerrainActive && is3DMode) {
-        if (hasSource) {
-          map.setTerrain({ source: 'aws-terrain-source', exaggeration: 1.2 });
-        }
-      } else {
-        map.setTerrain(null);
-      }
-    };
-
-    applyTerrain();
-    map.on('styledata', applyTerrain);
-    return () => {
-      map.off('styledata', applyTerrain);
-    };
-  }, [isTerrainActive, is3DMode]);
-
-  // Handle selected company BIM model updates
-  useEffect(() => {
-    if (selectedCompanyId && localZoom >= 16) {
-      const sub = mapData.processedSubmissions.find((s) => s.id === selectedCompanyId);
-      if (sub && sub.location.polygon && sub.location.polygon.length >= 3) {
-        const centroid = calculateCentroid(sub.location.polygon);
-        const modelUrl = 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb';
-        customUser3DLayer.loadModel(selectedCompanyId, centroid, modelUrl);
-      }
-    } else {
-      customUser3DLayer.clearModel();
-    }
-  }, [selectedCompanyId, localZoom, mapData.processedSubmissions, customUser3DLayer]);
-
-  useEffect(() => {
-    return () => {
-      customUser3DLayerRef.current?.onRemove();
-    };
-  }, [customUser3DLayerRef]);
-
-  // Handle flyTo triggers
-  useEffect(() => {
-    if (!flyToTarget || !mapRef.current) return;
-    const { longitude, latitude, zoom, pitch, bearing } = flyToTarget;
-    const currentIs3D = useGisUIStore.getState().is3DMode;
-    const targetPitch = currentIs3D ? (pitch ?? localViewState.pitch) : 0;
-    const targetBearing = currentIs3D ? (bearing ?? localViewState.bearing) : 0;
-    setLocalViewState((prev) => ({
-      ...prev,
-      longitude,
-      latitude,
-      zoom: zoom ?? 18,
-      pitch: targetPitch,
-      bearing: targetBearing,
-    }));
-    mapRef.current.flyTo({
-      center: [longitude, latitude],
-      zoom: zoom ?? 18,
-      pitch: targetPitch,
-      bearing: targetBearing,
-      duration: 1800,
-      essential: true,
-    });
-    clearFlyTo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flyToTarget, clearFlyTo]);
-
-  // Handle map state change events
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (Math.round(localViewState.pitch) !== Math.round(mapPitch) ||
-      Math.round(localViewState.bearing) !== Math.round(mapBearing)) {
-      setLocalViewState((prev) => ({
-        ...prev,
-        pitch: mapPitch,
-        bearing: mapBearing,
-      }));
-      map.easeTo({
-        pitch: mapPitch,
-        bearing: mapBearing,
-        duration: 300,
-      });
-    }
-  }, [mapPitch, mapBearing, localViewState.pitch, localViewState.bearing]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const nativeMap = map.getMap();
-    if (nativeMap) {
-      if (is3DMode) {
-        nativeMap.dragRotate.enable();
-        nativeMap.touchZoomRotate.enable();
-      } else {
-        nativeMap.dragRotate.disable();
-        nativeMap.touchZoomRotate.disable();
-      }
-    }
-
-    const targetPitch = is3DMode ? 45 : 0;
-    const targetBearing = is3DMode ? -10 : 0;
-    setLocalViewState((prev) => ({
-      ...prev,
-      pitch: targetPitch,
-      bearing: targetBearing,
-    }));
-    map.easeTo({
-      pitch: targetPitch,
-      bearing: targetBearing,
-      duration: 600,
-    });
-  }, [is3DMode]);
-
-  const handleMapLoad = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const handleZoomIn = () => map.zoomIn({ duration: 300 });
-    const handleZoomOut = () => map.zoomOut({ duration: 300 });
-    const handleReset = () => {
-      const store = useGisUIStore.getState();
-      const currentIs3D = store.is3DMode;
-      const targetPitch = currentIs3D ? 45 : 0;
-      const targetBearing = currentIs3D ? -10 : 0;
-
-      store.setMapPitch(targetPitch);
-      store.setMapBearing(targetBearing);
-
-      map.flyTo({
-        center: [BOGOR_LNG, BOGOR_LAT],
-        zoom: 11,
-        pitch: targetPitch,
-        bearing: targetBearing,
-        duration: 1200,
-      });
-    };
-    const handleFlyTo = (e: Event) => {
-      const ev = e as CustomEvent<{ lat: number; lng: number }>;
-      const currentState = useGisUIStore.getState();
-      const safeZoom = (currentState.isTerrainActive && currentState.is3DMode) ? 15 : 18;
-      if (ev.detail) map.flyTo({ center: [ev.detail.lng, ev.detail.lat], zoom: safeZoom, pitch: 55, duration: 1800 });
-    };
-
-    window.addEventListener('map-zoom-in', handleZoomIn);
-    window.addEventListener('map-zoom-out', handleZoomOut);
-    window.addEventListener('map-reset-view', handleReset);
-    window.addEventListener('map-fly-to-coords', handleFlyTo);
-
-    const mapNative = map.getMap();
-    const onRemove = () => {
-      window.removeEventListener('map-zoom-in', handleZoomIn);
-      window.removeEventListener('map-zoom-out', handleZoomOut);
-      window.removeEventListener('map-reset-view', handleReset);
-      window.removeEventListener('map-fly-to-coords', handleFlyTo);
-    };
-    mapNative.once('remove', onRemove);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      try {
-        mapRef.current?.getMap()?.remove();
-      } catch {
-        // ignore map destruction errors
-      }
-    };
-  }, []);
-
-  const handleMoveStart = useCallback(() => {
-    window.dispatchEvent(new Event('map-move-start'));
-  }, []);
-
-  const handleMove = useCallback((e: ViewStateChangeEvent) => {
-    const currentIs3D = useGisUIStore.getState().is3DMode;
-    if (!currentIs3D) {
-      setLocalViewState({ ...(e.viewState as MapViewState), pitch: 0, bearing: 0 });
-    } else {
-      setLocalViewState(e.viewState as MapViewState);
-    }
-  }, []);
-
-  const handleMoveEnd = useCallback((e: ViewStateChangeEvent) => {
-    const { longitude, latitude, zoom } = e.viewState;
-    let { pitch, bearing } = e.viewState;
-
-    const currentIs3D = useGisUIStore.getState().is3DMode;
-    if (!currentIs3D) {
-      pitch = 0;
-      bearing = 0;
-    }
-
-    setMapCenter([latitude, longitude]);
-    setMapZoom(zoom);
-    setMapPitch(pitch);
-    setMapBearing(bearing);
-
-    const map = mapRef.current;
-    if (map) {
-      const bounds = map.getBounds();
-      if (bounds) {
-        mapData.setViewBBox([
-          bounds.getWest(), bounds.getSouth(),
-          bounds.getEast(), bounds.getNorth(),
-        ]);
-      }
-    }
-
-    window.dispatchEvent(new Event('map-move-end'));
-  }, [setMapCenter, setMapZoom, setMapPitch, setMapBearing, mapData]);
-
-  const handleSubmissionClick = useCallback((e: MapLayerMouseEvent) => {
-    const props = e.features?.[0]?.properties;
-    if (!props?.id) return;
-    const sub = mapData.processedSubmissions.find((s) => s.id === props.id);
-    if (!sub) return;
-    setSelectedCompanyId(sub.id);
-    closePanelsToTheRight(-1);
-    openPanel('detil-perusahaan', `Detail: ${sub.housingName}`, sub);
-    const currentIs3D = useGisUIStore.getState().is3DMode;
-    const currentIsTerrainActive = useGisUIStore.getState().isTerrainActive;
-    const targetPitch = currentIs3D ? 60 : 0;
-    const targetBearing = currentIs3D ? -10 : 0;
-    const rawZoom = Math.max(localZoom, 15);
-    const safeZoom = (currentIsTerrainActive && currentIs3D) ? Math.min(rawZoom, 15) : rawZoom;
-    setLocalViewState((prev) => ({
-      ...prev,
-      longitude: sub.location.lng,
-      latitude: sub.location.lat,
-      zoom: safeZoom,
-      pitch: targetPitch,
-      bearing: targetBearing,
-    }));
-    mapRef.current?.flyTo({
-      center: [sub.location.lng, sub.location.lat],
-      zoom: safeZoom,
-      pitch: targetPitch,
-      bearing: targetBearing,
-      duration: 1200,
-    });
-  }, [mapData.processedSubmissions, setSelectedCompanyId, closePanelsToTheRight, openPanel, localZoom]);
-
-  const handleMarkerClick = useCallback((sub: ProcessedSubmission) => {
-    setSelectedCompanyId(sub.id);
-    closePanelsToTheRight(-1);
-    openPanel('detil-perusahaan', `Detail: ${sub.housingName}`, sub);
-    const currentIs3D = useGisUIStore.getState().is3DMode;
-    const currentIsTerrainActive = useGisUIStore.getState().isTerrainActive;
-    const targetPitch = currentIs3D ? 55 : 0;
-    const targetBearing = currentIs3D ? -10 : 0;
-    const safeZoom = (currentIsTerrainActive && currentIs3D) ? 15 : 16;
-    setLocalViewState((prev) => ({
-      ...prev,
-      longitude: sub.location.lng,
-      latitude: sub.location.lat,
-      zoom: safeZoom,
-      pitch: targetPitch,
-      bearing: targetBearing,
-    }));
-    mapRef.current?.flyTo({
-      center: [sub.location.lng, sub.location.lat],
-      zoom: safeZoom,
-      pitch: targetPitch,
-      bearing: targetBearing,
-      duration: 1200,
-    });
-  }, [setSelectedCompanyId, closePanelsToTheRight, openPanel]);
-
-  const handleClusterExpand = useCallback((
-    clusterId: number, lng: number, lat: number, currentZoom: number,
-  ) => {
-    try {
-      const z = mapData.supercluster.getClusterExpansionZoom(clusterId);
-      mapRef.current?.flyTo({ center: [lng, lat], zoom: z, duration: 800 });
-    } catch {
-      mapRef.current?.flyTo({ center: [lng, lat], zoom: currentZoom + 2, duration: 800 });
-    }
-  }, [mapData.supercluster]);
-
-  const opacity = mapOpacity / 100;
+  // Derived layer visibility
   const showSungai = activeLayers.includes('layer-river') && localZoom >= 10;
   const showKontur = activeLayers.includes('layer-kontur') && localZoom >= 10;
   const showPemukiman = activeLayers.includes('layer-aqi') && localZoom >= 10;
@@ -5476,190 +4956,300 @@ export default function SipasMap() {
   const showRelka = activeLayers.includes('layer-relka') && localZoom >= 8;
   const showDetail = localZoom >= 14;
   const showClusters = localZoom < 13;
-  const bangunanTolerance = localZoom < 15 ? 1.0 : 0.5;
+
+  // FlyTo handler
+  useEffect(() => {
+    if (!flyToTarget) return;
+    const { latitude, longitude, zoom } = flyToTarget;
+    map.flyTo([latitude, longitude], zoom ?? 18, { duration: 1.8, animate: true });
+    clearFlyTo();
+  }, [flyToTarget, clearFlyTo, map]);
+
+  // Map event listeners via custom events
+  useEffect(() => {
+    const handleZoomIn = () => map.zoomIn();
+    const handleZoomOut = () => map.zoomOut();
+    const handleReset = () => map.flyTo(INITIAL_CENTER, INITIAL_ZOOM, { duration: 1.2, animate: true });
+    const handleFlyTo = (e: Event) => {
+      const ev = e as CustomEvent<{ lat: number; lng: number }>;
+      if (ev.detail) map.flyTo([ev.detail.lat, ev.detail.lng], 18, { duration: 1.8, animate: true });
+    };
+
+    window.addEventListener('map-zoom-in', handleZoomIn);
+    window.addEventListener('map-zoom-out', handleZoomOut);
+    window.addEventListener('map-reset-view', handleReset);
+    window.addEventListener('map-fly-to-coords', handleFlyTo);
+    return () => {
+      window.removeEventListener('map-zoom-in', handleZoomIn);
+      window.removeEventListener('map-zoom-out', handleZoomOut);
+      window.removeEventListener('map-reset-view', handleReset);
+      window.removeEventListener('map-fly-to-coords', handleFlyTo);
+    };
+  }, [map]);
+
+  // Map move/zoom event listeners
+  useMapEvents({
+    movestart: () => window.dispatchEvent(new Event('map-move-start')),
+    moveend: () => {
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      setMapCenter([center.lat, center.lng]);
+      setMapZoom(zoom);
+      setLocalZoom(zoom);
+
+      const bounds: LatLngBounds = map.getBounds();
+      mapData.setViewBBox([
+        bounds.getWest(), bounds.getSouth(),
+        bounds.getEast(), bounds.getNorth(),
+      ]);
+
+      window.dispatchEvent(new Event('map-move-end'));
+    },
+    zoomend: () => {
+      setLocalZoom(map.getZoom());
+    },
+    mousemove: (e) => {
+      setCursorCoords({ lat: e.latlng.lat, lng: e.latlng.lng, elevation: null });
+    },
+    mouseout: () => {
+      setCursorCoords(null);
+    },
+  });
+
+  return (
+    <>
+      {/* ─── DRONE ORTHOPHOTO OVERLAY ─── */}
+      {isDroneLayerActive && (
+        <TileLayer
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          opacity={droneLayerOpacity / 100}
+          attribution="© Esri"
+        />
+      )}
+
+      {/* ─── SEMUA LAYER GEOJSON SPASIAL ─── */}
+      <SpatialGeoJSONLayers
+        opacity={opacity}
+        localZoom={localZoom}
+        selectedCompanyId={selectedCompanyId}
+        showPemukiman={showPemukiman}
+        showKontur={showKontur}
+        showSungai={showSungai}
+        showSawah={showSawah}
+        showPasir={showPasir}
+        showKebun={showKebun}
+        showLadang={showLadang}
+        showAdministrasi={showAdministrasi}
+        showDesa={showDesa}
+        showDanau={showDanau}
+        showJalan={showJalan}
+        showTanamCampur={showTanamCampur}
+        showHutanKering={showHutanKering}
+        showAlang={showAlang}
+        showSemak={showSemak}
+        showPunggungBukit={showPunggungBukit}
+        showRelka={showRelka}
+        showDetail={showDetail}
+        bangunanData={mapData.bangunanData}
+        pemukimanData={mapData.pemukimanData}
+        konturData={mapData.konturData}
+        sungaiData={mapData.sungaiData}
+        sawahData={mapData.sawahData}
+        pasirData={mapData.pasirData}
+        kebunData={mapData.kebunData}
+        ladangData={mapData.ladangData}
+        administrasiData={mapData.administrasiData}
+        desaData={mapData.desaData}
+        danauData={mapData.danauData}
+        jalanData={mapData.jalanData}
+        tanamCampurData={mapData.tanamCampurData}
+        hutanKeringData={mapData.hutanKeringData}
+        alangData={mapData.alangData}
+        semakData={mapData.semakData}
+        punggungBukitData={mapData.punggungBukitData}
+        relkaData={mapData.relkaData}
+        submissionsGeoJSON={mapData.submissionsGeoJSON}
+        subPolygonsGeoJSON={mapData.subPolygonsGeoJSON}
+        compensationGeoJSON={mapData.compensationGeoJSON}
+        clashGeoJSON={mapData.clashGeoJSON}
+        onSubmissionClick={(id, sub) => {
+          onMarkerClick(sub);
+        }}
+      />
+
+      {/* ─── CLUSTER MARKERS atau PIN MARKERS ─── */}
+      {showClusters
+        ? mapData.clusters.map((cluster) => {
+          const [lng, lat] = cluster.geometry.coordinates;
+          const { cluster: isCluster, point_count, cluster_id } = cluster.properties;
+
+          if (isCluster) {
+            return (
+              <ClusterMarker
+                key={`cluster-${cluster_id}`}
+                lat={lat}
+                lng={lng}
+                count={point_count}
+                clusterId={cluster_id}
+                zoom={localZoom}
+                onExpand={onClusterExpand}
+              />
+            );
+          }
+
+          const sub = mapData.processedSubmissions.find(
+            (s) => s.id === cluster.properties.submissionId
+          );
+          if (!sub) return null;
+
+          return (
+            <PinMarker
+              key={`marker-${sub.id}`}
+              sub={sub}
+              isSelected={selectedCompanyId === sub.id}
+              onClickPin={onMarkerClick}
+              onShowPopup={mapData.setPopupInfo}
+            />
+          );
+        })
+        : mapData.processedSubmissions.map((sub) => (
+          <PinMarker
+            key={`marker-hi-${sub.id}`}
+            sub={sub}
+            isSelected={selectedCompanyId === sub.id}
+            onClickPin={onMarkerClick}
+            onShowPopup={mapData.setPopupInfo}
+          />
+        ))}
+
+      {/* ─── POPUP INFO ─── */}
+      {mapData.popupInfo && (
+        <Popup
+          position={[
+            mapData.popupInfo.centroidLat ?? mapData.popupInfo.location.lat,
+            mapData.popupInfo.centroidLng ?? mapData.popupInfo.location.lng,
+          ]}
+          onClose={() => mapData.setPopupInfo(null)}
+          offset={[0, -28]}
+          className="sipas-popup"
+        >
+          <div className="px-3.5 py-3 min-w-[180px] text-left select-none bg-white">
+            <div className="font-black text-[13px] text-slate-900 leading-tight mb-1">
+              {mapData.popupInfo.housingName}
+            </div>
+            <div className="text-[11px] text-slate-500 mb-2.5">
+              {mapData.popupInfo.developerName}
+            </div>
+            <span
+              className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5"
+              style={{
+                color: mapData.popupInfo.color,
+                background: `${mapData.popupInfo.color}18`,
+              }}
+            >
+              {mapData.popupInfo.status}
+            </span>
+          </div>
+        </Popup>
+      )}
+
+      {/* ─── SONAR RIPPLE PINS UNTUK KONFLIK SPASIAL ─── */}
+      <ConflictMarkers conflicts={spatialConflicts} />
+    </>
+  );
+}
+
+// ─── KOMPONEN UTAMA ────────────────────────────────────────────────────────────
+export default function SipasMap() {
+  const activeLayers = useGisUIStore((s) => s.activeLayers);
+  const activeBaseMap = useGisUIStore((s) => s.activeBaseMap);
+  const mapOpacity = useGisUIStore((s) => s.mapOpacity);
+  const selectedCompanyId = useGisUIStore((s) => s.selectedCompanyId);
+  const flyToTarget = useGisUIStore((s) => s.flyToTarget);
+  const isDroneLayerActive = useGisUIStore((s) => s.isDroneLayerActive);
+  const droneLayerOpacity = useGisUIStore((s) => s.droneLayerOpacity);
+  const spatialConflicts = useGisUIStore((s) => s.spatialConflicts);
+
+  const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
+  const setMapZoom = useGisUIStore((s) => s.setMapZoom);
+  const setMapCenter = useGisUIStore((s) => s.setMapCenter);
+  const setCursorCoords = useGisUIStore((s) => s.setCursorCoords);
+  const openPanel = useGisUIStore((s) => s.openPanel);
+  const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
+  const clearFlyTo = useGisUIStore((s) => s.clearFlyTo);
+
+  // Local zoom state (react-leaflet doesn't have viewState like react-map-gl)
+  const [localZoom, setLocalZoom] = React.useState(INITIAL_ZOOM);
+
+  const mapData = useSipasMapData(localZoom);
+  const opacity = mapOpacity / 100;
+
+  const handleMarkerClick = useCallback((sub: ProcessedSubmission) => {
+    setSelectedCompanyId(sub.id);
+    closePanelsToTheRight(-1);
+    openPanel('detil-perusahaan', `Detail: ${sub.housingName}`, sub);
+  }, [setSelectedCompanyId, closePanelsToTheRight, openPanel]);
+
+  const handleClusterExpand = useCallback((
+    clusterId: number, lng: number, lat: number, currentZoom: number,
+  ) => {
+    try {
+      const z = mapData.supercluster.getClusterExpansionZoom(clusterId);
+      window.dispatchEvent(Object.assign(new CustomEvent('map-fly-to-coords'), {
+        detail: { lat, lng },
+      }));
+      void z;
+    } catch {
+      // fallback handled in MapController
+    }
+  }, [mapData.supercluster]);
 
   return (
     <div className="absolute inset-0 z-0">
-      <Map
-        ref={mapRef}
-        mapLib={import('maplibre-gl')}
-        mapStyle={getMapStyle(activeBaseMap)}
-        {...localViewState}
-        onMove={handleMove}
-        onMouseMove={handleMouseMove}
-        style={{ width: '100%', height: '100%' }}
-        maxZoom={18}
+      <MapContainer
+        center={INITIAL_CENTER}
+        zoom={INITIAL_ZOOM}
         minZoom={4}
-        pitchWithRotate={is3DMode}
-        dragRotate={is3DMode}
-        touchZoomRotate={is3DMode}
-        maxPitch={85}
-        interactiveLayerIds={['submissions-fill-flat', 'sub-poly-extrusion']}
-        onMoveStart={handleMoveStart}
-        onMoveEnd={handleMoveEnd}
-        onClick={handleSubmissionClick}
-        onLoad={handleMapLoad}
-        renderWorldCopies={false}
-        maxBounds={REGIONAL_BOUNDS}
+        maxZoom={18}
+        zoomControl={false}
+        attributionControl={true}
+        style={{ width: '100%', height: '100%' }}
+        maxBounds={[[- 15, 90], [15, 150]]}
+        maxBoundsViscosity={1.0}
       >
-        <Source
-          id="aws-terrain-source"
-          type="raster-dem"
-          tiles={['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png']}
-          encoding="terrarium"
-          tileSize={256}
-          maxzoom={18}
+        <TileLayer
+          key={activeBaseMap}
+          url={getBasemapUrl(activeBaseMap)}
+          attribution={getBasemapAttribution(activeBaseMap)}
+          maxZoom={18}
         />
 
-        <SpatialGeoJSONLayers
-          opacity={opacity}
+        <MapController
+          mapData={mapData}
           localZoom={localZoom}
+          setLocalZoom={setLocalZoom}
           selectedCompanyId={selectedCompanyId}
-          showPemukiman={showPemukiman}
-          showKontur={showKontur}
-          showSungai={showSungai}
-          showSawah={showSawah}
-          showPasir={showPasir}
-          showKebun={showKebun}
-          showLadang={showLadang}
-          showAdministrasi={showAdministrasi}
-          showDesa={showDesa}
-          showDanau={showDanau}
-          showJalan={showJalan}
-          showTanamCampur={showTanamCampur}
-          showHutanKering={showHutanKering}
-          showAlang={showAlang}
-          showSemak={showSemak}
-          showPunggungBukit={showPunggungBukit}
-          showRelka={showRelka}
-          showDetail={showDetail}
+          opacity={opacity}
+          activeLayers={activeLayers}
           isDroneLayerActive={isDroneLayerActive}
           droneLayerOpacity={droneLayerOpacity}
-          bangunanTolerance={bangunanTolerance}
-          pemukimanData={mapData.pemukimanData}
-          konturData={mapData.konturData}
-          sungaiData={mapData.sungaiData}
-          sawahData={mapData.sawahData}
-          pasirData={mapData.pasirData}
-          kebunData={mapData.kebunData}
-          ladangData={mapData.ladangData}
-          administrasiData={mapData.administrasiData}
-          desaData={mapData.desaData}
-          danauData={mapData.danauData}
-          jalanData={mapData.jalanData}
-          tanamCampurData={mapData.tanamCampurData}
-          hutanKeringData={mapData.hutanKeringData}
-          alangData={mapData.alangData}
-          semakData={mapData.semakData}
-          punggungBukitData={mapData.punggungBukitData}
-          relkaData={mapData.relkaData}
-          bangunanData={mapData.bangunanData}
-          submissionsGeoJSON={mapData.submissionsGeoJSON}
-          subPolygonsGeoJSON={mapData.subPolygonsGeoJSON}
-          compensationGeoJSON={mapData.compensationGeoJSON}
-          clashGeoJSON={mapData.clashGeoJSON}
+          spatialConflicts={spatialConflicts}
+          activeBaseMap={activeBaseMap}
+          flyToTarget={flyToTarget}
+          clearFlyTo={clearFlyTo}
+          setMapZoom={setMapZoom}
+          setMapCenter={setMapCenter}
+          setCursorCoords={setCursorCoords}
+          onMarkerClick={handleMarkerClick}
+          onClusterExpand={handleClusterExpand}
         />
-
-        {showClusters
-          ? mapData.clusters.map((cluster) => {
-            const [lng, lat] = cluster.geometry.coordinates;
-            const { cluster: isCluster, point_count, cluster_id } = cluster.properties;
-
-            if (isCluster) {
-              return (
-                <ClusterMarker
-                  key={`cluster-${cluster_id}`}
-                  lng={lng} lat={lat}
-                  count={point_count}
-                  clusterId={cluster_id}
-                  zoom={localZoom}
-                  onExpand={handleClusterExpand}
-                />
-              );
-            }
-
-            const sub = mapData.processedSubmissions.find(
-              (s) => s.id === cluster.properties.submissionId
-            );
-            if (!sub) return null;
-
-            return (
-              <PinMarker
-                key={`marker-${sub.id}`}
-                sub={sub}
-                isSelected={selectedCompanyId === sub.id}
-                sizeBase={28}
-                onClickPin={handleMarkerClick}
-                onShowPopup={mapData.setPopupInfo}
-              />
-            );
-          })
-          : mapData.processedSubmissions.map((sub) => (
-            <PinMarker
-              key={`marker-hi-${sub.id}`}
-              sub={sub}
-              isSelected={selectedCompanyId === sub.id}
-              sizeBase={24}
-              onClickPin={handleMarkerClick}
-              onShowPopup={mapData.setPopupInfo}
-            />
-          ))}
-
-        {/* Sonar Ripple Pins for Conflicts */}
-        {spatialConflicts.map((conflict) => (
-          <Marker
-            key={conflict.id}
-            longitude={conflict.coordinates[0]}
-            latitude={conflict.coordinates[1]}
-            anchor="center"
-            onClick={(e) => {
-              e.originalEvent.stopPropagation();
-              toast.error(`Konflik Spasial Terdeteksi: ${conflict.description}`, {
-                description: `Kategori: ${conflict.category}`,
-                duration: 4000
-              });
-            }}
-          >
-            <div className="relative flex items-center justify-center h-8 w-8 cursor-pointer">
-              <div className="absolute h-full w-full rounded-full sonar-ripple-rose pointer-events-none" />
-              <div className="relative h-3.5 w-3.5 rounded-full bg-rose-600 border border-white shadow-md" />
-            </div>
-          </Marker>
-        ))}
-
-        {mapData.popupInfo && (
-          <Popup
-            longitude={mapData.popupInfo.location.lng}
-            latitude={mapData.popupInfo.location.lat}
-            anchor="bottom"
-            offset={[0, -36] as [number, number]}
-            onClose={() => mapData.setPopupInfo(null)}
-            closeButton={false}
-            className="!rounded-none !border-0 !p-0 !shadow-2xl"
-          >
-            <div className="px-3.5 py-3 min-w-[180px] bg-white text-left select-none">
-              <div className="font-black text-[13px] text-slate-900 leading-tight mb-1">
-                {mapData.popupInfo.housingName}
-              </div>
-              <div className="text-[11px] text-slate-500 mb-2.5">
-                {mapData.popupInfo.developerName}
-              </div>
-              <span
-                className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5"
-                style={{
-                  color: mapData.popupInfo.color,
-                  background: `${mapData.popupInfo.color}18`,
-                }}
-              >
-                {mapData.popupInfo.status}
-              </span>
-            </div>
-          </Popup>
-        )}
-      </Map>
+      </MapContainer>
     </div>
   );
 }
+
+// React import needed for useState in module scope
+import React from 'react';
 
 --- FILE: src\features\gis\components\ZoningHorizontalLegend.tsx ---
 import { useState, useEffect } from "react";
@@ -5670,7 +5260,6 @@ import { cn } from "@/lib/utils";
 export default function ZoningHorizontalLegend() {
     const {
         activeLayers, activePanels, mapZoom, mapPitch, mapBearing, cursorCoords,
-        is3DMode, toggle3DMode, isTerrainActive, toggleTerrain
     } = useGisUIStore();
     const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -5691,11 +5280,11 @@ export default function ZoningHorizontalLegend() {
     if (!isZoningActive) return null;
 
     const zoningSpectrum = [
-        { label: "Kawasan Hunian",  range: "Permukiman",  color: "#0d9488", text: "text-white" },
+        { label: "Kawasan Hunian", range: "Permukiman", color: "#0d9488", text: "text-white" },
         { label: "Kawasan Lindung", range: "Hutan & RTH", color: "#16a34a", text: "text-white" },
-        { label: "Sempadan Sungai", range: "Buffer 25m",  color: "#2563eb", text: "text-white" },
-        { label: "Sempadan SUTET",  range: "Buffer Rel",  color: "#eab308", text: "text-slate-900" },
-        { label: "Zona Industri",   range: "Komersial",   color: "#ca1d45", text: "text-white" },
+        { label: "Sempadan Sungai", range: "Buffer 25m", color: "#2563eb", text: "text-white" },
+        { label: "Sempadan SUTET", range: "Buffer Rel", color: "#eab308", text: "text-slate-900" },
+        { label: "Zona Industri", range: "Komersial", color: "#ca1d45", text: "text-white" },
     ];
 
     const leftSidebarWidth = 64;
@@ -5716,8 +5305,8 @@ export default function ZoningHorizontalLegend() {
 
     const smoothGradientBackground = `linear-gradient(to right, ${colorStops})`;
 
-    const triggerZoomIn   = () => window.dispatchEvent(new Event("map-zoom-in"));
-    const triggerZoomOut  = () => window.dispatchEvent(new Event("map-zoom-out"));
+    const triggerZoomIn = () => window.dispatchEvent(new Event("map-zoom-in"));
+    const triggerZoomOut = () => window.dispatchEvent(new Event("map-zoom-out"));
     const triggerResetView = () => window.dispatchEvent(new Event("map-reset-view"));
 
     const zoomLabel = mapZoom < 10 ? "KAB." : mapZoom < 14 ? "KEC." : "DETAIL";
@@ -5795,33 +5384,12 @@ export default function ZoningHorizontalLegend() {
                         ))}
                     </div>
 
-                    {/* Tombol Control Peta (Zoom + 3D/Terrain) */}
+                    {/* Tombol Control Peta (Zoom) */}
                     <div className="hidden md:flex bg-slate-900 text-slate-300 select-none divide-x divide-white/10 shrink-0 border-l border-slate-700">
-                        <button onClick={triggerZoomIn}   className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Plus size={13} strokeWidth={3} /></button>
+                        <button onClick={triggerZoomIn} className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Plus size={13} strokeWidth={3} /></button>
                         <button onClick={triggerResetView} className="w-11 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Maximize2 size={11} strokeWidth={3} /></button>
-                        <button onClick={triggerZoomOut}  className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Minus size={13} strokeWidth={3} /></button>
+                        <button onClick={triggerZoomOut} className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Minus size={13} strokeWidth={3} /></button>
 
-                        <button
-                            onClick={toggle3DMode}
-                            className={cn(
-                                "w-10 h-full flex items-center justify-center transition-colors duration-150 outline-none cursor-pointer rounded-none text-[10px] font-black tracking-wider",
-                                is3DMode ? "bg-teal-600 text-white" : "hover:bg-teal-600 hover:text-white"
-                            )}
-                            title={is3DMode ? 'Beralih ke Tampilan Flat 2D' : 'Beralih ke Tampilan 3D Imersif'}
-                        >
-                            3D
-                        </button>
-
-                        <button
-                            onClick={toggleTerrain}
-                            className={cn(
-                                "w-10 h-full flex items-center justify-center transition-colors duration-150 outline-none cursor-pointer rounded-none",
-                                isTerrainActive ? "bg-teal-600 text-white" : "hover:bg-teal-600 hover:text-white"
-                            )}
-                            title={isTerrainActive ? 'Nonaktifkan 3D Terrain' : 'Aktifkan 3D Terrain'}
-                        >
-                            <Mountain size={12} strokeWidth={3} />
-                        </button>
                     </div>
                 </div>
             )}
@@ -5830,13 +5398,14 @@ export default function ZoningHorizontalLegend() {
 }
 
 --- FILE: src\features\gis\components\layers\SpatialGeoJSONLayers.tsx ---
-import { Source, Layer } from 'react-map-gl/maplibre';
+import { GeoJSON } from 'react-leaflet';
+import type { PathOptions, StyleFunction } from 'leaflet';
 
 interface SpatialGeoJSONLayersProps {
   opacity: number;
   localZoom: number;
   selectedCompanyId: string | null;
-  // Overlays show flags
+  // Overlay show flags
   showPemukiman: boolean;
   showKontur: boolean;
   showSungai: boolean;
@@ -5855,9 +5424,7 @@ interface SpatialGeoJSONLayersProps {
   showPunggungBukit: boolean;
   showRelka: boolean;
   showDetail: boolean;
-  isDroneLayerActive: boolean;
-  droneLayerOpacity: number;
-  bangunanTolerance: number;
+  bangunanData: any;
   // GeoJSON Datas
   pemukimanData: any;
   konturData: any;
@@ -5876,15 +5443,33 @@ interface SpatialGeoJSONLayersProps {
   semakData: any;
   punggungBukitData: any;
   relkaData: any;
-  bangunanData: any;
   submissionsGeoJSON: any;
   subPolygonsGeoJSON: any;
   compensationGeoJSON: any;
   clashGeoJSON: any;
+  onSubmissionClick?: (id: string, sub: any) => void;
 }
 
-function vis(active: boolean): 'visible' | 'none' {
-  return active ? 'visible' : 'none';
+// ─── Helper: layer style factories ────────────────────────────────────────────
+
+function fillStyle(color: string, fillOpacity: number, strokeColor: string, weight: number, opacity: number): PathOptions {
+  return {
+    color: strokeColor,
+    weight,
+    opacity,
+    fillColor: color,
+    fillOpacity,
+  };
+}
+
+function lineStyle(color: string, weight: number, opacity: number, dashArray?: string): PathOptions {
+  return {
+    color,
+    weight,
+    opacity,
+    fillOpacity: 0,
+    dashArray,
+  };
 }
 
 export const SpatialGeoJSONLayers = ({
@@ -5909,9 +5494,7 @@ export const SpatialGeoJSONLayers = ({
   showPunggungBukit,
   showRelka,
   showDetail,
-  isDroneLayerActive,
-  droneLayerOpacity,
-  bangunanTolerance,
+  bangunanData,
   pemukimanData,
   konturData,
   sungaiData,
@@ -5929,362 +5512,233 @@ export const SpatialGeoJSONLayers = ({
   semakData,
   punggungBukitData,
   relkaData,
-  bangunanData,
   submissionsGeoJSON,
   subPolygonsGeoJSON,
   compensationGeoJSON,
   clashGeoJSON,
+  onSubmissionClick,
 }: SpatialGeoJSONLayersProps) => {
   return (
     <>
-      {/* ─── LAYER DRONE ORTHOPHOTO OVERLAY ─── */}
-      {isDroneLayerActive && (
-        <Source
-          id="drone-orthophoto-source"
-          type="raster"
-          tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']}
-          tileSize={256}
-        >
-          <Layer
-            id="drone-orthophoto-layer"
-            type="raster"
-            paint={{ 'raster-opacity': droneLayerOpacity / 100 }}
-            beforeId="submissions-fill-flat"
-          />
-        </Source>
-      )}
-
+      {/* ─── PEMUKIMAN ─── */}
       {showPemukiman && pemukimanData && (
-        <Source key="pemukiman-source" id="pemukiman" type="geojson" data={pemukimanData}>
-          <Layer id="pemukiman-fill" type="fill"
-            layout={{ visibility: vis(showPemukiman) }}
-            paint={{ 'fill-color': '#06b6d4', 'fill-opacity': 0.35 * opacity }}
-          />
-          <Layer id="pemukiman-outline" type="line"
-            layout={{ visibility: vis(showPemukiman) }}
-            paint={{ 'line-color': '#0891b2', 'line-width': 1, 'line-opacity': 0.6 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`pemukiman-${localZoom}`}
+          data={pemukimanData}
+          style={fillStyle('#06b6d4', 0.35 * opacity, '#0891b2', 1, 0.6 * opacity)}
+        />
       )}
 
+      {/* ─── KONTUR ─── */}
       {showKontur && konturData && (
-        <Source key="kontur-source" id="kontur" type="geojson" data={konturData}>
-          <Layer id="kontur-line" type="line"
-            layout={{ visibility: vis(showKontur) }}
-            paint={{
-              'line-color': '#fbbf24', 'line-width': 1,
-              'line-opacity': 0.8 * opacity, 'line-dasharray': [4, 2],
-            }}
-          />
-        </Source>
+        <GeoJSON
+          key={`kontur-${localZoom}`}
+          data={konturData}
+          style={lineStyle('#fbbf24', 1, 0.8 * opacity, '4 2')}
+        />
       )}
 
+      {/* ─── SUNGAI ─── */}
       {showSungai && sungaiData && (
-        <Source key="sungai-source" id="sungai" type="geojson" data={sungaiData}>
-          <Layer id="sungai-casing" type="line"
-            layout={{ visibility: vis(showSungai) }}
-            paint={{ 'line-color': '#1d4ed8', 'line-width': 5, 'line-opacity': 0.5 * opacity }}
-          />
-          <Layer id="sungai-line" type="line"
-            layout={{ visibility: vis(showSungai) }}
-            paint={{ 'line-color': '#3b82f6', 'line-width': 3, 'line-opacity': 0.9 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`sungai-${localZoom}`}
+          data={sungaiData}
+          style={lineStyle('#3b82f6', 3, 0.9 * opacity)}
+        />
       )}
 
+      {/* ─── SAWAH ─── */}
       {showSawah && sawahData && (
-        <Source key="sawah-source" id="sawah" type="geojson" data={sawahData}>
-          <Layer id="sawah-fill" type="fill"
-            layout={{ visibility: vis(showSawah) }}
-            paint={{ 'fill-color': '#34d399', 'fill-opacity': 0.3 * opacity }}
-          />
-          <Layer id="sawah-outline" type="line"
-            layout={{ visibility: vis(showSawah) }}
-            paint={{ 'line-color': '#059669', 'line-width': 1, 'line-opacity': 0.5 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`sawah-${localZoom}`}
+          data={sawahData}
+          style={fillStyle('#34d399', 0.3 * opacity, '#059669', 1, 0.5 * opacity)}
+        />
       )}
 
+      {/* ─── PASIR ─── */}
       {showPasir && pasirData && (
-        <Source key="pasir-source" id="pasir" type="geojson" data={pasirData}>
-          <Layer id="pasir-fill" type="fill"
-            layout={{ visibility: vis(showPasir) }}
-            paint={{ 'fill-color': '#fed7aa', 'fill-opacity': 0.3 * opacity }}
-          />
-          <Layer id="pasir-outline" type="line"
-            layout={{ visibility: vis(showPasir) }}
-            paint={{ 'line-color': '#ea580c', 'line-width': 1, 'line-opacity': 0.5 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`pasir-${localZoom}`}
+          data={pasirData}
+          style={fillStyle('#fed7aa', 0.3 * opacity, '#ea580c', 1, 0.5 * opacity)}
+        />
       )}
 
+      {/* ─── KEBUN ─── */}
       {showKebun && kebunData && (
-        <Source key="kebun-source" id="kebun" type="geojson" data={kebunData}>
-          <Layer id="kebun-fill" type="fill"
-            layout={{ visibility: vis(showKebun) }}
-            paint={{ 'fill-color': '#15803d', 'fill-opacity': 0.3 * opacity }}
-          />
-          <Layer id="kebun-outline" type="line"
-            layout={{ visibility: vis(showKebun) }}
-            paint={{ 'line-color': '#166534', 'line-width': 1, 'line-opacity': 0.5 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`kebun-${localZoom}`}
+          data={kebunData}
+          style={fillStyle('#15803d', 0.3 * opacity, '#166534', 1, 0.5 * opacity)}
+        />
       )}
 
+      {/* ─── LADANG ─── */}
       {showLadang && ladangData && (
-        <Source key="ladang-source" id="ladang" type="geojson" data={ladangData}>
-          <Layer id="ladang-fill" type="fill"
-            layout={{ visibility: vis(showLadang) }}
-            paint={{ 'fill-color': '#84cc16', 'fill-opacity': 0.3 * opacity }}
-          />
-          <Layer id="ladang-outline" type="line"
-            layout={{ visibility: vis(showLadang) }}
-            paint={{ 'line-color': '#65a30d', 'line-width': 1, 'line-opacity': 0.5 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`ladang-${localZoom}`}
+          data={ladangData}
+          style={fillStyle('#84cc16', 0.3 * opacity, '#65a30d', 1, 0.5 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER BATAS ADMINISTRASI KABUPATEN ─── */}
+      {/* ─── BATAS ADMINISTRASI ─── */}
       {showAdministrasi && administrasiData && (
-        <Source key="administrasi-source" id="administrasi" type="geojson" data={administrasiData}>
-          <Layer id="administrasi-line" type="line"
-            layout={{ visibility: vis(showAdministrasi) }}
-            paint={{ 'line-color': '#ef4444', 'line-width': 2, 'line-opacity': 0.8 * opacity, 'line-dasharray': [6, 3] }}
-          />
-        </Source>
+        <GeoJSON
+          key={`administrasi-${localZoom}`}
+          data={administrasiData}
+          style={lineStyle('#ef4444', 2, 0.8 * opacity, '6 3')}
+        />
       )}
 
-      {/* ─── LAYER BATAS DESA/KELURAHAN ─── */}
+      {/* ─── BATAS DESA ─── */}
       {showDesa && desaData && (
-        <Source key="desa-source" id="desa" type="geojson" data={desaData}>
-          <Layer id="desa-fill" type="fill"
-            layout={{ visibility: vis(showDesa) }}
-            paint={{ 'fill-color': '#fb923c', 'fill-opacity': 0.08 * opacity }}
-          />
-          <Layer id="desa-outline" type="line"
-            layout={{ visibility: vis(showDesa) }}
-            paint={{ 'line-color': '#ea580c', 'line-width': 1, 'line-opacity': 0.7 * opacity, 'line-dasharray': [3, 2] }}
-          />
-        </Source>
+        <GeoJSON
+          key={`desa-${localZoom}`}
+          data={desaData}
+          style={fillStyle('#fb923c', 0.08 * opacity, '#ea580c', 1, 0.7 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER DANAU / BADAN AIR ─── */}
+      {/* ─── DANAU ─── */}
       {showDanau && danauData && (
-        <Source key="danau-source" id="danau" type="geojson" data={danauData}>
-          <Layer id="danau-fill" type="fill"
-            layout={{ visibility: vis(showDanau) }}
-            paint={{ 'fill-color': '#38bdf8', 'fill-opacity': 0.5 * opacity }}
-          />
-          <Layer id="danau-outline" type="line"
-            layout={{ visibility: vis(showDanau) }}
-            paint={{ 'line-color': '#0ea5e9', 'line-width': 1.5, 'line-opacity': 0.9 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`danau-${localZoom}`}
+          data={danauData}
+          style={fillStyle('#38bdf8', 0.5 * opacity, '#0ea5e9', 1.5, 0.9 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER JARINGAN JALAN ─── */}
+      {/* ─── JALAN ─── */}
       {showJalan && jalanData && (
-        <Source key="jalan-source" id="jalan" type="geojson" data={jalanData}>
-          <Layer id="jalan-casing" type="line"
-            layout={{ visibility: vis(showJalan) }}
-            paint={{ 'line-color': '#94a3b8', 'line-width': 4, 'line-opacity': 0.4 * opacity }}
-          />
-          <Layer id="jalan-line" type="line"
-            layout={{ visibility: vis(showJalan) }}
-            paint={{ 'line-color': '#f5f5f4', 'line-width': 2, 'line-opacity': 0.85 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`jalan-${localZoom}`}
+          data={jalanData}
+          style={lineStyle('#f5f5f4', 2, 0.85 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER TANAM CAMPUR ─── */}
+      {/* ─── TANAM CAMPUR ─── */}
       {showTanamCampur && tanamCampurData && (
-        <Source key="tanamcampur-source" id="tanamcampur" type="geojson" data={tanamCampurData}>
-          <Layer id="tanamcampur-fill" type="fill"
-            layout={{ visibility: vis(showTanamCampur) }}
-            paint={{ 'fill-color': '#2dd4bf', 'fill-opacity': 0.25 * opacity }}
-          />
-          <Layer id="tanamcampur-outline" type="line"
-            layout={{ visibility: vis(showTanamCampur) }}
-            paint={{ 'line-color': '#0d9488', 'line-width': 1, 'line-opacity': 0.5 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`tanamcampur-${localZoom}`}
+          data={tanamCampurData}
+          style={fillStyle('#2dd4bf', 0.25 * opacity, '#0d9488', 1, 0.5 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER HUTAN KERING ─── */}
+      {/* ─── HUTAN KERING ─── */}
       {showHutanKering && hutanKeringData && (
-        <Source key="hutankering-source" id="hutankering" type="geojson" data={hutanKeringData}>
-          <Layer id="hutankering-fill" type="fill"
-            layout={{ visibility: vis(showHutanKering) }}
-            paint={{ 'fill-color': '#14532d', 'fill-opacity': 0.35 * opacity }}
-          />
-          <Layer id="hutankering-outline" type="line"
-            layout={{ visibility: vis(showHutanKering) }}
-            paint={{ 'line-color': '#052e16', 'line-width': 1, 'line-opacity': 0.6 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`hutankering-${localZoom}`}
+          data={hutanKeringData}
+          style={fillStyle('#14532d', 0.35 * opacity, '#052e16', 1, 0.6 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER ALANG-ALANG ─── */}
+      {/* ─── ALANG-ALANG ─── */}
       {showAlang && alangData && (
-        <Source key="alang-source" id="alang" type="geojson" data={alangData}>
-          <Layer id="alang-fill" type="fill"
-            layout={{ visibility: vis(showAlang) }}
-            paint={{ 'fill-color': '#fcd34d', 'fill-opacity': 0.25 * opacity }}
-          />
-          <Layer id="alang-outline" type="line"
-            layout={{ visibility: vis(showAlang) }}
-            paint={{ 'line-color': '#f59e0b', 'line-width': 1, 'line-opacity': 0.5 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`alang-${localZoom}`}
+          data={alangData}
+          style={fillStyle('#fcd34d', 0.25 * opacity, '#f59e0b', 1, 0.5 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER SEMAK BELUKAR ─── */}
+      {/* ─── SEMAK BELUKAR ─── */}
       {showSemak && semakData && (
-        <Source key="semak-source" id="semak" type="geojson" data={semakData}>
-          <Layer id="semak-fill" type="fill"
-            layout={{ visibility: vis(showSemak) }}
-            paint={{ 'fill-color': '#d97706', 'fill-opacity': 0.25 * opacity }}
-          />
-          <Layer id="semak-outline" type="line"
-            layout={{ visibility: vis(showSemak) }}
-            paint={{ 'line-color': '#b45309', 'line-width': 1, 'line-opacity': 0.5 * opacity }}
-          />
-        </Source>
+        <GeoJSON
+          key={`semak-${localZoom}`}
+          data={semakData}
+          style={fillStyle('#d97706', 0.25 * opacity, '#b45309', 1, 0.5 * opacity)}
+        />
       )}
 
-      {/* ─── LAYER PUNGGUNG BUKIT (RIDGE LINE) ─── */}
+      {/* ─── PUNGGUNG BUKIT ─── */}
       {showPunggungBukit && punggungBukitData && (
-        <Source key="punggungbukit-source" id="punggungbukit" type="geojson" data={punggungBukitData}>
-          <Layer id="punggungbukit-line" type="line"
-            layout={{ visibility: vis(showPunggungBukit) }}
-            paint={{ 'line-color': '#a855f7', 'line-width': 1.5, 'line-opacity': 0.7 * opacity, 'line-dasharray': [2, 3] }}
-          />
-        </Source>
+        <GeoJSON
+          key={`punggungbukit-${localZoom}`}
+          data={punggungBukitData}
+          style={lineStyle('#a855f7', 1.5, 0.7 * opacity, '2 3')}
+        />
       )}
 
-      {/* ─── LAYER REL KERETA API ─── */}
+      {/* ─── REL KERETA ─── */}
       {showRelka && relkaData && (
-        <Source key="relka-source" id="relka" type="geojson" data={relkaData}>
-          <Layer id="relka-casing" type="line"
-            layout={{ visibility: vis(showRelka) }}
-            paint={{ 'line-color': '#1e293b', 'line-width': 5, 'line-opacity': 0.5 * opacity }}
-          />
-          <Layer id="relka-line" type="line"
-            layout={{ visibility: vis(showRelka) }}
-            paint={{ 'line-color': '#e2e8f0', 'line-width': 2, 'line-opacity': 0.9 * opacity, 'line-dasharray': [8, 4] }}
-          />
-        </Source>
+        <GeoJSON
+          key={`relka-${localZoom}`}
+          data={relkaData}
+          style={lineStyle('#e2e8f0', 2, 0.9 * opacity, '8 4')}
+        />
       )}
 
+      {/* ─── BANGUNAN (zoom >= 14) ─── */}
       {bangunanData && localZoom >= 14 && (
-        <Source key="bangunan-source" id="bangunan" type="geojson" data={bangunanData}
-          tolerance={bangunanTolerance}>
-          <Layer id="bangunan-fill-flat" type="fill" maxzoom={17}
-            paint={{ 'fill-color': '#94a3b8', 'fill-opacity': 0.4 * opacity }}
-          />
-          <Layer id="bangunan-extrusion" type="fill-extrusion" minzoom={17}
-            paint={{
-              'fill-extrusion-color': '#94a3b8', 'fill-extrusion-height': 8,
-              'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.6 * opacity,
-            }}
-          />
-        </Source>
+        <GeoJSON
+          key={`bangunan-${localZoom}`}
+          data={bangunanData}
+          style={fillStyle('#94a3b8', 0.4 * opacity, '#64748b', 0.5, 0.3 * opacity)}
+        />
       )}
 
-      <Source key="submissions-source" id="submissions" type="geojson" data={submissionsGeoJSON} generateId={true}>
-        <Layer id="submissions-fill-flat" type="fill"
-          paint={{
-            'fill-color': ['get', 'color'],
-            'fill-opacity': [
-              'case', ['==', ['get', 'id'], selectedCompanyId ?? ''],
-              0.6, 0.35 * opacity,
-            ],
+      {/* ─── LAYER PENGAJUAN (submissions) ─── */}
+      {submissionsGeoJSON && (
+        <GeoJSON
+          key={`submissions-${selectedCompanyId}`}
+          data={submissionsGeoJSON}
+          style={(feature) => {
+            const color = feature?.properties?.color ?? '#6b7280';
+            const isSelected = feature?.properties?.id === selectedCompanyId;
+            return {
+              color,
+              weight: isSelected ? 3 : 1.5,
+              opacity,
+              fillColor: color,
+              fillOpacity: isSelected ? 0.6 : 0.35 * opacity,
+            };
+          }}
+          onEachFeature={(feature, layer) => {
+            layer.on('click', () => {
+              if (feature.properties?.id && onSubmissionClick) {
+                onSubmissionClick(feature.properties.id, feature.properties);
+              }
+            });
           }}
         />
-        <Layer id="submissions-outline-flat" type="line"
-          paint={{
-            'line-color': ['get', 'color'],
-            'line-width': [
-              'case', ['==', ['get', 'id'], selectedCompanyId ?? ''], 3, 1.5,
-            ],
-            'line-opacity': opacity,
-          }}
-        />
-      </Source>
-
-      {showDetail && (
-        <Source key="sub-polygons-source" id="sub-polygons" type="geojson" data={subPolygonsGeoJSON}>
-          <Layer id="sub-poly-fill" type="fill"
-            paint={{ 'fill-color': ['get', 'color'], 'fill-opacity': 0.5 * opacity }}
-          />
-          <Layer id="sub-poly-outline" type="line"
-            paint={{ 'line-color': ['get', 'color'], 'line-width': 1, 'line-opacity': 0.8 * opacity }}
-          />
-          <Layer id="sub-poly-extrusion" type="fill-extrusion"
-            filter={['any', ['==', ['get', 'type'], 'kavling'], ['==', ['get', 'type'], 'psu']]}
-            paint={{
-              'fill-extrusion-color': ['get', 'color'],
-              'fill-extrusion-height': [
-                'case', ['==', ['get', 'id'], selectedCompanyId ?? ''],
-                ['*', ['get', 'height'], 1.5], ['get', 'height']
-              ],
-              'fill-extrusion-base': 0,
-              'fill-extrusion-opacity': 0.75 * opacity,
-            }}
-          />
-          <Layer id="sub-poly-roof-tiers" type="fill-extrusion"
-            filter={['==', ['get', 'type'], 'roof-tier']}
-            paint={{
-              'fill-extrusion-color': ['get', 'color'],
-              'fill-extrusion-base': [
-                'case', ['==', ['get', 'id'], selectedCompanyId ?? ''],
-                ['*', ['get', 'base'], 1.5], ['get', 'base']
-              ],
-              'fill-extrusion-height': [
-                'case', ['==', ['get', 'id'], selectedCompanyId ?? ''],
-                ['*', ['get', 'height'], 1.5], ['get', 'height']
-              ],
-              'fill-extrusion-opacity': 0.95 * opacity,
-            }}
-          />
-        </Source>
       )}
 
-      {/* ─── LAYER RENDERING POLIGON LAHAN KOMPENSASI ─── */}
+      {/* ─── SITEPLAN DETAIL (internal SHP / CAD vectors) ─── */}
+      {subPolygonsGeoJSON && subPolygonsGeoJSON.features?.length > 0 && (
+        <GeoJSON
+          key={`sub-polygons-${selectedCompanyId}`}
+          data={subPolygonsGeoJSON}
+          style={(feature) => ({
+            color: feature?.properties?.color ?? '#6b7280',
+            weight: 1,
+            opacity: 0.95 * opacity,
+            fillColor: feature?.properties?.color ?? '#6b7280',
+            fillOpacity: feature?.properties?.type === 'road' ? 0.4 * opacity : 0.55 * opacity,
+          })}
+        />
+      )}
+
+      {/* ─── KOMPENSASI LAHAN ─── */}
       {compensationGeoJSON && (
-        <Source key="compensation-source" id="compensation-source" type="geojson" data={compensationGeoJSON}>
-          <Layer
-            id="compensation-fill"
-            type="fill"
-            paint={{
-              'fill-color': '#10b981', // emerald-500
-              'fill-opacity': 0.45 * opacity
-            }}
-          />
-          <Layer
-            id="compensation-outline"
-            type="line"
-            paint={{
-              'line-color': '#047857', // emerald-700
-              'line-width': 2.5,
-              'line-dasharray': [3, 2]
-            }}
-          />
-        </Source>
+        <GeoJSON
+          key="compensation"
+          data={compensationGeoJSON}
+          style={fillStyle('#10b981', 0.45 * opacity, '#047857', 2.5, 1)}
+        />
       )}
 
+      {/* ─── CLASH / KONFLIK SPASIAL ─── */}
       {clashGeoJSON && (
-        <Source key="clash-source" id="clash" type="geojson" data={clashGeoJSON}>
-          <Layer id="clash-fill" type="fill"
-            paint={{ 'fill-color': '#ef4444', 'fill-opacity': 0.5 }}
-          />
-          <Layer id="clash-outline" type="line"
-            paint={{
-              'line-color': '#ff0000', 'line-width': 3,
-              'line-opacity': 1, 'line-dasharray': [4, 3],
-            }}
-          />
-        </Source>
+        <GeoJSON
+          key="clash"
+          data={clashGeoJSON}
+          style={lineStyle('#ff0000', 3, 1, '4 3')}
+        />
       )}
     </>
   );
@@ -6292,7 +5746,8 @@ export const SpatialGeoJSONLayers = ({
 
 --- FILE: src\features\gis\components\markers\ClusterMarker.tsx ---
 import { memo } from 'react';
-import { Marker } from 'react-map-gl/maplibre';
+import { Marker } from 'react-leaflet';
+import L from 'leaflet';
 
 interface ClusterMarkerProps {
   lng: number;
@@ -6307,22 +5762,43 @@ export const ClusterMarker = memo(function ClusterMarker({
   lng, lat, count, clusterId, zoom, onExpand,
 }: ClusterMarkerProps) {
   const size = count < 10 ? 36 : count < 50 ? 44 : 52;
+  const fontSize = size < 44 ? 12 : 14;
+
+  const icon = L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:linear-gradient(135deg,#0f766e,#14b8a6);
+      border:3px solid #fff;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:${fontSize}px;font-weight:900;color:#fff;
+      box-shadow:0 2px 12px rgba(20,184,166,0.55);cursor:pointer;
+      font-family:sans-serif;
+    ">${count}</div>`,
+  });
+
   return (
-    <Marker longitude={lng} latitude={lat} anchor="center"
-      onClick={(e) => { e.originalEvent.stopPropagation(); onExpand(clusterId, lng, lat, zoom); }}>
-      <div style={{
-        width: size, height: size,
-        background: 'linear-gradient(135deg, #0f766e, #14b8a6)',
-        border: '3px solid #fff', borderRadius: '50%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: size < 44 ? 12 : 14, fontWeight: 900, color: '#fff',
-        boxShadow: '0 2px 12px rgba(20,184,166,0.55)', cursor: 'pointer',
-      }}>
-        {count}
-      </div>
-    </Marker>
+    <Marker
+      position={[lat, lng]}
+      icon={icon}
+      eventHandlers={{
+        click: () => onExpand(clusterId, lng, lat, zoom),
+      }}
+    />
   );
 });
+
+--- FILE: src\features\gis\components\markers\ConflictMarkers.tsx ---
+// ConflictMarkers — DISABLED
+// Marker konflik spasial (sonar ripple merah) telah dihapus dari tampilan peta
+// sesuai permintaan pengguna. Komponen dipertahankan sebagai stub kosong
+// agar tidak ada breaking import di SipasMap.tsx.
+
+export default function ConflictMarkers({ conflicts }: { conflicts: any[] }) {
+  return null;
+}
 
 --- FILE: src\features\gis\components\markers\index.ts ---
 export { ClusterMarker } from './ClusterMarker';
@@ -6330,16 +5806,8 @@ export { PinMarker } from './PinMarker';
 
 --- FILE: src\features\gis\components\markers\PinMarker.tsx ---
 import { memo } from 'react';
-import { Marker } from 'react-map-gl/maplibre';
-
-interface ProcessedSubmission {
-  id: string;
-  color: string;
-  location: {
-    lng: number;
-    lat: number;
-  };
-}
+import { Marker } from 'react-leaflet';
+import L from 'leaflet';
 
 interface PinMarkerProps {
   sub: any;
@@ -6353,23 +5821,41 @@ export const PinMarker = memo(function PinMarker({
   sub, isSelected, sizeBase = 28, onClickPin, onShowPopup,
 }: PinMarkerProps) {
   const size = isSelected ? sizeBase + 4 : sizeBase;
+  const boxShadow = isSelected
+    ? `0 0 0 3px ${sub.color},0 4px 16px rgba(0,0,0,0.5)`
+    : '0 2px 8px rgba(0,0,0,0.3)';
+
+  const icon = L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${sub.color};
+      border:3px solid #fff;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      box-shadow:${boxShadow};
+      cursor:pointer;
+      transition:all 0.15s ease;
+    "></div>`,
+  });
+
+  // Gunakan centroid polygon jika tersedia, fallback ke location.lat/lng
+  const lat = sub.centroidLat ?? sub.location.lat;
+  const lng = sub.centroidLng ?? sub.location.lng;
+
   return (
-    <Marker longitude={sub.location.lng} latitude={sub.location.lat} anchor="bottom"
-      onClick={(e) => {
-        e.originalEvent.stopPropagation();
-        onShowPopup(sub);
-        onClickPin(sub);
-      }}>
-      <div style={{
-        width: size, height: size, background: sub.color,
-        border: '3px solid #fff',
-        borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)',
-        boxShadow: isSelected
-          ? `0 0 0 3px ${sub.color}, 0 4px 16px rgba(0,0,0,0.5)`
-          : '0 2px 8px rgba(0,0,0,0.3)',
-        cursor: 'pointer', transition: 'all 0.15s ease',
-      }} />
-    </Marker>
+    <Marker
+      position={[lat, lng]}
+      icon={icon}
+      eventHandlers={{
+        click: () => {
+          onShowPopup(sub);
+          onClickPin(sub);
+        },
+      }}
+    />
   );
 });
 
@@ -6954,14 +6440,14 @@ interface ValidationRow {
 }
 
 const getStatusBadgeClass = (status: string) => {
-  switch (status) {
-    case 'Disetujui':
-      return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
-    case 'Ditolak':
-      return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
-    default:
-      return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
-  }
+    switch (status) {
+        case 'Disetujui':
+            return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
+        case 'Ditolak':
+            return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
+        default:
+            return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
+    }
 };
 
 export default function DetailSubmissionPanel({ submissionData }: DetailSubmissionPanelProps) {
@@ -7231,16 +6717,8 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     )}
                 </div>
 
-                {/* --- TOMBOL KONSOL 3D CAD/BIM INTERAKTIF (GFW LIGHT NEOMORPHIC STYLE) --- */}
-                <div className="px-4 py-3 border-b border-slate-100">
-                    <button
-                        type="button"
-                        onClick={() => navigate(`/gis/bim/${submissionData.id}`)}
-                        className="w-full h-10 bg-slate-900 hover:bg-teal-600 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 transition-all cursor-pointer outline-none"
-                    >
-                        <RotateCw size={13} className="animate-spin-slow text-teal-400" />
-                        <span>[ KONSOL 3D ] TINJAU SITE PLAN</span>
-                    </button>
+                <div className="px-4 py-3 border-b border-slate-100 bg-yellow-50 text-yellow-800 text-xs font-semibold uppercase tracking-wider">
+                    3D BIM viewer dinonaktifkan sementara. Fitur 3D sedang dalam pengembangan.
                 </div>
 
                 {/* STREAMING_CHUNK:Rendering high-density loss parameters comparison ledger */}
@@ -8204,200 +7682,6 @@ export default function SubmissionListPanel() {
     );
 }
 
---- FILE: src\features\gis\hooks\useCustom3DLayer.ts ---
-import { useMemo, useRef } from 'react';
-import * as THREE from 'three';
-import { MercatorCoordinate } from 'maplibre-gl';
-import { disposeHierarchy, createMockSitePlanModel } from '../utils/bimModel';
-
-export function useCustom3DLayer() {
-  const customUser3DLayerRef = useRef<any>(null);
-
-  const customUser3DLayer = useMemo(() => {
-    const layer: any = {
-      id: 'user-3d-model-layer',
-      type: 'custom',
-      renderingMode: '3d',
-      map: null,
-      renderer: null,
-      scene: null,
-      camera: null,
-      modelMesh: null,
-      currentModelId: null,
-      modelTransform: null,
-      pendingCentroid: null,
-      pendingModelUrl: null,
-
-      onAdd(map: any, gl: any) {
-        this.map = map;
-        this.renderer = new THREE.WebGLRenderer({
-          canvas: map.getCanvas(),
-          context: gl,
-          antialias: true,
-        });
-        this.renderer.autoClear = false;
-
-        this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera();
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        this.scene.add(ambientLight);
-
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(0, -70, 100).normalize();
-        this.scene.add(dirLight);
-
-        const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-        dirLight2.position.set(0, 70, 100).normalize();
-        this.scene.add(dirLight2);
-
-        if (this.currentModelId && this.pendingCentroid) {
-          const id = this.currentModelId;
-          const centroid = this.pendingCentroid;
-          const url = this.pendingModelUrl;
-          this.currentModelId = null;
-          this.loadModel(id, centroid, url);
-        }
-      },
-
-      loadModel(id: string, centroid: [number, number], modelUrl: string) {
-        if (this.currentModelId === id && this.scene) return;
-
-        this.clearModel();
-        this.currentModelId = id;
-        this.pendingCentroid = centroid;
-        this.pendingModelUrl = modelUrl;
-
-        if (!this.scene) return;
-
-        const center = MercatorCoordinate.fromLngLat(centroid, 0);
-        const scale = center.meterInMercatorCoordinateUnits();
-
-        this.modelTransform = {
-          translateX: center.x,
-          translateY: center.y,
-          translateZ: center.z,
-          scale: scale,
-          rx: Math.PI / 2,
-          ry: 0,
-          rz: 0,
-        };
-
-        const triggerFallback = () => {
-          if (this.currentModelId !== id || !this.scene) return;
-          if (this.modelMesh) {
-            this.scene.remove(this.modelMesh);
-            disposeHierarchy(this.modelMesh);
-          }
-          const mockModel = createMockSitePlanModel();
-          this.modelMesh = mockModel;
-          this.scene.add(mockModel);
-          if (this.map) this.map.triggerRepaint();
-        };
-
-        if (modelUrl) {
-          import('three/addons/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
-            if (this.currentModelId !== id) return;
-
-            const loader = new GLTFLoader();
-            loader.load(
-              modelUrl,
-              (gltf) => {
-                if (this.currentModelId !== id) {
-                  disposeHierarchy(gltf.scene);
-                  return;
-                }
-
-                if (this.modelMesh && this.scene) {
-                  this.scene.remove(this.modelMesh);
-                  disposeHierarchy(this.modelMesh);
-                }
-
-                const model = gltf.scene;
-                model.scale.set(10, 10, 10);
-
-                this.modelMesh = model;
-                this.scene.add(model);
-                if (this.map) this.map.triggerRepaint();
-              },
-              undefined,
-              (err) => {
-                console.warn('[THREE-BIM] Fallback triggered:', err);
-                triggerFallback();
-              }
-            );
-          }).catch((err) => {
-            console.warn('[THREE-BIM] Fallback triggered:', err);
-            triggerFallback();
-          });
-        } else {
-          triggerFallback();
-        }
-      },
-
-      clearModel() {
-        this.currentModelId = null;
-        this.modelTransform = null;
-        this.pendingCentroid = null;
-        this.pendingModelUrl = null;
-        if (this.modelMesh && this.scene) {
-          this.scene.remove(this.modelMesh);
-          disposeHierarchy(this.modelMesh);
-          this.modelMesh = null;
-          if (this.map) this.map.triggerRepaint();
-        }
-      },
-
-      render(_gl: any, matrix: number[]) {
-        if (!this.renderer || !this.scene || !this.camera || !this.modelMesh || !this.modelTransform || !this.pendingCentroid) return;
-
-        const { rx, ry, rz } = this.modelTransform;
-
-        let elevation = 0;
-        if (this.map) {
-          try {
-            elevation = this.map.queryTerrainElevation(this.pendingCentroid) || 0;
-          } catch (e) {
-            // ignore elevation read errors during tile transitions
-          }
-        }
-
-        const center = MercatorCoordinate.fromLngLat(this.pendingCentroid, elevation);
-        const scale = center.meterInMercatorCoordinateUnits();
-
-        const rotationX = new THREE.Matrix4().makeRotationX(rx);
-        const rotationY = new THREE.Matrix4().makeRotationY(ry);
-        const rotationZ = new THREE.Matrix4().makeRotationZ(rz);
-
-        const m = new THREE.Matrix4().fromArray(matrix);
-        const l = new THREE.Matrix4()
-          .makeTranslation(center.x, center.y, center.z)
-          .scale(new THREE.Vector3(scale, -scale, scale))
-          .multiply(rotationX)
-          .multiply(rotationY)
-          .multiply(rotationZ);
-
-        this.camera.projectionMatrix = m.multiply(l);
-        this.renderer.resetState();
-        this.renderer.render(this.scene, this.camera);
-      },
-
-      onRemove() {
-        this.clearModel();
-        if (this.renderer) {
-          this.renderer.dispose();
-          this.renderer = null;
-        }
-      }
-    };
-
-    customUser3DLayerRef.current = layer;
-    return layer;
-  }, []);
-
-  return { customUser3DLayer, customUser3DLayerRef };
-}
-
 --- FILE: src\features\gis\hooks\useSipasMapData.ts ---
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -8408,7 +7692,7 @@ import { SubmissionService } from '@/features/submission/services/submission.ser
 import type { Submission } from '@/features/submission/types';
 import {
   leafletRingToGeoJSON,
-  calcExtrusionHeight,
+  polygonCentroid,
   resolveStatusColor,
   resolveLayerCategory,
 } from '@/lib/geoUtils';
@@ -8416,7 +7700,9 @@ import {
 export interface ProcessedSubmission extends Submission {
   color: string;
   categoryLayer: string;
-  extrusionHeight: number;
+  /** Centroid polygon batas lahan [lat, lng] — posisi tepat di tengah SHP */
+  centroidLat: number;
+  centroidLng: number;
 }
 
 export function useSipasMapData(localZoom: number) {
@@ -8608,12 +7894,28 @@ export function useSipasMapData(localZoom: number) {
   // ─── MEMOIZED GEOMETRIES ───
   const processedSubmissions = useMemo<ProcessedSubmission[]>(() =>
     submissions
-      .map((sub: Submission) => ({
-        ...sub,
-        color: resolveStatusColor(sub.status),
-        categoryLayer: resolveLayerCategory(sub.landArea),
-        extrusionHeight: calcExtrusionHeight(sub),
-      }))
+      .map((sub: Submission) => {
+        // Hitung centroid polygon batas lahan menggunakan formula centroid poligon
+        let centroidLat = sub.location.lat;
+        let centroidLng = sub.location.lng;
+        const polygon = sub.location.polygon as [number, number][] | undefined;
+        if (polygon && polygon.length >= 3) {
+          try {
+            const centroid = polygonCentroid(polygon);
+            if (centroid) {
+              centroidLat = centroid[0];
+              centroidLng = centroid[1];
+            }
+          } catch { /* fallback ke location.lat/lng */ }
+        }
+        return {
+          ...sub,
+          color: resolveStatusColor(sub.status),
+          categoryLayer: resolveLayerCategory(sub.landArea),
+          centroidLat,
+          centroidLng,
+        };
+      })
       .filter((sub) => activeLayers.includes(sub.categoryLayer)),
     [submissions, activeLayers]
   );
@@ -8630,7 +7932,6 @@ export function useSipasMapData(localZoom: number) {
             properties: {
               id: sub.id,
               color: sub.color,
-              height: sub.extrusionHeight,
               status: sub.status,
               housingName: sub.housingName,
               categoryLayer: sub.categoryLayer,
@@ -8648,72 +7949,16 @@ export function useSipasMapData(localZoom: number) {
   const subPolygonsGeoJSON = useMemo(() => {
     const features: any[] = [];
 
-    const getCentroid = (ring: [number, number][]): [number, number] => {
-      let totalLng = 0;
-      let totalLat = 0;
-      ring.forEach(([lng, lat]) => {
-        totalLng += lng;
-        totalLat += lat;
-      });
-      return [totalLng / ring.length, totalLat / ring.length];
-    };
-
-    const shrinkRing = (ring: [number, number][], factor: number, centroid: [number, number]): [number, number][] => {
-      return ring.map(([lng, lat]) => {
-        const dx = lng - centroid[0];
-        const dy = lat - centroid[1];
-        return [centroid[0] + dx * factor, centroid[1] + dy * factor];
-      });
-    };
-
     if (activeGeometries && selectedCompanyId) {
-      const parentSub = processedSubmissions.find((s) => s.id === selectedCompanyId);
-      const parentHeight = parentSub ? parentSub.extrusionHeight : 10;
       const addPoly = (rings: number[][][], color: string, type: string) => {
         rings.forEach((ring) => {
           try {
             const geoJSONRing = leafletRingToGeoJSON(ring as [number, number][]);
-
             features.push({
               type: 'Feature',
               geometry: { type: 'Polygon', coordinates: [geoJSONRing] },
-              properties: {
-                id: selectedCompanyId,
-                color,
-                type,
-                submissionId: selectedCompanyId,
-                height: parentHeight,
-                base: 0,
-              },
+              properties: { id: selectedCompanyId, color, type, submissionId: selectedCompanyId },
             });
-
-            if (type === 'kavling' || type === 'psu') {
-              const centroid = getCentroid(geoJSONRing);
-              const roofColor = '#c2410c';
-
-              const tiers = [
-                { factor: 0.85, baseOffset: 0, heightOffset: 0.8 },
-                { factor: 0.6, baseOffset: 0.8, heightOffset: 1.6 },
-                { factor: 0.35, baseOffset: 1.6, heightOffset: 2.3 },
-                { factor: 0.1, baseOffset: 2.3, heightOffset: 2.8 },
-              ];
-
-              tiers.forEach((tier) => {
-                const shrunk = shrinkRing(geoJSONRing, tier.factor, centroid);
-                features.push({
-                  type: 'Feature',
-                  geometry: { type: 'Polygon', coordinates: [shrunk] },
-                  properties: {
-                    id: selectedCompanyId,
-                    color: roofColor,
-                    type: 'roof-tier',
-                    submissionId: selectedCompanyId,
-                    base: parentHeight + tier.baseOffset,
-                    height: parentHeight + tier.heightOffset,
-                  },
-                });
-              });
-            }
           } catch { /* skip */ }
         });
       };
@@ -8727,47 +7972,11 @@ export function useSipasMapData(localZoom: number) {
           rings.forEach((ring) => {
             try {
               const geoJSONRing = leafletRingToGeoJSON(ring);
-
               features.push({
                 type: 'Feature',
                 geometry: { type: 'Polygon', coordinates: [geoJSONRing] },
-                properties: {
-                  id: sub.id,
-                  color,
-                  type,
-                  submissionId: sub.id,
-                  height: sub.extrusionHeight,
-                  base: 0,
-                },
+                properties: { id: sub.id, color, type, submissionId: sub.id },
               });
-
-              if (type === 'kavling' || type === 'psu') {
-                const centroid = getCentroid(geoJSONRing);
-                const roofColor = '#c2410c';
-
-                const tiers = [
-                  { factor: 0.85, baseOffset: 0, heightOffset: 0.8 },
-                  { factor: 0.6, baseOffset: 0.8, heightOffset: 1.6 },
-                  { factor: 0.35, baseOffset: 1.6, heightOffset: 2.3 },
-                  { factor: 0.1, baseOffset: 2.3, heightOffset: 2.8 },
-                ];
-
-                tiers.forEach((tier) => {
-                  const shrunk = shrinkRing(geoJSONRing, tier.factor, centroid);
-                  features.push({
-                    type: 'Feature',
-                    geometry: { type: 'Polygon', coordinates: [shrunk] },
-                    properties: {
-                      id: sub.id,
-                      color: roofColor,
-                      type: 'roof-tier',
-                      submissionId: sub.id,
-                      base: sub.extrusionHeight + tier.baseOffset,
-                      height: sub.extrusionHeight + tier.heightOffset,
-                    },
-                  });
-                });
-              }
             } catch { /* skip */ }
           });
         };
@@ -8806,7 +8015,8 @@ export function useSipasMapData(localZoom: number) {
     const sc = new Supercluster<GeoJsonProperties>({ radius: 80, maxZoom: 12, minZoom: 0 });
     sc.load(processedSubmissions.map((sub) => ({
       type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [sub.location.lng, sub.location.lat] },
+      // Gunakan centroid polygon (pre-computed di processedSubmissions)
+      geometry: { type: 'Point' as const, coordinates: [sub.centroidLng, sub.centroidLat] },
       properties: {
         submissionId: sub.id, color: sub.color,
         housingName: sub.housingName, developerName: sub.developerName, status: sub.status,
@@ -9243,20 +8453,13 @@ export function useSpatialValidator() {
 }
 
 --- FILE: src\features\gis\pages\BimViewerPage.tsx ---
-import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { Sun, RotateCw, ArrowLeft, MousePointer2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { Submission } from '@/features/submission/types';
 
 export default function BimViewerPage() {
-    const mountRef = useRef<HTMLDivElement>(null);
-    const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-    const [isSimulatingSun, setIsSimulatingSun] = useState(false);
-    const [isReady, setIsReady] = useState(false);
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
 
@@ -9269,342 +8472,39 @@ export default function BimViewerPage() {
 
     const housingName = submission?.housingName || "Peninjau 3D CAD/BIM";
 
-    useEffect(() => {
-        const container = mountRef.current;
-        if (!container) return;
-
-        let animationFrameId: number;
-        let time = 0;
-        const sunState = { active: false };
-
-        // ─── SCENE ───────────────────────────────────────────────────────────────
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0f172a);
-        scene.fog = new THREE.FogExp2(0x0f172a, 0.012);
-
-        // ─── CAMERA ──────────────────────────────────────────────────────────────
-        const w = container.clientWidth || window.innerWidth;
-        const h = container.clientHeight || window.innerHeight;
-        const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
-        camera.position.set(40, 35, 55);
-        camera.lookAt(0, 0, 0);
-
-        // ─── RENDERER (Optimized) ─────────────────────────────────────────────────
-        const renderer = new THREE.WebGLRenderer({
-            antialias: false,           // Off for performance
-            powerPreference: "high-performance",
-        });
-        renderer.setSize(w, h);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFShadowMap; // Lighter than PCFSoft
-        renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-        // Canvas must fill container — explicitly style it
-        renderer.domElement.style.display = "block";
-        renderer.domElement.style.width = "100%";
-        renderer.domElement.style.height = "100%";
-        container.appendChild(renderer.domElement);
-        rendererRef.current = renderer;
-
-        // ─── ORBIT CONTROLS ───────────────────────────────────────────────────────
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.06;
-        controls.maxPolarAngle = Math.PI / 2 - 0.02;
-        controls.minDistance = 8;
-        controls.maxDistance = 180;
-
-        // ─── LIGHTING ────────────────────────────────────────────────────────────
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-
-        const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x2d3748, 0.5);
-        scene.add(hemisphereLight);
-
-        const sunLight = new THREE.DirectionalLight(0xfff9c4, 1.8);
-        sunLight.position.set(40, 60, 30);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 1024;
-        sunLight.shadow.mapSize.height = 1024;
-        sunLight.shadow.camera.near = 1;
-        sunLight.shadow.camera.far = 200;
-        sunLight.shadow.camera.left = -60;
-        sunLight.shadow.camera.right = 60;
-        sunLight.shadow.camera.top = 60;
-        sunLight.shadow.camera.bottom = -60;
-        sunLight.shadow.bias = -0.001;
-        scene.add(sunLight);
-
-        // ─── VISIBLE SUN SPHERE ───────────────────────────────────────────────────
-        const sunGeom = new THREE.SphereGeometry(2.5, 12, 12);
-        const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff9c4 });
-        const sunMesh = new THREE.Mesh(sunGeom, sunMat);
-        sunMesh.position.copy(sunLight.position);
-        scene.add(sunMesh);
-
-        // ─── GROUND ───────────────────────────────────────────────────────────────
-        const groundGeom = new THREE.PlaneGeometry(400, 400);
-        const groundMat = new THREE.MeshLambertMaterial({ color: 0x1a2535 }); // Cheaper than Standard
-        const ground = new THREE.Mesh(groundGeom, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        ground.castShadow = false;
-        scene.add(ground);
-
-        // ─── GRID ─────────────────────────────────────────────────────────────────
-        const gridHelper = new THREE.GridHelper(200, 80, 0x2d3748, 0x1a2535);
-        gridHelper.position.y = 0.05;
-        const gridMats = Array.isArray(gridHelper.material) ? gridHelper.material : [gridHelper.material];
-        gridMats.forEach(m => { m.transparent = true; m.opacity = 0.4; });
-        scene.add(gridHelper);
-
-        // ─── ROADS ────────────────────────────────────────────────────────────────
-        const roadMat = new THREE.MeshLambertMaterial({ color: 0x2d3748 });
-        const road1 = new THREE.Mesh(new THREE.PlaneGeometry(6, 100), roadMat);
-        road1.rotation.x = -Math.PI / 2;
-        road1.position.y = 0.06;
-        scene.add(road1);
-        const road2 = new THREE.Mesh(new THREE.PlaneGeometry(100, 6), roadMat);
-        road2.rotation.x = -Math.PI / 2;
-        road2.position.y = 0.06;
-        scene.add(road2);
-
-        // ─── BUILDINGS ────────────────────────────────────────────────────────────
-        const houseMat = new THREE.MeshLambertMaterial({ color: 0x0f766e });
-        const roofMat = new THREE.MeshLambertMaterial({ color: 0x134e4a });
-        const facilityMat = new THREE.MeshLambertMaterial({ color: 0xd97706 });
-        const facilityRoofMat = new THREE.MeshLambertMaterial({ color: 0x92400e });
-
-        const buildingGroup = new THREE.Group();
-        scene.add(buildingGroup);
-        const allGeoms: THREE.BufferGeometry[] = [];
-
-        const placeBuilding = (
-            x: number, z: number, w: number, d: number, h: number,
-            bodyMat: THREE.Material, roofMaterial: THREE.Material
-        ) => {
-            const bodyGeom = new THREE.BoxGeometry(w, h, d);
-            allGeoms.push(bodyGeom);
-            const body = new THREE.Mesh(bodyGeom, bodyMat);
-            body.position.set(x, h / 2, z);
-            body.castShadow = true;
-            body.receiveShadow = true;
-            buildingGroup.add(body);
-
-            // Roof (pyramid-like via scaled box)
-            const roofGeom = new THREE.ConeGeometry(Math.max(w, d) * 0.75, h * 0.3, 4);
-            allGeoms.push(roofGeom);
-            const roof = new THREE.Mesh(roofGeom, roofMaterial);
-            roof.position.set(x, h + (h * 0.15), z);
-            roof.rotation.y = Math.PI / 4;
-            roof.castShadow = true;
-            buildingGroup.add(roof);
-        };
-
-        // Grid-based layout for realism (not random scatter)
-        const rows = 5, cols = 5;
-        const spacingX = 14, spacingZ = 16;
-        const offsetX = -((cols - 1) * spacingX) / 2;
-        const offsetZ = -((rows - 1) * spacingZ) / 2;
-
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                const x = offsetX + col * spacingX;
-                const z = offsetZ + row * spacingZ;
-                // Skip center area for road intersection
-                if (Math.abs(x) < 6 || Math.abs(z) < 8) continue;
-
-                const isFacility = (row === 0 && col === 0) || (row === 4 && col === 4);
-                const bw = 4 + Math.random() * 2;
-                const bd = 5 + Math.random() * 2;
-                const bh = isFacility ? 8 + Math.random() * 6 : 3 + Math.random() * 2;
-
-                placeBuilding(
-                    x + (Math.random() - 0.5) * 2,
-                    z + (Math.random() - 0.5) * 2,
-                    bw, bd, bh,
-                    isFacility ? facilityMat : houseMat,
-                    isFacility ? facilityRoofMat : roofMat
-                );
-            }
-        }
-
-        // ─── ANIMATION LOOP ───────────────────────────────────────────────────────
-        const animate = () => {
-            animationFrameId = requestAnimationFrame(animate);
-            controls.update();
-
-            if (sunState.active) {
-                time += 0.004;
-                const radius = 90;
-                sunLight.position.x = Math.cos(time) * radius;
-                sunLight.position.y = Math.max(8, Math.sin(time) * radius);
-                sunLight.position.z = Math.sin(time * 0.5) * 40;
-                sunMesh.position.copy(sunLight.position);
-
-                const ratio = sunLight.position.y / radius;
-                if (ratio < 0.25) {
-                    sunLight.color.set(0xf97316);
-                    sunMat.color.set(0xf97316);
-                    sunLight.intensity = 0.7;
-                    ambientLight.intensity = 0.15;
-                } else {
-                    sunLight.color.set(0xfff9c4);
-                    sunMat.color.set(0xfff9c4);
-                    sunLight.intensity = 1.8;
-                    ambientLight.intensity = 0.5;
-                }
-            } else {
-                sunLight.position.set(40, 60, 30);
-                sunMesh.position.copy(sunLight.position);
-                sunLight.color.set(0xfff9c4);
-                sunMat.color.set(0xfff9c4);
-                sunLight.intensity = 1.8;
-                ambientLight.intensity = 0.5;
-            }
-
-            renderer.render(scene, camera);
-        };
-        animate();
-        setIsReady(true);
-
-        // ─── RESIZE ───────────────────────────────────────────────────────────────
-        const handleResize = () => {
-            const cw = container.clientWidth;
-            const ch = container.clientHeight;
-            camera.aspect = cw / ch;
-            camera.updateProjectionMatrix();
-            renderer.setSize(cw, ch);
-        };
-        window.addEventListener("resize", handleResize);
-
-        // ─── RESET CAM EVENT ──────────────────────────────────────────────────────
-        const handleResetCam = () => {
-            camera.position.set(40, 35, 55);
-            controls.target.set(0, 0, 0);
-            controls.update();
-        };
-        window.addEventListener("bim-reset-cam", handleResetCam);
-
-        // ─── TOGGLE SUN EVENT ─────────────────────────────────────────────────────
-        const handleToggleSun = (e: Event) => {
-            sunState.active = (e as CustomEvent).detail;
-        };
-        window.addEventListener("bim-toggle-sun", handleToggleSun);
-
-        // ─── CLEANUP ─────────────────────────────────────────────────────────────
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-            window.removeEventListener("resize", handleResize);
-            window.removeEventListener("bim-reset-cam", handleResetCam);
-            window.removeEventListener("bim-toggle-sun", handleToggleSun);
-
-            allGeoms.forEach(g => g.dispose());
-            sunGeom.dispose();
-            sunMat.dispose();
-            groundGeom.dispose();
-            groundMat.dispose();
-            roadMat.dispose();
-            houseMat.dispose();
-            roofMat.dispose();
-            facilityMat.dispose();
-            facilityRoofMat.dispose();
-            gridHelper.geometry.dispose();
-            gridMats.forEach(m => m.dispose());
-
-            controls.dispose();
-            renderer.dispose();
-            renderer.forceContextLoss();
-            rendererRef.current = null;
-
-            if (container.contains(renderer.domElement)) {
-                container.removeChild(renderer.domElement);
-            }
-        };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Toggle sun via custom event (avoids stale closure problem)
-    const handleSunToggle = () => {
-        const next = !isSimulatingSun;
-        setIsSimulatingSun(next);
-        window.dispatchEvent(new CustomEvent("bim-toggle-sun", { detail: next }));
-    };
-
     return (
-        <div style={{ position: "fixed", inset: 0, background: "#0f172a", zIndex: 9999 }}>
-            {/* ── THREE.JS MOUNT TARGET ── fills entire viewport */}
-            <div
-                ref={mountRef}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-            />
-
-            {/* ── TOP BAR ── */}
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 }}
-                className="flex items-center gap-4 px-6 py-4 border-b border-slate-700/60 bg-slate-900/70 backdrop-blur-md shadow-xl"
-            >
+        <div className="fixed inset-0 bg-slate-950 text-slate-100 flex flex-col">
+            <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/95 shadow-lg">
                 <button
-                    onClick={() => navigate("/gis")}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-teal-600 text-slate-300 hover:text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer outline-none border border-slate-700 hover:border-teal-500"
+                    type="button"
+                    onClick={() => navigate('/gis')}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-wider bg-slate-800 hover:bg-teal-600 text-slate-200 rounded-lg transition"
                 >
-                    <ArrowLeft size={15} />
+                    <ArrowLeft size={16} />
                     Kembali ke Peta
                 </button>
-
-                <div className="h-5 w-px bg-slate-700" />
-
-                <div className="flex items-center gap-3 text-teal-400">
-                    <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-70" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500" />
-                    </span>
-                    <h1 className="text-sm font-black tracking-widest uppercase text-teal-300">
-                        BIM VIEWER — {housingName}
-                    </h1>
+                <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-teal-300">BIM Viewer</p>
+                    <h1 className="text-lg font-black tracking-tight">{housingName}</h1>
                 </div>
+            </header>
 
-                {!isReady && (
-                    <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
-                        <span className="animate-spin text-teal-400">⏳</span>
-                        Memuat engine 3D…
+            <main className="flex-1 flex items-center justify-center p-8">
+                <div className="max-w-2xl w-full rounded-3xl border border-slate-700/80 bg-slate-900/95 p-8 shadow-2xl">
+                    <h2 className="text-2xl font-black text-white mb-4">3D Viewer Dinonaktifkan Sementara</h2>
+                    <p className="text-sm text-slate-300 leading-relaxed mb-6">
+                        Fitur BIM/3D saat ini sedang dalam pengembangan dan akan diaktifkan kembali setelah optimasi selesai. Untuk saat ini, Anda dapat menggunakan peta 2D ringan dan melihat data spasial tanpa mode 3D.
+                    </p>
+                    <div className="rounded-2xl border border-teal-500/20 bg-slate-800/80 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-teal-300 mb-2">Status</p>
+                        <ul className="space-y-2 text-sm text-slate-300">
+                            <li>• 3D rendering dimatikan</li>
+                            <li>• Viewer heavy WebGL tidak dimuat</li>
+                            <li>• Navigasi peta tetap tersedia di halaman GIS utama</li>
+                        </ul>
                     </div>
-                )}
-            </div>
-
-            {/* ── HUD BOTTOM BAR ── */}
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10 }}
-                className="flex items-center justify-between px-6 pb-6 pt-4 pointer-events-none"
-            >
-                {/* Left: hint */}
-                <div className="pointer-events-auto flex items-center gap-3 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 px-5 py-3 rounded-xl shadow-xl">
-                    <MousePointer2 size={16} className="text-teal-400" />
-                    <span className="text-xs font-semibold text-slate-300">
-                        Drag → Putar &nbsp;|&nbsp; Scroll → Zoom &nbsp;|&nbsp; Klik Kanan+Drag → Geser
-                    </span>
                 </div>
-
-                {/* Right: actions */}
-                <div className="pointer-events-auto flex items-center gap-3">
-                    <button
-                        onClick={handleSunToggle}
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all shadow-xl cursor-pointer outline-none ${isSimulatingSun
-                                ? "bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30"
-                                : "bg-slate-900/80 text-slate-300 border-slate-700/50 hover:bg-slate-800 hover:text-white"
-                            }`}
-                    >
-                        <Sun size={16} className={isSimulatingSun ? "animate-spin" : ""} style={isSimulatingSun ? { animationDuration: "3s" } : {}} />
-                        {isSimulatingSun ? "Hentikan Simulasi" : "Simulasi Matahari"}
-                    </button>
-
-                    <button
-                        onClick={() => window.dispatchEvent(new Event("bim-reset-cam"))}
-                        className="flex items-center gap-2 px-5 py-3 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 hover:bg-teal-600 hover:border-teal-500 hover:text-white text-slate-300 rounded-xl text-sm font-bold transition-all shadow-xl cursor-pointer outline-none"
-                    >
-                        <RotateCw size={16} />
-                        Reset View
-                    </button>
-                </div>
-            </div>
+            </main>
         </div>
     );
 }
@@ -9699,168 +8599,6 @@ export default function GISPage() {
 
     </main>
   );
-}
-
---- FILE: src\features\gis\utils\bimModel.ts ---
-import * as THREE from 'three';
-
-export function disposeHierarchy(obj: any) {
-  obj.traverse((child: any) => {
-    if (child.geometry) {
-      child.geometry.dispose();
-    }
-    if (child.material) {
-      if (Array.isArray(child.material)) {
-        child.material.forEach((m: any) => m.dispose());
-      } else {
-        child.material.dispose();
-      }
-    }
-  });
-}
-
-export function createMockSitePlanModel() {
-  const mainGroup = new THREE.Group();
-
-  const lawnMat = new THREE.MeshLambertMaterial({ color: 0x1b5e20 });
-  const roadMat = new THREE.MeshLambertMaterial({ color: 0x1e293b }); // Darker asphalt
-  const markingMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // White markings
-  const houseMat = new THREE.MeshLambertMaterial({ color: 0x0f766e });
-  const roofMat = new THREE.MeshLambertMaterial({ color: 0x9a3412 }); // Terracotta orange
-  const facilityMat = new THREE.MeshLambertMaterial({ color: 0xd97706 });
-  const facilityRoofMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
-  const windowMat = new THREE.MeshBasicMaterial({ color: 0xfef08a }); // Lit window yellow
-  const poleMat = new THREE.MeshLambertMaterial({ color: 0x475569 }); // Slate pole
-  const lightMat = new THREE.MeshBasicMaterial({ color: 0xfbef35 }); // Glowing light
-
-  // 1. Lawn
-  const lawnGeo = new THREE.BoxGeometry(80, 0.2, 80);
-  const lawn = new THREE.Mesh(lawnGeo, lawnMat);
-  lawn.position.y = 0.1;
-  mainGroup.add(lawn);
-
-  // 2. Roads
-  const road1 = new THREE.Mesh(new THREE.BoxGeometry(6, 0.3, 80), roadMat);
-  road1.position.set(0, 0.2, 0);
-  mainGroup.add(road1);
-
-  const road2 = new THREE.Mesh(new THREE.BoxGeometry(80, 0.3, 6), roadMat);
-  road2.position.set(0, 0.2, 0);
-  mainGroup.add(road2);
-
-  // 3. Road Markings (dashed center lines)
-  for (let z = -38; z <= 38; z += 6) {
-    if (Math.abs(z) < 5) continue;
-    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.32, 3), markingMat);
-    mark.position.set(0, 0.201, z);
-    mainGroup.add(mark);
-  }
-  for (let x = -38; x <= 38; x += 6) {
-    if (Math.abs(x) < 5) continue;
-    const mark = new THREE.Mesh(new THREE.BoxGeometry(3, 0.32, 0.2), markingMat);
-    mark.position.set(x, 0.201, 0);
-    mainGroup.add(mark);
-  }
-
-  // 4. Streetlights
-  const addStreetlight = (lx: number, lz: number) => {
-    const lightGroup = new THREE.Group();
-    lightGroup.position.set(lx, 0.2, lz);
-
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.2, 6, 0.2), poleMat);
-    pole.position.y = 3;
-    lightGroup.add(pole);
-
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.15, 0.5), poleMat);
-    head.position.set(lx > 0 ? -0.3 : 0.3, 6, 0);
-    lightGroup.add(head);
-
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), lightMat);
-    bulb.position.set(lx > 0 ? -0.3 : 0.3, 5.8, 0);
-    lightGroup.add(bulb);
-
-    mainGroup.add(lightGroup);
-  };
-
-  addStreetlight(4, 4);
-  addStreetlight(-4, 4);
-  addStreetlight(4, -4);
-  addStreetlight(-4, -4);
-  addStreetlight(4, 30);
-  addStreetlight(-4, -30);
-
-  // 5. Buildings Builder
-  const placeBuilding = (
-    x: number, z: number, w: number, d: number, h: number,
-    bodyMat: THREE.Material, roofMaterial: THREE.Material
-  ) => {
-    const buildingGroup = new THREE.Group();
-    buildingGroup.position.set(x, 0.2, z);
-
-    const bodyGeom = new THREE.BoxGeometry(w, h, d);
-    const body = new THREE.Mesh(bodyGeom, bodyMat);
-    body.position.y = h / 2;
-    buildingGroup.add(body);
-
-    const roofH = h * 0.4;
-    const roofGeom = new THREE.ConeGeometry(Math.max(w, d) * 0.85, roofH, 4);
-    const roof = new THREE.Mesh(roofGeom, roofMaterial);
-    roof.position.y = h + (roofH / 2);
-    roof.rotation.y = Math.PI / 4;
-    buildingGroup.add(roof);
-
-    const windowW = 0.5;
-    const windowH = 0.8;
-    const windowThick = 0.05;
-    const floors = Math.floor(h / 3.5);
-
-    for (let f = 0; f < floors; f++) {
-      const winY = 1.5 + f * 3.5;
-      for (let side = -1; side <= 1; side += 2) {
-        const winX = side * (w * 0.25);
-        const win = new THREE.Mesh(new THREE.BoxGeometry(windowW, windowH, windowThick), windowMat);
-        win.position.set(winX, winY, d / 2 + 0.02);
-        buildingGroup.add(win);
-
-        const winBack = new THREE.Mesh(new THREE.BoxGeometry(windowW, windowH, windowThick), windowMat);
-        winBack.position.set(winX, winY, -d / 2 - 0.02);
-        buildingGroup.add(winBack);
-      }
-    }
-
-    mainGroup.add(buildingGroup);
-  };
-
-  const rows = 5;
-  const cols = 5;
-  const spacingX = 14;
-  const spacingZ = 16;
-  const offsetX = -((cols - 1) * spacingX) / 2;
-  const offsetZ = -((rows - 1) * spacingZ) / 2;
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = offsetX + col * spacingX;
-      const z = offsetZ + row * spacingZ;
-
-      if (Math.abs(x) < 6 || Math.abs(z) < 8) continue;
-
-      const isFacility = (row === 0 && col === 0) || (row === 4 && col === 4);
-      const bw = 5 + (row % 2) * 1.5 + (col % 2) * 0.5;
-      const bd = 6 + (col % 2) * 1.5 + (row % 2) * 0.5;
-      const bh = isFacility ? 24 : 10 + (row % 3) * 3; // Much taller!
-
-      placeBuilding(
-        x,
-        z,
-        bw, bd, bh,
-        isFacility ? facilityMat : houseMat,
-        isFacility ? facilityRoofMat : roofMat
-      );
-    }
-  }
-
-  return mainGroup;
 }
 
 --- FILE: src\features\siteplan\pages\SitePlanDetailPage.tsx ---
@@ -10419,7 +9157,7 @@ export { PhotosTab } from './PhotosTab';
 --- FILE: src\features\submission\components\detail-tabs\LocationTab.tsx ---
 import { useMemo } from 'react';
 import { Landmark, MapPin } from 'lucide-react';
-import { Source, Layer } from 'react-map-gl/maplibre';
+import { GeoJSON } from 'react-leaflet';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 
@@ -10608,47 +9346,31 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
               >
                 {/* Render Outer Boundary */}
                 {outerBoundaryGeoJSON && (
-                  <Source id="outer-boundary" type="geojson" data={outerBoundaryGeoJSON}>
-                    <Layer
-                      id="outer-boundary-line"
-                      type="line"
-                      paint={{
-                        'line-color': '#ef4444',
-                        'line-width': 2.5,
-                        'line-dasharray': [2, 2]
-                      }}
-                    />
-                    <Layer
-                      id="outer-boundary-fill"
-                      type="fill"
-                      paint={{
-                        'fill-color': '#ef4444',
-                        'fill-opacity': 0.08
-                      }}
-                    />
-                  </Source>
+                  <GeoJSON
+                    key="outer-boundary"
+                    data={outerBoundaryGeoJSON}
+                    style={{
+                      color: '#ef4444',
+                      weight: 2.5,
+                      dashArray: '6 4',
+                      fillColor: '#ef4444',
+                      fillOpacity: 0.08,
+                    }}
+                  />
                 )}
 
-                {/* Render Site Plan AutoCAD Vectors */}
+                {/* Render Site Plan Vectors */}
                 {siteplanFeaturesGeoJSON.features.length > 0 && (
-                  <Source id="siteplan-features" type="geojson" data={siteplanFeaturesGeoJSON}>
-                    <Layer
-                      id="siteplan-features-fill"
-                      type="fill"
-                      paint={{
-                        'fill-color': ['get', 'color'],
-                        'fill-opacity': 0.65
-                      }}
-                    />
-                    <Layer
-                      id="siteplan-features-line"
-                      type="line"
-                      paint={{
-                        'line-color': '#ffffff',
-                        'line-width': 1
-                      }}
-                    />
-                  </Source>
+                  <GeoJSON
+                    key="siteplan-features"
+                    data={siteplanFeaturesGeoJSON}
+                    style={(feature) => ({
+                      color: '#ffffff',
+                      weight: 1,
+                      fillColor: feature?.properties?.color || '#0d9488',
+                      fillOpacity: 0.65,
+                    })}
+                  />
                 )}
               </GISMapContainer>
             ) : (
@@ -19065,6 +17787,47 @@ export function leafletRingToGeoJSON(ring: LeafletCoord[]): GeoJSONCoord[] {
 }
 
 /**
+ * Hitung centroid untuk ring poligon Leaflet [lat,lng].
+ * Menggunakan formula centroid poligon sesuai area (shoelace).
+ * Mengembalikan null jika poligon tidak valid atau area nol.
+ */
+export function polygonCentroid(ring: LeafletCoord[]): LeafletCoord | null {
+    if (ring.length < 3) return null;
+
+    const points = ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+        ? ring.slice(0, ring.length - 1)
+        : ring;
+
+    let area = 0;
+    let centroidX = 0;
+    let centroidY = 0;
+
+    for (let i = 0; i < points.length; i += 1) {
+        const [lat1, lng1] = points[i];
+        const [lat2, lng2] = points[(i + 1) % points.length];
+
+        const x1 = lng1;
+        const y1 = lat1;
+        const x2 = lng2;
+        const y2 = lat2;
+        const cross = x1 * y2 - x2 * y1;
+
+        area += cross;
+        centroidX += (x1 + x2) * cross;
+        centroidY += (y1 + y2) * cross;
+    }
+
+    area *= 0.5;
+    if (Math.abs(area) < Number.EPSILON) return null;
+
+    const factor = 1 / (6 * area);
+    const centroidLng = centroidX * factor;
+    const centroidLat = centroidY * factor;
+
+    return [centroidLat, centroidLng];
+}
+
+/**
  * Konversi sebuah ring poligon dari format GeoJSON ke Leaflet.
  */
 export function geoJSONRingToLeaflet(ring: GeoJSONCoord[]): LeafletCoord[] {
@@ -19084,7 +17847,7 @@ export function leafletPolygonToGeoJSON(rings: LeafletCoord[][]): GeoJSONCoord[]
 // ─── Kalkulasi Ketinggian Bangunan ─────────────────────────────────────────────
 
 const DEFAULT_HEIGHT_METERS = 30;
-const FLOOR_HEIGHT_METERS   = 8;
+const FLOOR_HEIGHT_METERS = 8;
 
 /**
  * Hitung tinggi bangunan fill-extrusion dalam meter berdasarkan KLB.
@@ -19108,14 +17871,14 @@ export function calcExtrusionHeight(submission: Submission): number {
  */
 export function resolveStatusColor(status: Submission['status']): string {
     switch (status) {
-        case 'Disetujui':               return '#10b981'; // emerald-500
-        case 'Ditolak':                 return '#ef4444'; // red-500
-        case 'Verifikasi Teknis':       return '#6366f1'; // indigo-500
+        case 'Disetujui': return '#10b981'; // emerald-500
+        case 'Ditolak': return '#ef4444'; // red-500
+        case 'Verifikasi Teknis': return '#6366f1'; // indigo-500
         case 'Verifikasi Administrasi': return '#3b82f6'; // blue-500
-        case 'Menunggu Verifikasi':     return '#f59e0b'; // amber-500
-        case 'Menunggu Persetujuan':    return '#8b5cf6'; // violet-500
-        case 'Proses TTE':              return '#db2777'; // pink-600
-        default:                        return '#64748b'; // slate-500
+        case 'Menunggu Verifikasi': return '#f59e0b'; // amber-500
+        case 'Menunggu Persetujuan': return '#8b5cf6'; // violet-500
+        case 'Proses TTE': return '#db2777'; // pink-600
+        default: return '#64748b'; // slate-500
     }
 }
 

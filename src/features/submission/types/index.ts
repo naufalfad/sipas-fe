@@ -5,7 +5,7 @@
  * Peran: Kontrak tipe data (Single Source of Truth) untuk permohonan site plan.
  *        Diperbarui penuh untuk mendukung perbandingan metrik tiga sisi,
  *        dynamic checklist evaluasi dinas, metadata verifikasi KKPR, peran baru,
- *        serta snapshot metadata dokumen Telaah Staf.
+ *        snapshot dokumen Telaah Staf, serta draf Surat Keputusan (SK) resmi.
  * ============================================================================
  */
 
@@ -174,6 +174,74 @@ export interface EvaluationChecklistItem {
   verifiedAt?: string;               // ISO 8601 Timestamp pengisian evaluasi
 }
 
+// ─── UPDATE BARU TAHAP 1: VALUE OBJECT INTERFACES UNTUK DRAF SK ───────────────
+
+export interface SkSignerInfo {
+  name: string;
+  nip: string;
+  office_title?: string;
+  signed_at?: string | null;
+  signature_base64?: string | null;
+}
+
+export interface SkDiktumHunian {
+  tipe_rumah: string;
+  jumlah_unit: number;
+  luas_m2: number;
+}
+
+export interface SkDiktumPsu {
+  total_psu_area_m2: number;
+  allocation_details: string;
+  cemetery_scheme: string;
+  road_row_min: number;
+  road_row_max: number;
+  drainage_type?: string;
+}
+
+export interface SkDiktumIntensity {
+  kdb_max: number;
+  klb_max: number;
+  kdh_min: number;
+}
+
+export interface SkConsiderations {
+  menimbang: string[];
+  mengingat: string[];
+  memperhatikan: string[];
+}
+
+export interface SkDraftPayload {
+  id_sk: string;
+  id_permohonan: string;
+  sk_number: string;
+  sequence_no: number;
+  classification_code: string;
+  office_code: string;
+  created_at: string;
+  verdict: string;
+  custom_notes?: string | null;
+  is_overridden: boolean;
+  override_reason?: string | null;
+  signer?: SkSignerInfo | null;
+  considerations?: SkConsiderations | null;
+  diktum_hunian: SkDiktumHunian[];
+  diktum_psu?: SkDiktumPsu | null;
+  diktum_intensity?: SkDiktumIntensity | null;
+}
+
+export interface SkDraft {
+  idSk: string;
+  skNumber: string;
+  verdict: string;
+  isOverridden: boolean;
+  overrideReason?: string | null;
+  createdAt: string;
+  payload: SkDraftPayload;
+}
+
+// ─── UTAMA: INTERFACE PERMOHONAN SINKRON (SOT) ───────────────────────────────
+
 export interface Submission {
   id: string;
   submissionNo: string;
@@ -255,4 +323,7 @@ export interface Submission {
     createdAt: string;
     payload: any;
   };
+
+  // ─── BARU TAHAP 1: SNAPSHOT METADATA KEPUTUSAN DRAF SK (TAHAP 5 INTEGRASI) ───
+  skDraft?: SkDraft | null;
 }
