@@ -7,7 +7,7 @@ import { SubmissionService } from '@/features/submission/services/submission.ser
 import type { Submission } from '@/features/submission/types';
 import {
   leafletRingToGeoJSON,
-  calcExtrusionHeight,
+  polygonCentroid,
   resolveStatusColor,
   resolveLayerCategory,
 } from '@/lib/geoUtils';
@@ -15,7 +15,9 @@ import {
 export interface ProcessedSubmission extends Submission {
   color: string;
   categoryLayer: string;
-  extrusionHeight: number;
+  /** Centroid polygon batas lahan [lat, lng] — posisi tepat di tengah SHP */
+  centroidLat: number;
+  centroidLng: number;
 }
 
 export function useSipasMapData(localZoom: number) {
@@ -207,12 +209,28 @@ export function useSipasMapData(localZoom: number) {
   // ─── MEMOIZED GEOMETRIES ───
   const processedSubmissions = useMemo<ProcessedSubmission[]>(() =>
     submissions
-      .map((sub: Submission) => ({
-        ...sub,
-        color: resolveStatusColor(sub.status),
-        categoryLayer: resolveLayerCategory(sub.landArea),
-        extrusionHeight: calcExtrusionHeight(sub),
-      }))
+      .map((sub: Submission) => {
+        // Hitung centroid polygon batas lahan menggunakan formula centroid poligon
+        let centroidLat = sub.location.lat;
+        let centroidLng = sub.location.lng;
+        const polygon = sub.location.polygon as [number, number][] | undefined;
+        if (polygon && polygon.length >= 3) {
+          try {
+            const centroid = polygonCentroid(polygon);
+            if (centroid) {
+              centroidLat = centroid[0];
+              centroidLng = centroid[1];
+            }
+          } catch { /* fallback ke location.lat/lng */ }
+        }
+        return {
+          ...sub,
+          color: resolveStatusColor(sub.status),
+          categoryLayer: resolveLayerCategory(sub.landArea),
+          centroidLat,
+          centroidLng,
+        };
+      })
       .filter((sub) => activeLayers.includes(sub.categoryLayer)),
     [submissions, activeLayers]
   );
@@ -229,7 +247,6 @@ export function useSipasMapData(localZoom: number) {
             properties: {
               id: sub.id,
               color: sub.color,
-              height: sub.extrusionHeight,
               status: sub.status,
               housingName: sub.housingName,
               categoryLayer: sub.categoryLayer,
@@ -247,72 +264,16 @@ export function useSipasMapData(localZoom: number) {
   const subPolygonsGeoJSON = useMemo(() => {
     const features: any[] = [];
 
-    const getCentroid = (ring: [number, number][]): [number, number] => {
-      let totalLng = 0;
-      let totalLat = 0;
-      ring.forEach(([lng, lat]) => {
-        totalLng += lng;
-        totalLat += lat;
-      });
-      return [totalLng / ring.length, totalLat / ring.length];
-    };
-
-    const shrinkRing = (ring: [number, number][], factor: number, centroid: [number, number]): [number, number][] => {
-      return ring.map(([lng, lat]) => {
-        const dx = lng - centroid[0];
-        const dy = lat - centroid[1];
-        return [centroid[0] + dx * factor, centroid[1] + dy * factor];
-      });
-    };
-
     if (activeGeometries && selectedCompanyId) {
-      const parentSub = processedSubmissions.find((s) => s.id === selectedCompanyId);
-      const parentHeight = parentSub ? parentSub.extrusionHeight : 10;
       const addPoly = (rings: number[][][], color: string, type: string) => {
         rings.forEach((ring) => {
           try {
             const geoJSONRing = leafletRingToGeoJSON(ring as [number, number][]);
-
             features.push({
               type: 'Feature',
               geometry: { type: 'Polygon', coordinates: [geoJSONRing] },
-              properties: {
-                id: selectedCompanyId,
-                color,
-                type,
-                submissionId: selectedCompanyId,
-                height: parentHeight,
-                base: 0,
-              },
+              properties: { id: selectedCompanyId, color, type, submissionId: selectedCompanyId },
             });
-
-            if (type === 'kavling' || type === 'psu') {
-              const centroid = getCentroid(geoJSONRing);
-              const roofColor = '#c2410c';
-
-              const tiers = [
-                { factor: 0.85, baseOffset: 0, heightOffset: 0.8 },
-                { factor: 0.6, baseOffset: 0.8, heightOffset: 1.6 },
-                { factor: 0.35, baseOffset: 1.6, heightOffset: 2.3 },
-                { factor: 0.1, baseOffset: 2.3, heightOffset: 2.8 },
-              ];
-
-              tiers.forEach((tier) => {
-                const shrunk = shrinkRing(geoJSONRing, tier.factor, centroid);
-                features.push({
-                  type: 'Feature',
-                  geometry: { type: 'Polygon', coordinates: [shrunk] },
-                  properties: {
-                    id: selectedCompanyId,
-                    color: roofColor,
-                    type: 'roof-tier',
-                    submissionId: selectedCompanyId,
-                    base: parentHeight + tier.baseOffset,
-                    height: parentHeight + tier.heightOffset,
-                  },
-                });
-              });
-            }
           } catch { /* skip */ }
         });
       };
@@ -326,47 +287,11 @@ export function useSipasMapData(localZoom: number) {
           rings.forEach((ring) => {
             try {
               const geoJSONRing = leafletRingToGeoJSON(ring);
-
               features.push({
                 type: 'Feature',
                 geometry: { type: 'Polygon', coordinates: [geoJSONRing] },
-                properties: {
-                  id: sub.id,
-                  color,
-                  type,
-                  submissionId: sub.id,
-                  height: sub.extrusionHeight,
-                  base: 0,
-                },
+                properties: { id: sub.id, color, type, submissionId: sub.id },
               });
-
-              if (type === 'kavling' || type === 'psu') {
-                const centroid = getCentroid(geoJSONRing);
-                const roofColor = '#c2410c';
-
-                const tiers = [
-                  { factor: 0.85, baseOffset: 0, heightOffset: 0.8 },
-                  { factor: 0.6, baseOffset: 0.8, heightOffset: 1.6 },
-                  { factor: 0.35, baseOffset: 1.6, heightOffset: 2.3 },
-                  { factor: 0.1, baseOffset: 2.3, heightOffset: 2.8 },
-                ];
-
-                tiers.forEach((tier) => {
-                  const shrunk = shrinkRing(geoJSONRing, tier.factor, centroid);
-                  features.push({
-                    type: 'Feature',
-                    geometry: { type: 'Polygon', coordinates: [shrunk] },
-                    properties: {
-                      id: sub.id,
-                      color: roofColor,
-                      type: 'roof-tier',
-                      submissionId: sub.id,
-                      base: sub.extrusionHeight + tier.baseOffset,
-                      height: sub.extrusionHeight + tier.heightOffset,
-                    },
-                  });
-                });
-              }
             } catch { /* skip */ }
           });
         };
@@ -405,7 +330,8 @@ export function useSipasMapData(localZoom: number) {
     const sc = new Supercluster<GeoJsonProperties>({ radius: 80, maxZoom: 12, minZoom: 0 });
     sc.load(processedSubmissions.map((sub) => ({
       type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [sub.location.lng, sub.location.lat] },
+      // Gunakan centroid polygon (pre-computed di processedSubmissions)
+      geometry: { type: 'Point' as const, coordinates: [sub.centroidLng, sub.centroidLat] },
       properties: {
         submissionId: sub.id, color: sub.color,
         housingName: sub.housingName, developerName: sub.developerName, status: sub.status,
@@ -413,6 +339,8 @@ export function useSipasMapData(localZoom: number) {
     })));
     return sc;
   }, [processedSubmissions]);
+
+
 
   const intZoom = Math.floor(localZoom);
   useEffect(() => {

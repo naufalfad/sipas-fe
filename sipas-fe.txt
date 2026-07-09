@@ -603,6 +603,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
 }
 
 --- FILE: src\app\router\index.tsx ---
+// --- FILE: src/app/router/index.tsx ---
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
 
@@ -703,7 +704,8 @@ export const router = createBrowserRouter([
           {
             path: 'verifikasi/:id',
             element: (
-              <ProtectedRoute allowedRoles={['Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+              // REVISI: Pembatasan ketat fungsional SoD. Kabid dilarang keras memproses lembar input verifikasi teknis.
+              <ProtectedRoute allowedRoles={['Tim Teknis', 'Super Admin']}>
                 <SubmissionVerificationPage />
               </ProtectedRoute>
             ),
@@ -739,9 +741,9 @@ export const router = createBrowserRouter([
       {
         path: 'verifikasi',
         element: (
-          // SOD: Super Admin dikecualikan. Hanya pejabat fungsional yang berwenang
-          // melakukan verifikasi administrasi, teknis, dan persetujuan TTE.
-          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang']}>
+          // SOD REVISI: Kabid diarahkan langsung ke Detail Page dan tidak menggunakan antrean input evaluasi.
+          // Hanya menyisakan Admin SIPAS (administrasi) dan Tim Teknis (koordinat/spasial).
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis']}>
             <VerificationPage />
           </ProtectedRoute>
         ),
@@ -828,7 +830,64 @@ export const router = createBrowserRouter([
 ]);
 
 --- FILE: src\app\store\useAuthStore.ts ---
+// --- FILE: src/app/store/useAuthStore.ts ---
 import { create } from 'zustand';
+
+// ─── SECTION 1: GLOBAL APP PERMISSIONS CONSTANTS (Erasable Syntax Compatible) ─────
+
+export const AppPermission = {
+  CAN_CREATE_SUBMISSION: 'CAN_CREATE_SUBMISSION',
+  CAN_VERIFY_ADMIN: 'CAN_VERIFY_ADMIN',
+  CAN_VERIFY_TECHNICAL: 'CAN_VERIFY_TECHNICAL',
+  CAN_ENDORSE_KABID: 'CAN_ENDORSE_KABID',
+  CAN_SIGN_KADIS: 'CAN_SIGN_KADIS',
+} as const;
+
+export type AppPermission = (typeof AppPermission)[keyof typeof AppPermission];
+
+// ─── SECTION 2: CORE ROLE-PERMISSION POLICY MAPPING (Protected Variations) ───
+// Centralized Source of Truth untuk memisahkan nama jabatan (Role) dari tindakan (Permission)
+
+const ROLE_PERMISSIONS: Record<string, AppPermission[]> = {
+  'PEMOHON': [
+    AppPermission.CAN_CREATE_SUBMISSION
+  ],
+  'ADMIN': [
+    AppPermission.CAN_VERIFY_ADMIN
+  ],
+  'TIM_TEKNIS': [
+    AppPermission.CAN_VERIFY_TECHNICAL
+  ],
+  'KABID_PUPR': [
+    AppPermission.CAN_ENDORSE_KABID
+  ],
+  'KADIS': [
+    AppPermission.CAN_SIGN_KADIS
+  ],
+  'SUPER_ADMIN': [
+    AppPermission.CAN_CREATE_SUBMISSION,
+    AppPermission.CAN_VERIFY_ADMIN,
+    AppPermission.CAN_VERIFY_TECHNICAL,
+    AppPermission.CAN_ENDORSE_KABID,
+    AppPermission.CAN_SIGN_KADIS,
+  ],
+};
+
+// ─── SECTION 3: SYSTEM ROLE RESOLVER (Type Safety & Defensiveness) ────────────
+// Menormalisasi format input string peran (DB UPPER_SNAKE vs FE Display) secara aman.
+
+const normalizeRoleForCheck = (role: string): string => {
+  const r = role.toUpperCase().trim();
+  if (r === 'PEMOHON') return 'PEMOHON';
+  if (r === 'ADMIN' || r === 'ADMIN SIPAS' || r === 'ADMIN_SIPAS') return 'ADMIN';
+  if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') return 'TIM_TEKNIS';
+  if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') return 'KABID_PUPR';
+  if (r === 'KADIS' || r === 'KEPALA DINAS') return 'KADIS';
+  if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') return 'SUPER_ADMIN';
+  return r;
+};
+
+// ─── SECTION 4: STATE STORE ANTARMUKA & IMPLEMENTASI ─────────────────────────
 
 export interface UserAuthProfile {
   id?: number; // Tambahan (Fase 1): Penjajakan ID unik pengguna dari database backend
@@ -849,6 +908,8 @@ interface AuthState {
   login: (token: string, user: UserAuthProfile) => void;
   logout: () => void;
   updateUser: (user: Partial<UserAuthProfile>) => void;
+  /** Evaluator hak akses operasional pendaftaran / verifikasi terdesentralisasi */
+  hasPermission: (permission: AppPermission) => boolean;
 }
 
 // Helper to safely parse user from localStorage
@@ -861,7 +922,7 @@ const getSavedUser = (): UserAuthProfile | null => {
   }
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   token: localStorage.getItem('token'),
   user: getSavedUser(),
   isAuthenticated: !!localStorage.getItem('token'),
@@ -885,6 +946,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.setItem('user', JSON.stringify(newUser));
       return { user: newUser };
     });
+  },
+
+  hasPermission: (permission: AppPermission): boolean => {
+    const user = get().user;
+    if (!user) return false;
+
+    const resolvedRole = normalizeRoleForCheck(user.role);
+    const permissions = ROLE_PERMISSIONS[resolvedRole] || [];
+    return permissions.includes(permission);
   }
 }));
 
@@ -14302,12 +14372,13 @@ export default function SubmissionCreatePage() {
 }
 
 --- FILE: src\features\submission\pages\SubmissionDetailPage.tsx ---
+// --- FILE: src/features/submission/pages/SubmissionDetailPage.tsx ---
 /* STREAMING_CHUNK:Configuring imports and base constants */
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
-import { useAuthStore } from '@/app/store/useAuthStore';
+import { useAuthStore, AppPermission } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import { useGisUIStore, type LahanKompensasi } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
@@ -14365,7 +14436,7 @@ export default function SubmissionDetailPage() {
   const navigate = useNavigate(); // Perbaikan: navigate digunakan secara aktif pada aksi kembali
 
   const { activeRole: uiActiveRole, userProfile: uiUserProfile } = useUIStore();
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore(); // Memanfaatkan hasPermission dari store tepercaya
 
   const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
   const activeRole = effectiveRole;
@@ -14555,8 +14626,8 @@ export default function SubmissionDetailPage() {
   const showKabidPanel = isKabidActive && subData.status === 'Menunggu Rekomendasi';
   const showKadisPanel = isKadisActive && subData.status === 'Menunggu Persetujuan';
 
-  const isTeknisActive = effectiveRole === 'Tim Teknis' || effectiveRole === 'Super Admin' || effectiveRole === 'Kepala Bidang';
-  const showTeknisPanel = isTeknisActive && subData.status === 'Verifikasi Teknis';
+  // REVISI: Pengkondisian panel diputuskan tepercaya murni dari otorisasi PBAC, bukan hardcoded role strings
+  const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && subData.status === 'Verifikasi Teknis';
 
   const allAdminChecked = Object.values(adminChecks).every(Boolean);
 
@@ -14594,7 +14665,7 @@ export default function SubmissionDetailPage() {
         aspekCode: 'supportDoc',
         aspekLabel: 'Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Terlampir',
         statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Dokumen KKPR terlampir dan sesuai.',
+        catatanVerifikator: 'Dokumen KKPR terlampir and sesuai.',
         verifiedById: user?.id,
         verifiedAt: new Date().toISOString()
       },
@@ -14736,7 +14807,7 @@ export default function SubmissionDetailPage() {
     });
   };
 
-  // ─── SEKSI BARU: HASIL EVALUASI TEKNIS & TELAAH STAF (Type Safe Argument Method) ───
+  // ─── SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ───
   const renderTelaahStafSection = (data: Submission) => {
     const hasTechnicalResult = data.kkprVerdict || data.telaahStaf;
     if (!hasTechnicalResult) return null;
@@ -14752,9 +14823,9 @@ export default function SubmissionDetailPage() {
           </div>
           <span className={cn(
             "rounded-none text-[8.5px] font-black tracking-widest px-2.5 py-1 uppercase leading-none border shrink-0",
-            verdictLabel === 'Sesuai' || verdictLabel === 'Sesuai / Dapat Disetujui' ? "bg-emerald-50 text-emerald-800 border-emerald-200" :
-              verdictLabel === 'Sesuai Bersyarat' || verdictLabel === 'Sesuai Bersyarat / Ketentuan Khusus' ? "bg-amber-50 text-amber-800 border-amber-200" :
-                "bg-rose-50 text-rose-800 border-rose-200"
+            verdictLabel === 'Sesuai' || verdictLabel === 'Sesuai / Dapat Disetujui' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+              verdictLabel === 'Sesuai Bersyarat' || verdictLabel === 'Sesuai Bersyarat / Ketentuan Khusus' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                "bg-rose-50 text-rose-700 border-rose-200"
           )}>
             {verdictLabel}
           </span>
@@ -15215,7 +15286,7 @@ export default function SubmissionDetailPage() {
                 }}
                 className={cn(
                   "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-slate-500",
-                  isVetoModeActive ? "bg-amber-500" : "bg-slate-200"
+                  isVetoModeActive ? "bg-amber-50" : "bg-slate-200"
                 )}
               >
                 <span className={cn(
@@ -16018,12 +16089,12 @@ export default function SubmissionPreviewTelaahPage() {
 }
 
 --- FILE: src\features\submission\pages\SubmissionVerificationPage.tsx ---
+// --- FILE: src/features/submission/pages/SubmissionVerificationPage.tsx ---
 /* STREAMING_CHUNK:Configuring imports and verification schemas */
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/app/store/useAuthStore';
-import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import { useAuthStore, AppPermission } from '@/app/store/useAuthStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { SubmissionStatus } from '../types';
 import {
@@ -16054,9 +16125,8 @@ export default function SubmissionVerificationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { user: userProfile } = useAuthStore();
+  const { user: userProfile, hasPermission } = useAuthStore();
   const activeRole = userProfile?.role || '';
-  const effectiveRole = normalizeRole(activeRole);
 
   const [kkprVerdict, setKkprVerdict] = useState<string>('Sesuai');
   const [verifiedKdb, setVerifiedKdb] = useState<number | ''>('');
@@ -16313,8 +16383,9 @@ export default function SubmissionVerificationPage() {
     );
   }
 
-  const isVerifier = effectiveRole === 'Tim Teknis' || effectiveRole === 'Kepala Bidang' || effectiveRole === 'Super Admin';
-  if (!isVerifier || sub.status !== 'Verifikasi Teknis') {
+  // REVISI: Gerbang Masuk Halaman Menggunakan Permission-Based Access Control (PBAC) [Pylance & SoD Enforcer]
+  const isAuthorizedVerifier = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL);
+  if (!isAuthorizedVerifier || sub.status !== 'Verifikasi Teknis') {
     return (
       <div className="p-8 text-left bg-white border border-slate-300 max-w-md mx-auto mt-12 rounded-none space-y-4">
         <ShieldCheck className="h-8 w-8 text-amber-600" />

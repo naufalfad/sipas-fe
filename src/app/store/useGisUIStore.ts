@@ -30,8 +30,6 @@ export interface FlyToTarget {
     longitude: number;
     latitude: number;
     zoom?: number;
-    pitch?: number;
-    bearing?: number;
 }
 
 /** Representasi Data Konflik Spasial hasil Sidak Lapangan & Drone Mapping [Bogor 8] */
@@ -64,7 +62,6 @@ interface GisUIState {
     mapOpacity: number;
     maskOpacity: number;
     activeBaseMap: string;
-    isTerrainActive: boolean;
 
     // ── Layer Drone (Orthophoto) & Deteksi Konflik ───────────────────────────
     isDroneLayerActive: boolean;
@@ -79,11 +76,8 @@ interface GisUIState {
     mapZoom: number;
     /** Format [latitude, longitude] — tetap dipertahankan untuk kompatibilitas komponen lain */
     mapCenter: [number, number];
-    mapPitch: number;
-    mapBearing: number;
-    is3DMode: boolean;
 
-    /** Posisi kursor mouse aktif di peta (koordinat + elevasi dari DEM) */
+    /** Posisi kursor mouse aktif di peta (koordinat 2D, elevation selalu null di Leaflet) */
     cursorCoords: { lat: number; lng: number; elevation: number | null } | null;
 
     // ── Panel Orchestrator ───────────────────────────────────────────────────
@@ -103,7 +97,6 @@ interface GisUIState {
     setMapOpacity: (opacity: number) => void;
     setMaskOpacity: (opacity: number) => void;
     setActiveBaseMap: (baseMap: string) => void;
-    toggleTerrain: () => void;
     toggleDroneLayer: () => void;
     setDroneLayerOpacity: (opacity: number) => void;
     setClashGeoJson: (geoJson: any | null) => void;
@@ -116,10 +109,6 @@ interface GisUIState {
     // ── Actions: Kamera ──────────────────────────────────────────────────────
     setMapZoom: (zoom: number) => void;
     setMapCenter: (center: [number, number]) => void;
-    setMapPitch: (pitch: number) => void;
-    setMapBearing: (bearing: number) => void;
-    /** Toggle antara mode 3D (pitch=45) dan flat (pitch=0) */
-    toggle3DMode: () => void;
     /** Perintahkan SipasMap untuk terbang ke koordinat tertentu */
     flyTo: (target: FlyToTarget) => void;
     /** Dipanggil oleh SipasMap setelah flyTo dieksekusi */
@@ -151,12 +140,8 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     selectedCompanyId: null,
     activeKompensasi: null,
     mapZoom: 11,
-    mapCenter: [-6.4816, 106.8560],   // [lat, lng] — format Leaflet historis
-    mapPitch: 45,                      // Default 3D immersive view
-    mapBearing: -10,                   // Sedikit rotasi kompas untuk estetika
-    is3DMode: true,
+    mapCenter: [-6.4816, 106.8560],   // [lat, lng] — format Leaflet
     cursorCoords: null,
-    isTerrainActive: true,
     activeBaseMap: 'voyager',
     activePanels: [],
     flyToTarget: null,
@@ -184,10 +169,6 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     setMaskOpacity: (maskOpacity) => set({ maskOpacity }),
     setActiveBaseMap: (activeBaseMap) => set({ activeBaseMap }),
 
-    toggleTerrain: () => set((state) => ({
-        isTerrainActive: !state.isTerrainActive
-    })),
-
     toggleDroneLayer: () => set((state) => ({
         isDroneLayerActive: !state.isDroneLayerActive
     })),
@@ -211,17 +192,6 @@ export const useGisUIStore = create<GisUIState>((set) => ({
 
     setMapZoom: (mapZoom) => set({ mapZoom }),
     setMapCenter: (mapCenter) => set({ mapCenter }),
-    setMapPitch: (mapPitch) => set({ mapPitch }),
-    setMapBearing: (mapBearing) => set({ mapBearing }),
-
-    toggle3DMode: () => set((state) => {
-        const newIs3D = !state.is3DMode;
-        return {
-            is3DMode: newIs3D,
-            mapPitch: newIs3D ? 45 : 0,
-            mapBearing: newIs3D ? -10 : 0, // 2D = top-down (0°) | 3D = estetis (-10°)
-        };
-    }),
 
     flyTo: (flyToTarget) => set({ flyToTarget }),
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-    Plus, Minus, Maximize2, Map as MapIcon, Mountain,
+    Plus, Minus, Maximize2, Map as MapIcon,
     ChevronDown, ChevronUp, Crosshair, Navigation
 } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
@@ -16,8 +16,7 @@ import { cn } from "@/lib/utils";
  */
 export default function MapHUD() {
     const {
-        activeLayers, mapZoom, mapPitch, mapBearing,
-        is3DMode, toggle3DMode, isTerrainActive, toggleTerrain,
+        activeLayers, mapZoom,
         cursorCoords
     } = useGisUIStore();
 
@@ -66,13 +65,6 @@ export default function MapHUD() {
     const triggerZoomIn = () => window.dispatchEvent(new Event("map-zoom-in"));
     const triggerZoomOut = () => window.dispatchEvent(new Event("map-zoom-out"));
     const triggerResetView = () => window.dispatchEvent(new Event("map-reset-view"));
-
-    // Konversi bearing ke arah kompas
-    const bearingToCompass = (b: number) => {
-        const dirs = ["U", "TL", "T", "TG", "S", "BD", "B", "BL"];
-        const norm = ((b % 360) + 360) % 360;
-        return dirs[Math.round(norm / 45) % 8];
-    };
 
     const zoomLabel = mapZoom < 10 ? "KAB." : mapZoom < 14 ? "KEC." : "DETAIL";
 
@@ -160,11 +152,11 @@ export default function MapHUD() {
                     )}
                 </Panel>
 
-                {/* 2. PANEL KOORDINAT KURSOR + ELEVASI (collapsible) */}
+                {/* 2. PANEL KOORDINAT KURSOR (collapsible) */}
                 <Panel className="w-full">
                     <PanelHeader
                         icon={<Crosshair size={11} className="text-indigo-600" />}
-                        label="Koordinat & Elevasi"
+                        label="Koordinat Kursor"
                         isOpen={isCoordsOpen}
                         onToggle={() => setIsCoordsOpen(v => !v)}
                     />
@@ -184,22 +176,6 @@ export default function MapHUD() {
                                     </span>
                                 </div>
                             </div>
-                            <div className="px-3 py-2 flex items-center gap-2">
-                                <Mountain size={11} className="text-teal-600 shrink-0" />
-                                <div className="flex flex-col gap-0.5 flex-1">
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Elevasi / Ketinggian</span>
-                                    <span className={cn(
-                                        "text-[12px] font-mono font-black tabular-nums leading-none",
-                                        cursorCoords?.elevation !== null && cursorCoords?.elevation !== undefined
-                                            ? "text-teal-700"
-                                            : "text-slate-400"
-                                    )}>
-                                        {cursorCoords?.elevation !== null && cursorCoords?.elevation !== undefined
-                                            ? `${Math.round(cursorCoords.elevation)} mdpl`
-                                            : "Arahkan kursor ke peta"}
-                                    </span>
-                                </div>
-                            </div>
                         </div>
                     )}
                 </Panel>
@@ -214,25 +190,15 @@ export default function MapHUD() {
                     />
                     {isStatusOpen && (
                         <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+                            <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100">
                                 <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
                                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Zoom</span>
                                     <span className="text-[12px] font-black text-slate-800 tabular-nums">{Math.round(mapZoom)}</span>
                                 </div>
                                 <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Pitch</span>
-                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{Math.round(mapPitch)}°</span>
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Skala</span>
+                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{zoomLabel}</span>
                                 </div>
-                                <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Arah</span>
-                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{bearingToCompass(mapBearing)}</span>
-                                </div>
-                            </div>
-                            <div className="px-3 py-1.5 flex items-center justify-between">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{zoomLabel}</span>
-                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                                    {Math.round(((mapBearing % 360) + 360) % 360)}° KOMPAS
-                                </span>
                             </div>
                         </div>
                     )}
@@ -262,26 +228,6 @@ export default function MapHUD() {
                     title="Perkecil (Zoom Out)"
                 >
                     <Minus size={18} strokeWidth={2.5} />
-                </button>
-                <button
-                    onClick={toggle3DMode}
-                    className={`w-10 h-10 flex items-center justify-center transition-colors active:bg-slate-200 rounded-none outline-none ${is3DMode
-                            ? 'bg-teal-600 text-white hover:bg-teal-700'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-teal-700'
-                        }`}
-                    title={is3DMode ? 'Beralih ke Tampilan Flat 2D' : 'Beralih ke Tampilan 3D Imersif'}
-                >
-                    <span className="text-[11px] font-black tracking-wider leading-none">3D</span>
-                </button>
-                <button
-                    onClick={toggleTerrain}
-                    className={`w-10 h-10 flex items-center justify-center transition-colors active:bg-slate-200 rounded-none outline-none ${isTerrainActive
-                            ? 'bg-teal-600 text-white hover:bg-teal-700'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-teal-700'
-                        }`}
-                    title={isTerrainActive ? 'Nonaktifkan 3D Terrain' : 'Aktifkan 3D Terrain'}
-                >
-                    <Mountain size={18} strokeWidth={2.5} />
                 </button>
             </div>
 

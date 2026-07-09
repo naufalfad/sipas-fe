@@ -4,9 +4,8 @@ import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 
 export default function ZoningHorizontalLegend() {
-    const { 
+    const {
         activeLayers, activePanels, mapZoom, mapPitch, mapBearing, cursorCoords,
-        is3DMode, toggle3DMode, isTerrainActive, toggleTerrain 
     } = useGisUIStore();
     const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -27,11 +26,11 @@ export default function ZoningHorizontalLegend() {
     if (!isZoningActive) return null;
 
     const zoningSpectrum = [
-        { label: "Kawasan Hunian",  range: "Permukiman",  color: "#0d9488", text: "text-white" },
+        { label: "Kawasan Hunian", range: "Permukiman", color: "#0d9488", text: "text-white" },
         { label: "Kawasan Lindung", range: "Hutan & RTH", color: "#16a34a", text: "text-white" },
-        { label: "Sempadan Sungai", range: "Buffer 25m",  color: "#2563eb", text: "text-white" },
-        { label: "Sempadan SUTET",  range: "Buffer Rel",  color: "#eab308", text: "text-slate-900" },
-        { label: "Zona Industri",   range: "Komersial",   color: "#ca1d45", text: "text-white" },
+        { label: "Sempadan Sungai", range: "Buffer 25m", color: "#2563eb", text: "text-white" },
+        { label: "Sempadan SUTET", range: "Buffer Rel", color: "#eab308", text: "text-slate-900" },
+        { label: "Zona Industri", range: "Komersial", color: "#ca1d45", text: "text-white" },
     ];
 
     const leftSidebarWidth = 64;
@@ -52,8 +51,8 @@ export default function ZoningHorizontalLegend() {
 
     const smoothGradientBackground = `linear-gradient(to right, ${colorStops})`;
 
-    const triggerZoomIn   = () => window.dispatchEvent(new Event("map-zoom-in"));
-    const triggerZoomOut  = () => window.dispatchEvent(new Event("map-zoom-out"));
+    const triggerZoomIn = () => window.dispatchEvent(new Event("map-zoom-in"));
+    const triggerZoomOut = () => window.dispatchEvent(new Event("map-zoom-out"));
     const triggerResetView = () => window.dispatchEvent(new Event("map-reset-view"));
 
     const zoomLabel = mapZoom < 10 ? "KAB." : mapZoom < 14 ? "KEC." : "DETAIL";
@@ -131,33 +130,12 @@ export default function ZoningHorizontalLegend() {
                         ))}
                     </div>
 
-                    {/* Tombol Control Peta (Zoom + 3D/Terrain) */}
+                    {/* Tombol Control Peta (Zoom) */}
                     <div className="hidden md:flex bg-slate-900 text-slate-300 select-none divide-x divide-white/10 shrink-0 border-l border-slate-700">
-                        <button onClick={triggerZoomIn}   className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Plus size={13} strokeWidth={3} /></button>
+                        <button onClick={triggerZoomIn} className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Plus size={13} strokeWidth={3} /></button>
                         <button onClick={triggerResetView} className="w-11 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Maximize2 size={11} strokeWidth={3} /></button>
-                        <button onClick={triggerZoomOut}  className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Minus size={13} strokeWidth={3} /></button>
-                        
-                        <button
-                            onClick={toggle3DMode}
-                            className={cn(
-                                "w-10 h-full flex items-center justify-center transition-colors duration-150 outline-none cursor-pointer rounded-none text-[10px] font-black tracking-wider",
-                                is3DMode ? "bg-teal-600 text-white" : "hover:bg-teal-600 hover:text-white"
-                            )}
-                            title={is3DMode ? 'Beralih ke Tampilan Flat 2D' : 'Beralih ke Tampilan 3D Imersif'}
-                        >
-                            3D
-                        </button>
-                        
-                        <button
-                            onClick={toggleTerrain}
-                            className={cn(
-                                "w-10 h-full flex items-center justify-center transition-colors duration-150 outline-none cursor-pointer rounded-none",
-                                isTerrainActive ? "bg-teal-600 text-white" : "hover:bg-teal-600 hover:text-white"
-                            )}
-                            title={isTerrainActive ? 'Nonaktifkan 3D Terrain' : 'Aktifkan 3D Terrain'}
-                        >
-                            <Mountain size={12} strokeWidth={3} />
-                        </button>
+                        <button onClick={triggerZoomOut} className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Minus size={13} strokeWidth={3} /></button>
+
                     </div>
                 </div>
             )}

@@ -1,16 +1,13 @@
 /**
  * ============================================================================
- * GIS POLYGON LAYER — MapLibre Wrapper
+ * GIS POLYGON LAYER — Leaflet Wrapper
  * ============================================================================
- * Migrasi dari: react-leaflet Polygon + Popup
- * Migrasi ke  : react-map-gl/maplibre Source + Layer
- *
- * Komponen generik untuk merender sekumpulan poligon di atas peta.
- * HARUS dirender sebagai children dari <Map> (GISMapContainer atau SipasMap).
+ * Komponen generik untuk merender sekumpulan poligon di atas peta Leaflet.
+ * HARUS dirender sebagai children dari <MapContainer> atau GISMapContainer.
  * ============================================================================
  */
 
-import { Source, Layer, Popup } from 'react-map-gl/maplibre';
+import { GeoJSON, Popup } from 'react-leaflet';
 import { useState, useMemo } from 'react';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 
@@ -74,33 +71,29 @@ export default function GISPolygonLayer({ data }: GISPolygonLayerProps) {
 
     return (
         <>
-            <Source id="gis-polygons" type="geojson" data={geojson as any} generateId={true}>
-                <Layer
-                    id="gis-polygon-fill"
-                    type="fill"
-                    paint={{
-                        'fill-color': ['get', 'color'],
-                        'fill-opacity': 0.25,
-                    }}
-                />
-                <Layer
-                    id="gis-polygon-outline"
-                    type="line"
-                    paint={{
-                        'line-color': ['get', 'color'],
-                        'line-width': 2.5,
-                        'line-opacity': 1,
-                    }}
-                />
-            </Source>
+            <GeoJSON
+                key={JSON.stringify(data.map(d => d.id))}
+                data={geojson as any}
+                style={(feature) => ({
+                    color: feature?.properties?.color || '#0d9488',
+                    fillColor: feature?.properties?.color || '#0d9488',
+                    fillOpacity: 0.25,
+                    weight: 2.5,
+                    opacity: 1,
+                })}
+                onEachFeature={(feature, layer) => {
+                    layer.on('click', () => {
+                        setActiveId(
+                            feature.properties?.id === activeId ? null : feature.properties?.id
+                        );
+                    });
+                }}
+            />
 
             {activePolygon && centroid && (
                 <Popup
-                    longitude={centroid.lng}
-                    latitude={centroid.lat}
-                    anchor="top"
+                    position={[centroid.lat, centroid.lng]}
                     onClose={() => setActiveId(null)}
-                    closeButton={true}
                 >
                     <div className="p-1 space-y-1.5 text-xs min-w-[160px]">
                         <h4 className="font-bold text-slate-800 text-sm leading-tight">

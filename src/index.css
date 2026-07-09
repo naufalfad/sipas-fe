@@ -197,3 +197,38 @@
   background-color: rgba(239, 68, 68, 0.15);
   animation: sonar-wave-expand 1.2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
 }
+
+/* ─── LEAFLET OVERRIDES ─────────────────────────────────────────────────────── */
+
+/* Remove default Leaflet attribution bottom-right box clutter */
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  opacity: 0.6;
+}
+
+/* Custom Leaflet popup — remove default chrome (tip, padding, border) */
+.leaflet-popup-content-wrapper {
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18) !important;
+  border: none !important;
+}
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4;
+}
+.leaflet-popup-tip-container {
+  display: none !important;
+}
+.leaflet-popup-close-button {
+  display: none !important;
+}
+.sipas-popup .leaflet-popup-content-wrapper {
+  overflow: hidden;
+}
+
+/* Sonar animation for conflict divIcon HTML */
+@keyframes sonarRipple {
+  0%   { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}

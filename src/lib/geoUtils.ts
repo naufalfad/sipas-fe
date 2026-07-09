@@ -67,6 +67,47 @@ export function leafletRingToGeoJSON(ring: LeafletCoord[]): GeoJSONCoord[] {
 }
 
 /**
+ * Hitung centroid untuk ring poligon Leaflet [lat,lng].
+ * Menggunakan formula centroid poligon sesuai area (shoelace).
+ * Mengembalikan null jika poligon tidak valid atau area nol.
+ */
+export function polygonCentroid(ring: LeafletCoord[]): LeafletCoord | null {
+    if (ring.length < 3) return null;
+
+    const points = ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+        ? ring.slice(0, ring.length - 1)
+        : ring;
+
+    let area = 0;
+    let centroidX = 0;
+    let centroidY = 0;
+
+    for (let i = 0; i < points.length; i += 1) {
+        const [lat1, lng1] = points[i];
+        const [lat2, lng2] = points[(i + 1) % points.length];
+
+        const x1 = lng1;
+        const y1 = lat1;
+        const x2 = lng2;
+        const y2 = lat2;
+        const cross = x1 * y2 - x2 * y1;
+
+        area += cross;
+        centroidX += (x1 + x2) * cross;
+        centroidY += (y1 + y2) * cross;
+    }
+
+    area *= 0.5;
+    if (Math.abs(area) < Number.EPSILON) return null;
+
+    const factor = 1 / (6 * area);
+    const centroidLng = centroidX * factor;
+    const centroidLat = centroidY * factor;
+
+    return [centroidLat, centroidLng];
+}
+
+/**
  * Konversi sebuah ring poligon dari format GeoJSON ke Leaflet.
  */
 export function geoJSONRingToLeaflet(ring: GeoJSONCoord[]): LeafletCoord[] {
@@ -86,7 +127,7 @@ export function leafletPolygonToGeoJSON(rings: LeafletCoord[][]): GeoJSONCoord[]
 // ─── Kalkulasi Ketinggian Bangunan ─────────────────────────────────────────────
 
 const DEFAULT_HEIGHT_METERS = 30;
-const FLOOR_HEIGHT_METERS   = 8;
+const FLOOR_HEIGHT_METERS = 8;
 
 /**
  * Hitung tinggi bangunan fill-extrusion dalam meter berdasarkan KLB.
@@ -110,14 +151,14 @@ export function calcExtrusionHeight(submission: Submission): number {
  */
 export function resolveStatusColor(status: Submission['status']): string {
     switch (status) {
-        case 'Disetujui':               return '#10b981'; // emerald-500
-        case 'Ditolak':                 return '#ef4444'; // red-500
-        case 'Verifikasi Teknis':       return '#6366f1'; // indigo-500
+        case 'Disetujui': return '#10b981'; // emerald-500
+        case 'Ditolak': return '#ef4444'; // red-500
+        case 'Verifikasi Teknis': return '#6366f1'; // indigo-500
         case 'Verifikasi Administrasi': return '#3b82f6'; // blue-500
-        case 'Menunggu Verifikasi':     return '#f59e0b'; // amber-500
-        case 'Menunggu Persetujuan':    return '#8b5cf6'; // violet-500
-        case 'Proses TTE':              return '#db2777'; // pink-600
-        default:                        return '#64748b'; // slate-500
+        case 'Menunggu Verifikasi': return '#f59e0b'; // amber-500
+        case 'Menunggu Persetujuan': return '#8b5cf6'; // violet-500
+        case 'Proses TTE': return '#db2777'; // pink-600
+        default: return '#64748b'; // slate-500
     }
 }
 

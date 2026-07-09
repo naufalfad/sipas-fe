@@ -1,14 +1,6 @@
 import { memo } from 'react';
-import { Marker } from 'react-map-gl/maplibre';
-
-interface ProcessedSubmission {
-  id: string;
-  color: string;
-  location: {
-    lng: number;
-    lat: number;
-  };
-}
+import { Marker } from 'react-leaflet';
+import L from 'leaflet';
 
 interface PinMarkerProps {
   sub: any;
@@ -22,22 +14,40 @@ export const PinMarker = memo(function PinMarker({
   sub, isSelected, sizeBase = 28, onClickPin, onShowPopup,
 }: PinMarkerProps) {
   const size = isSelected ? sizeBase + 4 : sizeBase;
+  const boxShadow = isSelected
+    ? `0 0 0 3px ${sub.color},0 4px 16px rgba(0,0,0,0.5)`
+    : '0 2px 8px rgba(0,0,0,0.3)';
+
+  const icon = L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${sub.color};
+      border:3px solid #fff;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      box-shadow:${boxShadow};
+      cursor:pointer;
+      transition:all 0.15s ease;
+    "></div>`,
+  });
+
+  // Gunakan centroid polygon jika tersedia, fallback ke location.lat/lng
+  const lat = sub.centroidLat ?? sub.location.lat;
+  const lng = sub.centroidLng ?? sub.location.lng;
+
   return (
-    <Marker longitude={sub.location.lng} latitude={sub.location.lat} anchor="bottom"
-      onClick={(e) => {
-        e.originalEvent.stopPropagation();
-        onShowPopup(sub);
-        onClickPin(sub);
-      }}>
-      <div style={{
-        width: size, height: size, background: sub.color,
-        border: '3px solid #fff',
-        borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)',
-        boxShadow: isSelected
-          ? `0 0 0 3px ${sub.color}, 0 4px 16px rgba(0,0,0,0.5)`
-          : '0 2px 8px rgba(0,0,0,0.3)',
-        cursor: 'pointer', transition: 'all 0.15s ease',
-      }} />
-    </Marker>
+    <Marker
+      position={[lat, lng]}
+      icon={icon}
+      eventHandlers={{
+        click: () => {
+          onShowPopup(sub);
+          onClickPin(sub);
+        },
+      }}
+    />
   );
 });

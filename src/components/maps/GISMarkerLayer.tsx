@@ -1,21 +1,19 @@
 /**
  * ============================================================================
- * GIS MARKER LAYER — MapLibre Wrapper
+ * GIS MARKER LAYER — Leaflet Wrapper
  * ============================================================================
- * Migrasi dari: react-leaflet Marker + Popup
- * Migrasi ke  : react-map-gl/maplibre Marker + Popup
- *
- * Komponen generik untuk merender sekumpulan marker di atas peta.
- * HARUS dirender sebagai children dari <Map> (GISMapContainer atau SipasMap).
+ * Komponen generik untuk merender sekumpulan marker di atas peta Leaflet.
+ * HARUS dirender sebagai children dari <MapContainer> atau GISMapContainer.
  * ============================================================================
  */
 
-import { Marker, Popup } from 'react-map-gl/maplibre';
+import { Marker, Popup } from 'react-leaflet';
 import { useState } from 'react';
+import L from 'leaflet';
 
 export interface GISMarkerData {
     id: string;
-    /** Format [latitude, longitude] — konsisten dengan data historis */
+    /** Format [latitude, longitude] */
     position: [number, number];
     housingName: string;
     developerName: string;
@@ -33,55 +31,43 @@ export default function GISMarkerLayer({ data, markerColor = '#14b8a6' }: GISMar
     return (
         <>
             {data.map((marker) => {
-                const [lat, lng] = marker.position; // Konversi dari format [lat,lng] ke MapLibre
+                const [lat, lng] = marker.position;
+                const icon = L.divIcon({
+                    className: '',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 24],
+                    html: `<div style="
+                        width:24px;height:24px;
+                        background:${markerColor};
+                        border:3px solid #fff;
+                        border-radius:50% 50% 50% 0;
+                        transform:rotate(-45deg);
+                        box-shadow:0 2px 8px rgba(0,0,0,0.3);
+                        cursor:pointer;
+                    "></div>`,
+                });
+
                 return (
                     <Marker
                         key={marker.id}
-                        longitude={lng}
-                        latitude={lat}
-                        anchor="bottom"
-                        onClick={(e) => {
-                            e.originalEvent.stopPropagation();
-                            setActiveId(marker.id === activeId ? null : marker.id);
+                        position={[lat, lng]}
+                        icon={icon}
+                        eventHandlers={{
+                            click: () => setActiveId(marker.id === activeId ? null : marker.id),
                         }}
                     >
-                        <div
-                            style={{
-                                width: 24,
-                                height: 24,
-                                background: markerColor,
-                                border: '3px solid #fff',
-                                borderRadius: '50% 50% 50% 0',
-                                transform: 'rotate(-45deg)',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                                cursor: 'pointer',
-                            }}
-                        />
+                        {activeId === marker.id && (
+                            <Popup onClose={() => setActiveId(null)}>
+                                <div className="p-1 space-y-1 text-xs min-w-[160px]">
+                                    <h4 className="font-bold text-slate-800 text-sm leading-tight">{marker.housingName}</h4>
+                                    <p className="text-slate-500 font-medium">{marker.developerName}</p>
+                                    <p className="text-slate-400 leading-relaxed mt-1 max-w-[180px]">{marker.address}</p>
+                                </div>
+                            </Popup>
+                        )}
                     </Marker>
                 );
             })}
-
-            {activeId && (() => {
-                const m = data.find(d => d.id === activeId);
-                if (!m) return null;
-                const [lat, lng] = m.position;
-                return (
-                    <Popup
-                        longitude={lng}
-                        latitude={lat}
-                        anchor="bottom"
-                        offset={[0, -28]}
-                        onClose={() => setActiveId(null)}
-                        closeButton={true}
-                    >
-                        <div className="p-1 space-y-1 text-xs min-w-[160px]">
-                            <h4 className="font-bold text-slate-800 text-sm leading-tight">{m.housingName}</h4>
-                            <p className="text-slate-500 font-medium">{m.developerName}</p>
-                            <p className="text-slate-400 leading-relaxed mt-1 max-w-[180px]">{m.address}</p>
-                        </div>
-                    </Popup>
-                );
-            })()}
         </>
     );
 }

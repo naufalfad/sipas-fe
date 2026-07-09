@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Landmark, MapPin } from 'lucide-react';
-import { Source, Layer } from 'react-map-gl/maplibre';
+import { GeoJSON } from 'react-leaflet';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 
@@ -189,47 +189,31 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
               >
                 {/* Render Outer Boundary */}
                 {outerBoundaryGeoJSON && (
-                  <Source id="outer-boundary" type="geojson" data={outerBoundaryGeoJSON}>
-                    <Layer
-                      id="outer-boundary-line"
-                      type="line"
-                      paint={{
-                        'line-color': '#ef4444',
-                        'line-width': 2.5,
-                        'line-dasharray': [2, 2]
-                      }}
-                    />
-                    <Layer
-                      id="outer-boundary-fill"
-                      type="fill"
-                      paint={{
-                        'fill-color': '#ef4444',
-                        'fill-opacity': 0.08
-                      }}
-                    />
-                  </Source>
+                  <GeoJSON
+                    key="outer-boundary"
+                    data={outerBoundaryGeoJSON}
+                    style={{
+                      color: '#ef4444',
+                      weight: 2.5,
+                      dashArray: '6 4',
+                      fillColor: '#ef4444',
+                      fillOpacity: 0.08,
+                    }}
+                  />
                 )}
 
-                {/* Render Site Plan AutoCAD Vectors */}
+                {/* Render Site Plan Vectors */}
                 {siteplanFeaturesGeoJSON.features.length > 0 && (
-                  <Source id="siteplan-features" type="geojson" data={siteplanFeaturesGeoJSON}>
-                    <Layer
-                      id="siteplan-features-fill"
-                      type="fill"
-                      paint={{
-                        'fill-color': ['get', 'color'],
-                        'fill-opacity': 0.65
-                      }}
-                    />
-                    <Layer
-                      id="siteplan-features-line"
-                      type="line"
-                      paint={{
-                        'line-color': '#ffffff',
-                        'line-width': 1
-                      }}
-                    />
-                  </Source>
+                  <GeoJSON
+                    key="siteplan-features"
+                    data={siteplanFeaturesGeoJSON}
+                    style={(feature) => ({
+                      color: '#ffffff',
+                      weight: 1,
+                      fillColor: feature?.properties?.color || '#0d9488',
+                      fillOpacity: 0.65,
+                    })}
+                  />
                 )}
               </GISMapContainer>
             ) : (

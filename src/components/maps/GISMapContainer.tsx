@@ -1,39 +1,16 @@
 /**
  * ============================================================================
- * GIS MAP CONTAINER — MapLibre GL JS Wrapper
+ * GIS MAP CONTAINER — Leaflet Wrapper
  * ============================================================================
- * Migrasi dari: react-leaflet MapContainer
- * Migrasi ke  : react-map-gl/maplibre Map
- *
- * Komponen pembungkus peta generik. Digunakan oleh form pengajuan dan
- * komponen lain yang membutuhkan peta embedding ringan (bukan GISPage utama).
+ * Komponen pembungkus peta generik berbasis Leaflet.
+ * Digunakan oleh form pengajuan dan komponen lain yang membutuhkan
+ * peta embedding ringan (bukan GISPage utama).
  * ============================================================================
  */
 
-import React, { useRef, useEffect } from 'react';
-import Map, { type MapRef } from 'react-map-gl/maplibre';
-import type { StyleSpecification } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
-const DEFAULT_STYLE: StyleSpecification = {
-    version: 8,
-    sources: {
-        'osm': {
-            type: 'raster',
-            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors',
-            maxzoom: 18,
-        },
-    },
-    layers: [{ id: 'osm-layer', type: 'raster', source: 'osm' }],
-    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
-} as StyleSpecification;
-
-const REGIONAL_BOUNDS: [[number, number], [number, number]] = [
-    [90.0, -15.0], // Southwest: [lng, lat]
-    [150.0, 15.0], // Northeast: [lng, lat]
-];
+import React from 'react';
+import { MapContainer, TileLayer } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface GISMapContainerProps {
     /** Pusat awal peta dalam format [latitude, longitude] */
@@ -49,40 +26,25 @@ export default function GISMapContainer({
     children,
     className = 'w-full h-full rounded-xl shadow-inner border border-slate-200',
 }: GISMapContainerProps) {
-    const mapRef = useRef<MapRef>(null);
-
-    // ── WebGL Context Cleanup ──
-    // Memanggil map.remove() secara eksplisit saat unmount untuk membebaskan WebGL context secara instan.
-    useEffect(() => {
-        return () => {
-            try {
-                mapRef.current?.getMap()?.remove();
-            } catch {
-                // Abaikan jika map sudah dihancurkan oleh React
-            }
-        };
-    }, []);
-
     return (
         <div className={className} style={{ width: '100%', height: '100%' }}>
-            <Map
-                ref={mapRef}
-                id="gis-map-container"
-                mapLib={import('maplibre-gl')}
-                mapStyle={DEFAULT_STYLE}
-                initialViewState={{
-                    longitude: center[1], // GeoJSON format: [lng, lat]
-                    latitude: center[0],
-                    zoom,
-                }}
-                style={{ width: '100%', height: '100%' }}
+            <MapContainer
+                center={center}
+                zoom={zoom}
+                minZoom={4}
                 maxZoom={22}
-                pitchWithRotate={false}
-                renderWorldCopies={false}
-                maxBounds={REGIONAL_BOUNDS}
+                zoomControl={false}
+                style={{ width: '100%', height: '100%' }}
+                maxBounds={[[-15, 90], [15, 150]]}
+                maxBoundsViscosity={1.0}
             >
+                <TileLayer
+                    url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                    maxZoom={18}
+                />
                 {children}
-            </Map>
+            </MapContainer>
         </div>
     );
 }

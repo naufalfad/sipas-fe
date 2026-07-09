@@ -22,14 +22,14 @@ interface ValidationRow {
 }
 
 const getStatusBadgeClass = (status: string) => {
-  switch (status) {
-    case 'Disetujui':
-      return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
-    case 'Ditolak':
-      return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
-    default:
-      return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
-  }
+    switch (status) {
+        case 'Disetujui':
+            return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
+        case 'Ditolak':
+            return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
+        default:
+            return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
+    }
 };
 
 export default function DetailSubmissionPanel({ submissionData }: DetailSubmissionPanelProps) {
@@ -299,16 +299,8 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     )}
                 </div>
 
-                {/* --- TOMBOL KONSOL 3D CAD/BIM INTERAKTIF (GFW LIGHT NEOMORPHIC STYLE) --- */}
-                <div className="px-4 py-3 border-b border-slate-100">
-                    <button
-                        type="button"
-                        onClick={() => navigate(`/gis/bim/${submissionData.id}`)}
-                        className="w-full h-10 bg-slate-900 hover:bg-teal-600 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 transition-all cursor-pointer outline-none"
-                    >
-                        <RotateCw size={13} className="animate-spin-slow text-teal-400" />
-                        <span>[ KONSOL 3D ] TINJAU SITE PLAN</span>
-                    </button>
+                <div className="px-4 py-3 border-b border-slate-100 bg-yellow-50 text-yellow-800 text-xs font-semibold uppercase tracking-wider">
+                    3D BIM viewer dinonaktifkan sementara. Fitur 3D sedang dalam pengembangan.
                 </div>
 
                 {/* STREAMING_CHUNK:Rendering high-density loss parameters comparison ledger */}
