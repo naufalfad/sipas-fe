@@ -245,7 +245,12 @@ function MapController({
         compensationGeoJSON={mapData.compensationGeoJSON}
         clashGeoJSON={mapData.clashGeoJSON}
         onSubmissionClick={(id, sub) => {
-          onMarkerClick(sub);
+          const fullSub = mapData.processedSubmissions.find((p) => p.id === id);
+          if (fullSub) {
+            onMarkerClick(fullSub);
+          } else {
+            onMarkerClick(sub);
+          }
         }}
       />
 
