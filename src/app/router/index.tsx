@@ -7,6 +7,7 @@ import SubmissionListPage from '@/features/submission/pages/SubmissionListPage';
 import SubmissionCreatePage from '@/features/submission/pages/SubmissionCreatePage';
 import SubmissionDetailPage from '@/features/submission/pages/SubmissionDetailPage';
 import SubmissionVerificationPage from '@/features/submission/pages/SubmissionVerificationPage';
+import SubmissionPreviewTelaahPage from '@/features/submission/pages/SubmissionPreviewTelaahPage'; // Halaman Baru (Fase 2)
 import SitePlanListPage from '@/features/siteplan/pages/SitePlanListPage';
 import SitePlanDetailPage from '@/features/siteplan/pages/SitePlanDetailPage';
 import VerificationPage from '@/features/verification/pages/VerificationPage';
@@ -102,6 +103,15 @@ export const router = createBrowserRouter([
               </ProtectedRoute>
             ),
           },
+          // ─── BARU: HALAMAN PREVIEW & SUBMIT TELAAH STAF (Fase 2) ───
+          {
+            path: 'verifikasi/:id/preview-telaah',
+            element: (
+              <ProtectedRoute allowedRoles={['Tim Teknis', 'Super Admin']}>
+                <SubmissionPreviewTelaahPage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -134,9 +144,9 @@ export const router = createBrowserRouter([
       {
         path: 'persetujuan',
         element: (
-          // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Bidang PUPR.
-          // Tidak ada peran lain, termasuk Super Admin, yang dapat mengakses halaman ini.
-          <ProtectedRoute allowedRoles={['Kepala Bidang']}>
+          // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Dinas (Kadis).
+          // Tidak ada peran lain, termasuk Super Admin, yang dapat mengakses rute ini.
+          <ProtectedRoute allowedRoles={['Kadis']}>
             <ApprovalQueuePage />
           </ProtectedRoute>
         ),
@@ -191,7 +201,7 @@ export const router = createBrowserRouter([
   {
     path: '/gis',
     element: (
-      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin']}>
         <GISPage />
       </ProtectedRoute>
     ),
@@ -199,7 +209,7 @@ export const router = createBrowserRouter([
   {
     path: '/gis/bim/:id',
     element: (
-      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin']}>
+      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin']}>
         <BimViewerPage />
       </ProtectedRoute>
     ),

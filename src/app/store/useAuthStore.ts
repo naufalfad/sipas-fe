@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 export interface UserAuthProfile {
+  id?: number; // Tambahan (Fase 1): Penjajakan ID unik pengguna dari database backend
   username: string;
   email: string;
   full_name: string;

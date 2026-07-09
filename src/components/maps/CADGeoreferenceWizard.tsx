@@ -100,11 +100,19 @@ export default function CADGeoreferenceWizard({
             geometry: {
                 type: 'Polygon' as const,
                 coordinates: [[
-                    [106.8160, -6.5945],
-                    [106.8175, -6.5945],
-                    [106.8175, -6.5960],
-                    [106.8160, -6.5960],
-                    [106.8160, -6.5945]
+                    [106.8400, -6.4800],
+                    [106.8413, -6.4798],
+                    [106.8414, -6.4804],
+                    [106.8422, -6.4802],
+                    [106.8420, -6.4793],
+                    [106.8426, -6.4789],
+                    [106.8417, -6.4785],
+                    [106.8410, -6.4789],
+                    [106.8407, -6.4787],
+                    [106.8396, -6.4791],
+                    [106.8398, -6.4795],
+                    [106.8394, -6.4797],
+                    [106.8400, -6.4800]
                 ]]
             },
             properties: {}
@@ -165,12 +173,21 @@ export default function CADGeoreferenceWizard({
             try {
                 const result = solveHelmert2D(c1, c2, m1, m2);
 
-                // Menghasilkan poligon akhir yang ter-georeference dalam standard GeoJSON [Longitude, Latitude]
+                // Menghasilkan poligon akhir yang ter-georeference dalam standard GeoJSON [Longitude, Latitude] secara acak/irregular
+                const dx = m2[0] - m1[0];
+                const dy = m2[1] - m1[1];
                 const calibratedPolygon: [number, number][] = [
                     [m1[0], m1[1]],
-                    [m2[0], m1[1]],
-                    [m2[0], m2[1]],
-                    [m1[0], m2[1]],
+                    [m1[0] + dx * 0.4, m1[1] + dy * 0.1],
+                    [m1[0] + dx * 0.5, m1[1] + dy * 0.6],
+                    [m1[0] + dx * 0.9, m1[1] + dy * 0.5],
+                    [m1[0] + dx * 0.8, m1[1] + dy * 0.8],
+                    [m1[0] + dx * 1.1, m1[1] + dy * 1.0],
+                    [m1[0] + dx * 0.7, m1[1] + dy * 1.2],
+                    [m1[0] + dx * 0.3, m1[1] + dy * 0.9],
+                    [m1[0] + dx * 0.1, m1[1] + dy * 0.7],
+                    [m1[0] - dx * 0.2, m1[1] + dy * 0.4],
+                    [m1[0] - dx * 0.1, m1[1] + dy * 0.2],
                     [m1[0], m1[1]]
                 ];
 
@@ -235,7 +252,7 @@ export default function CADGeoreferenceWizard({
                             Peta Spasial Target (WGS 84 / GIS)
                         </div>
 
-                        <GISMapContainer center={[-6.595189, 106.816629]} zoom={16}>
+                        <GISMapContainer center={[-6.4800, 106.8400]} zoom={16}>
                             {/* Batas Bidang Tanah Target */}
                             <Source id="target-boundary" type="geojson" data={targetBoundaryGeoJSON}>
                                 <Layer
@@ -251,14 +268,14 @@ export default function CADGeoreferenceWizard({
 
                             {/* Titik Anchor Interaktif 1 di Peta */}
                             <Marker
-                                longitude={106.8160}
-                                latitude={-6.5945}
+                                longitude={106.8400}
+                                latitude={-6.4800}
                                 anchor="center"
                             >
                                 <button
                                     type="button"
                                     disabled={step !== 1 || !point1.cadCoords}
-                                    onClick={() => handleSelectMapPoint(1, 106.8160, -6.5945)}
+                                    onClick={() => handleSelectMapPoint(1, 106.8400, -6.4800)}
                                     className={cn(
                                         "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
                                         point1.mapCoords
@@ -272,14 +289,14 @@ export default function CADGeoreferenceWizard({
 
                             {/* Titik Anchor Interaktif 2 di Peta */}
                             <Marker
-                                longitude={106.8175}
-                                latitude={-6.5960}
+                                longitude={106.8415}
+                                latitude={-6.4815}
                                 anchor="center"
                             >
                                 <button
                                     type="button"
                                     disabled={step !== 2 || !point2.cadCoords}
-                                    onClick={() => handleSelectMapPoint(2, 106.8175, -6.5960)}
+                                    onClick={() => handleSelectMapPoint(2, 106.8415, -6.4815)}
                                     className={cn(
                                         "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
                                         point2.mapCoords

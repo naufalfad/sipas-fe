@@ -4,7 +4,13 @@ import { API_BASE_URL } from '@/config';
 
 // ─── DEFINISI TIPE & ANTARMUKA MODULAR ──────────────────────────────────────────
 
-export type UserRole = 'Pemohon' | 'Admin SIPAS' | 'Tim Teknis' | 'Kepala Bidang' | 'Super Admin';
+export type UserRole =
+  | 'Pemohon'
+  | 'Admin SIPAS'
+  | 'Tim Teknis'
+  | 'Kepala Bidang'
+  | 'Kadis'          // Peran Baru: Otoritas Utama Penandatangan Elektronik (TTE) SK Resmi
+  | 'Super Admin';
 
 export interface UserProfile {
   name: string;
@@ -20,20 +26,22 @@ export interface AuditTrailEntry {
   actorName: string;
   role: UserRole;
   action:
-  | 'SUBMIT_UNIFIED_FORM'        // Submit permohonan gabungan awal
-  | 'VERIFY_ADMIN_APPROVED'      // Lolos verifikasi berkas legalitas
-  | 'VERIFY_ADMIN_REJECTED'      // Dikembalikan karena cacat administrasi
-  | 'VERIFY_TECHNICAL_APPROVED'  // Lolos audit spasial live Turf.js
-  | 'VERIFY_TECHNICAL_REJECTED'  // Dikembalikan karena melanggar sempadan/KDB
-  | 'REGISTER_DISPENSASI'        // Pendaftaran jaminan kompensasi oleh petugas
-  | 'APPROVE_KABID_TTE'          // Pembubuhan TTE dinas resmi oleh KABID
-  | 'SIGN_BUPATI_TTE'            // TTE khusus sekala besar (Master Plan)
-  | 'FORCE_BYPASS_WARNING';      // Jejak audit jika petugas menimpa peringatan sistem
+  | 'SUBMIT_UNIFIED_FORM'          // Pengajuan Dokumen
+  | 'VERIFY_ADMIN_APPROVED'        // Verifikasi Administrasi (Lolos)
+  | 'VERIFY_ADMIN_REJECTED'        // Verifikasi Administrasi (Ditolak)
+  | 'VERIFY_TECHNICAL_APPROVED'    // Verifikasi Teknis (Lolos/Kirim draf)
+  | 'VERIFY_TECHNICAL_REJECTED'    // Verifikasi Teknis (Ditolak/Revisi)
+  | 'REGISTER_DISPENSASI'          // Pendaftaran jaminan kompensasi oleh petugas
+  | 'KABID_ENDORSE_APPROVE'        // Draft SK Persetujuan Siteplan (Disetujui Kabid)
+  | 'KABID_OVERRIDE_VETO'          // Draft SK Persetujuan Siteplan (Override Veto Kabid)
+  | 'APPROVE_KADIS_TTE'            // Permohonan Disetujui (SK Terbit oleh Kadis via BSrE)
+  | 'FORCE_BYPASS_WARNING'         // Jejak audit jika petugas menimpa peringatan sistem
+  | 'UNKNOWN';
   statusBefore: string;
   statusAfter: string;
   notes: string;                   // Justifikasi/pesan audit
-  ipAddress: string;               // Simulasi keamanan alamat jaringan
-  digitalSignatureHash?: string;   // Simulasi enkripsi hash dari BSrE API
+  ipAddress: string;               // Keamanan alamat jaringan
+  digitalSignatureHash?: string;   // Enkripsi hash resmi hasil respons BSrE API
 }
 
 interface UIState {
@@ -80,6 +88,11 @@ const roleProfiles: Record<UserRole, UserProfile> = {
     email: 'hendra.kabid@sipas.go.id',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces',
   },
+  'Kadis': {
+    name: 'Drs. H. Mulyana, M.Si. (Kadis)',
+    email: 'mulyana.kadis@sipas.go.id',
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop&crop=faces',
+  },
   'Super Admin': {
     name: 'Admin Utama (Super Admin)',
     email: 'superadmin@sipas.go.id',
@@ -101,12 +114,12 @@ export const useUIStore = create<UIState>((set) => ({
       id: 'audit-log-101',
       submissionId: 'sub-4',
       timestamp: '2026-06-14T09:30:00Z',
-      actorName: 'Dr. Hendra Wijaya (Kabid)',
-      role: 'Kepala Bidang',
-      action: 'APPROVE_KABID_TTE',
-      statusBefore: 'Menunggu Persetujuan',
+      actorName: 'Drs. H. Mulyana, M.Si. (Kadis)',
+      role: 'Kadis',
+      action: 'APPROVE_KADIS_TTE',
+      statusBefore: 'Proses TTE',
       statusAfter: 'Disetujui',
-      notes: 'Dokumen site plan dinilai lengkap secara teknis dan legalitas. TTE Dinas resmi terbit.',
+      notes: 'SK Site Plan resmi disahkan & diterbitkan oleh Kepala Dinas. Kode TTE tersemat legal.',
       ipAddress: '10.252.120.45',
       digitalSignatureHash: 'sha256-8f3e5b12a9c148dfa5070032111690a1dd7228f2d...'
     },
@@ -119,7 +132,7 @@ export const useUIStore = create<UIState>((set) => ({
       action: 'VERIFY_TECHNICAL_REJECTED',
       statusBefore: 'Verifikasi Teknis',
       statusAfter: 'Ditolak',
-      notes: 'Rencana jalan komplek melanggar garis sempadan sungai Cipakancilan sejauh 5 meter. Berkas ditolak.',
+      notes: 'Rencana jalan komplek melanggar garis sempadan sungai Cipakancilan sejauh 5 meter. Berkas dikembalikan.',
       ipAddress: '10.252.120.89'
     }
   ],
@@ -135,6 +148,7 @@ export const useUIStore = create<UIState>((set) => ({
     else if (role === 'Admin SIPAS') username = 'admin@geocitra.com';
     else if (role === 'Tim Teknis') username = 'tim_teknis@geocitra.com';
     else if (role === 'Kepala Bidang') username = 'kabid@geocitra.com';
+    else if (role === 'Kadis') username = 'kadis@geocitra.com'; // Sinkronisasi ke kredensial KADIS di seeder
     else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
 
     try {
@@ -148,7 +162,7 @@ export const useUIStore = create<UIState>((set) => ({
       });
       if (response.ok) {
         const data = await response.json();
-        // Update useAuthStore
+        // Update useAuthStore secara transaksional
         useAuthStore.getState().login(data.access_token, data.user);
         console.log(`[useUIStore] Berhasil sinkronisasi login JWT untuk role: ${role}`);
       }
@@ -164,7 +178,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   setUserProfile: (profile) => set({ userProfile: profile }),
 
-  // ── Implementasi Actions: Audit Trail Logging [Bogor 7] ──────────────────
+  // ── Actions: Audit Trail Logging [Bogor 7] ────────────────────────────────
 
   addAuditLog: (entry) => set((state) => {
     // Generate mock properties untuk kelengkapan audit
@@ -175,7 +189,7 @@ export const useUIStore = create<UIState>((set) => ({
     const mockIp = entry.role === 'Pemohon' ? '180.252.14.120' : '10.252.120.103';
 
     // Generate tanda tangan enkripsi hash tiruan jika merupakan tindakan persetujuan TTE BSrE [Bogor 7]
-    const isSigningAction = ['APPROVE_KABID_TTE', 'SIGN_BUPATI_TTE'].includes(entry.action);
+    const isSigningAction = ['APPROVE_KADIS_TTE'].includes(entry.action);
     const mockHash = isSigningAction
       ? `sha256-tte-bsre-mock-${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`
       : undefined;
@@ -194,13 +208,13 @@ export const useUIStore = create<UIState>((set) => ({
     };
   }),
 
-  // Replace/merge audit logs from server into local store (avoid duplicates)
+  // Replace/merge audit logs dari server ke lokal store secara idempotent
   setAuditLogs: (entries) => set((state) => {
     const existingByKey = new Map(state.auditTrailLogs.map(l => [l.id, l]));
     entries.forEach((e) => {
       existingByKey.set(e.id, e);
     });
-    // Keep descending order by timestamp (newest first)
+    // Menjaga urutan waktu menurun (descending order / terbaru di atas)
     const merged = Array.from(existingByKey.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return { auditTrailLogs: merged };
   }),

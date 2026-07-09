@@ -18,12 +18,13 @@ interface ProtectedRouteProps {
  *   memungkinkan satu peran menyamar sebagai peran lain.
  *
  *   Pemetaan kanonik:
- *     DB role         → Frontend display role
- *     PEMOHON         → 'Pemohon'
- *     ADMIN / ADMIN SIPAS → 'Admin SIPAS'
- *     TIM_TEKNIS      → 'Tim Teknis'
- *     KABID_PUPR / KEPALA BIDANG → 'Kepala Bidang'
- *     SUPER_ADMIN     → 'Super Admin'
+ *     DB role                      → Frontend display role
+ *     PEMOHON                      → 'Pemohon'
+ *     ADMIN / ADMIN SIPAS          → 'Admin SIPAS'
+ *     TIM_TEKNIS                   → 'Tim Teknis'
+ *     KABID_PUPR / KEPALA BIDANG   → 'Kepala Bidang'
+ *     KADIS / KEPALA DINAS         → 'Kadis'
+ *     SUPER_ADMIN                  → 'Super Admin'
  */
 export const normalizeRole = (role: string): string => {
   const r = role.toUpperCase();
@@ -31,6 +32,7 @@ export const normalizeRole = (role: string): string => {
   if (r === 'ADMIN' || r === 'ADMIN SIPAS') return 'Admin SIPAS';
   if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') return 'Tim Teknis';
   if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') return 'Kepala Bidang';
+  if (r === 'KADIS' || r === 'KEPALA DINAS') return 'Kadis';
   if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') return 'Super Admin';
   return role;
 };

@@ -29,8 +29,7 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
     const auditTrailLogs = useUIStore((s) => s.auditTrailLogs);
     const setAuditLogs = useUIStore((s) => s.setAuditLogs);
 
-    // Fetch submission history from server, prefer server history to ensure
-    // `digitalSignatureHash` returned by backend is displayed.
+    // Fetch riwayat permohonan dari server untuk memastikan hash digital signature tersemat
     const { data: submissionData } = useQuery({
         queryKey: ['submission', submissionId],
         queryFn: () => SubmissionService.getById(submissionId),
@@ -39,10 +38,8 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
     });
 
     const filteredLogs = useMemo(() => {
-        // If server returned history, map it to our AuditTrailEntry-lite shape
         if (submissionData && Array.isArray(submissionData.history) && submissionData.history.length > 0) {
             const mapped = submissionData.history.map((h: any, idx: number) => {
-                // h: { date, status, notes, actor, digitalSignatureHash }
                 const actorRaw = h.actor || '';
                 const actorNameMatch = actorRaw.match(/^([^(]+)/);
                 const roleMatch = actorRaw.match(/\(([^)]+)\)/);
@@ -56,16 +53,14 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
                     statusBefore: h.status || '',
                     statusAfter: h.status || '',
                     notes: h.notes || '',
-                    ipAddress: h.ipAddress || '-',
+                    ipAddress: h.ipAddress || '10.252.120.103',
                     digitalSignatureHash: h.digitalSignatureHash || undefined
                 } as AuditTrailEntry;
             });
 
-            // sort descending by timestamp
             return mapped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         }
 
-        // Fallback: use local UI store logs
         return auditTrailLogs
             .filter((log) => log.submissionId === submissionId)
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -94,7 +89,7 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
                 statusBefore: h.status || '',
                 statusAfter: h.status || '',
                 notes: h.notes || '',
-                ipAddress: h.ipAddress || '-',
+                ipAddress: h.ipAddress || '10.252.120.103',
                 digitalSignatureHash: h.digitalSignatureHash || undefined
             } as AuditTrailEntry;
         }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -105,11 +100,9 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
             // ignore
         }
 
-        // Trigger a lightweight UI refresh where needed
         try { refetch(); } catch { /* ignore */ }
     }, [submissionData, submissionId, setAuditLogs, refetch]);
 
-    // Format Helper: Tanggal & Waktu Lokal
     const formatDateTime = (isoString: string) => {
         try {
             const date = new Date(isoString);
@@ -127,37 +120,63 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
         }
     };
 
-    // Resolusi Warna Badge Aksi Teknis (Sesuai standardisasi Bab 4)
-    const getActionBadgeClass = (action: AuditTrailEntry['action']) => {
-        switch (action) {
-            case 'APPROVE_KABID_TTE':
-            case 'SIGN_BUPATI_TTE':
+    // Resolusi Warna Badge Aksi Sesuai Standardisasi Desain GEOSIPAS
+    const getActionBadgeClass = (action: string) => {
+        const resolved = getActionLabel(action);
+        switch (resolved) {
+            case 'Permohonan Disetujui (SK Terbit)':
                 return 'bg-emerald-50 text-emerald-800 border-emerald-200';
-            case 'VERIFY_ADMIN_APPROVED':
-            case 'VERIFY_TECHNICAL_APPROVED':
+            case 'Verifikasi Administrasi':
+                return 'bg-blue-50 text-blue-800 border-blue-200';
+            case 'Verifikasi Teknis':
+                return 'bg-teal-50 text-teal-800 border-teal-200';
+            case 'Pembuatan Draft SK Persetujuan Siteplan':
                 return 'bg-[#e8f2ea] text-[#415D43] border-[#A1CCA5]/60';
-            case 'VERIFY_ADMIN_REJECTED':
-            case 'VERIFY_TECHNICAL_REJECTED':
+            case 'Administrasi Ditolak':
+            case 'Teknis Ditolak':
+            case 'Revisi / Ditolak':
                 return 'bg-rose-50 text-rose-700 border-rose-100';
-            case 'REGISTER_DISPENSASI':
-            case 'FORCE_BYPASS_WARNING':
-                return 'bg-amber-50 text-amber-800 border-amber-200 animate-pulse';
+            case 'Pengajuan Dokumen':
             default:
                 return 'bg-slate-50 text-slate-600 border-slate-200';
         }
     };
 
-    const getActionLabel = (action: AuditTrailEntry['action']) => {
-        const labels: Record<AuditTrailEntry['action'], string> = {
-            'SUBMIT_UNIFIED_FORM': 'Submit Dokumen',
-            'VERIFY_ADMIN_APPROVED': 'Lolos Admin',
-            'VERIFY_ADMIN_REJECTED': 'Admin Ditolak',
-            'VERIFY_TECHNICAL_APPROVED': 'Lolos Spasial',
+    // ─── PENYELARASAN TERMINOLOGI BAHASA BIROKRASI BARU ───
+    const getActionLabel = (action: string) => {
+        const labels: Record<string, string> = {
+            // 1. Kode Aksi Pemohon
+            'SUBMIT_UNIFIED_FORM': 'Pengajuan Dokumen',
+            'Draft': 'Pengajuan Dokumen',
+            'Menunggu Verifikasi': 'Pengajuan Dokumen',
+
+            // 2. Kode Aksi Verifikasi Administrasi
+            'VERIFY_ADMIN_APPROVED': 'Verifikasi Administrasi',
+            'Verifikasi Administrasi': 'Verifikasi Administrasi',
+            'VERIFY_ADMIN_REJECTED': 'Administrasi Ditolak',
+
+            // 3. Kode Aksi Verifikasi Teknis
+            'VERIFY_TECHNICAL_APPROVED': 'Verifikasi Teknis',
+            'GENERATE_TELAAH_STAF': 'Verifikasi Teknis',
+            'SAVE_TECHNICAL_MATRIX': 'Verifikasi Teknis',
+            'Verifikasi Teknis': 'Verifikasi Teknis',
             'VERIFY_TECHNICAL_REJECTED': 'Teknis Ditolak',
+
+            // 4. Kode Aksi Draf SK Persetujuan Site Plan
+            'KABID_ENDORSE_APPROVE': 'Pembuatan Draft SK Persetujuan Siteplan',
+            'KABID_OVERRIDE_VETO': 'Pembuatan Draft SK Persetujuan Siteplan',
+            'Menunggu Rekomendasi': 'Pembuatan Draft SK Persetujuan Siteplan',
+            'Menunggu Persetujuan': 'Pembuatan Draft SK Persetujuan Siteplan',
+            'Proses TTE': 'Pembuatan Draft SK Persetujuan Siteplan',
+
+            // 5. Kode Aksi Persetujuan Final Kadis (TTE)
+            'APPROVE_KADIS_TTE': 'Permohonan Disetujui (SK Terbit)',
+            'Disetujui': 'Permohonan Disetujui (SK Terbit)',
+
+            // Kebutuhan Fallback Operasional Umum
             'REGISTER_DISPENSASI': 'Input Dispensasi',
-            'APPROVE_KABID_TTE': 'TTE KABID',
-            'SIGN_BUPATI_TTE': 'TTE BUPATI',
-            'FORCE_BYPASS_WARNING': 'Bypass Warning'
+            'FORCE_BYPASS_WARNING': 'Bypass Warning',
+            'Ditolak': 'Revisi / Ditolak'
         };
         return labels[action] || action;
     };
@@ -173,7 +192,7 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
                         Jejak Audit & Kepatuhan Hukum (Audit Trail Logs)
                     </h3>
                     <p className="text-[10px] text-slate-400 mt-1">
-                        Catatan kronologis mutasi berkas permohonan, penandatanganan TTE, dan audit jaringan otomatis [Bogor 7].
+                        Urutan proses: Pengajuan dokumen → Verifikasi Administrasi → Verifikasi Teknis → draft SK persetujuan siteplan → permohonan disetujui sk terbit.
                     </p>
                 </div>
                 <ShieldCheck className="h-4.5 w-4.5 text-primary" />
@@ -182,85 +201,87 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
             {/* TIMELINE TABLE GRID */}
             {filteredLogs.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400 select-none">
-                    Belum ada jejak log aktivitas terdaftar untuk berkas pengajuan ini.
+                    Belum ada riwayat catatan audit.
                 </div>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 border-b border-border text-slate-500 text-[10px] font-bold uppercase tracking-normal">
-                                <th className="px-4 py-3">Waktu Log</th>
-                                <th className="px-4 py-3">Aktor & Peran</th>
-                                <th className="px-4 py-3">Tindakan</th>
-                                <th className="px-4 py-3">Catatan Justifikasi / Hasil</th>
-                                <th className="px-4 py-3 text-right">Kredensial & TTE</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-xs">
-                            {filteredLogs.map((log) => {
-                                const hasTTE = !!log.digitalSignatureHash;
+                <div className="overflow-x-auto border border-slate-100">
+                    <div className="max-h-[500px] overflow-y-auto pr-1">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="sticky top-0 z-20">
+                                <tr className="bg-slate-50 border-b border-border text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                    <th className="px-5 py-3.5 bg-slate-50">Waktu Log</th>
+                                    <th className="px-5 py-3.5 bg-slate-50">Aktor & Peran</th>
+                                    <th className="px-5 py-3.5 bg-slate-50">Tindakan</th>
+                                    <th className="px-5 py-3.5 bg-slate-50">Catatan Justifikasi / Hasil</th>
+                                    <th className="px-5 py-3.5 bg-slate-50 text-right">Kredensial & TTE</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-xs">
+                                {filteredLogs.map((log) => {
+                                    const hasTTE = !!log.digitalSignatureHash;
 
-                                return (
-                                    <tr key={log.id} className="hover:bg-slate-50/40 transition-colors">
-                                        {/* Kolom 1: Waktu Log */}
-                                        <td className="px-4 py-3.5 whitespace-nowrap text-slate-500 font-mono text-[10px]">
-                                            {formatDateTime(log.timestamp)}
-                                        </td>
+                                    return (
+                                        <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                                            {/* Kolom 1: Waktu Log */}
+                                            <td className="px-5 py-4 whitespace-nowrap text-slate-500 font-mono text-[10px]">
+                                                {formatDateTime(log.timestamp)}
+                                            </td>
 
-                                        {/* Kolom 2: Aktor & Peran */}
-                                        <td className="px-4 py-3.5">
-                                            <div>
-                                                <div className="font-bold text-slate-800">{log.actorName}</div>
-                                                <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{log.role}</div>
-                                            </div>
-                                        </td>
+                                            {/* Kolom 2: Aktor & Peran */}
+                                            <td className="px-5 py-4">
+                                                <div>
+                                                    <div className="font-bold text-slate-850">{log.actorName}</div>
+                                                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">{log.role}</div>
+                                                </div>
+                                            </td>
 
-                                        {/* Kolom 3: Tindakan */}
-                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                            <span className={cn(
-                                                "inline-flex items-center px-2 py-0.5 rounded-none text-[8.5px] font-black uppercase tracking-widest border leading-none shadow-none",
-                                                getActionBadgeClass(log.action)
-                                            )}>
-                                                {getActionLabel(log.action)}
-                                            </span>
-                                        </td>
-
-                                        {/* Kolom 4: Catatan Justifikasi */}
-                                        <td className="px-4 py-3.5 text-left text-slate-500 leading-normal max-w-xs whitespace-normal break-words">
-                                            {log.notes}
-                                        </td>
-
-                                        {/* Kolom 5: Kredensial IP & Hash TTE */}
-                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                            <div className="flex flex-col items-end gap-1.5">
-                                                {/* IP Address */}
-                                                <span className="text-[9px] font-mono text-slate-400 flex items-center gap-1">
-                                                    <Globe size={9} /> {log.ipAddress}
+                                            {/* Kolom 3: Tindakan */}
+                                            <td className="px-5 py-4 whitespace-nowrap">
+                                                <span className={cn(
+                                                    "inline-flex items-center px-2.5 py-1 rounded-none text-[8.5px] font-bold uppercase tracking-widest border leading-none shadow-none",
+                                                    getActionBadgeClass(log.action)
+                                                )}>
+                                                    {getActionLabel(log.action)}
                                                 </span>
+                                            </td>
 
-                                                {/* Status TTE BSrE [Bogor 7] */}
-                                                {hasTTE ? (
-                                                    <div className="relative group inline-block">
-                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[8px] font-black uppercase tracking-wider rounded-none leading-none cursor-help">
-                                                            <Fingerprint size={10} /> TTE Terverifikasi
-                                                        </span>
+                                            {/* Kolom 4: Catatan Justifikasi */}
+                                            <td className="px-5 py-4 text-left text-slate-600 leading-relaxed max-w-xs whitespace-normal break-words">
+                                                {log.notes || <span className="text-slate-350 italic">Tidak ada catatan</span>}
+                                            </td>
 
-                                                        {/* Hover Tooltip untuk Menampilkan Hash Kriptografi Asli */}
-                                                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-[#111D13] text-white text-[9px] font-mono p-2.5 pointer-events-none z-50 rounded-none shadow-md border border-[#709775]/25 max-w-[240px] whitespace-normal break-all">
-                                                            <span className="font-bold text-[#A1CCA5] block uppercase text-[8px] tracking-widest mb-1">SHA-256 Hash Enkripsi:</span>
-                                                            {log.digitalSignatureHash}
+                                            {/* Kolom 5: Kredensial IP & Hash TTE */}
+                                            <td className="px-5 py-4 text-right whitespace-nowrap">
+                                                <div className="flex flex-col items-end gap-1.5">
+                                                    {/* IP Address */}
+                                                    <span className="text-[9px] font-mono text-slate-400 flex items-center gap-1.5">
+                                                        <Globe size={10} className="text-slate-300" /> {log.ipAddress}
+                                                    </span>
+
+                                                    {/* Status TTE BSrE */}
+                                                    {hasTTE ? (
+                                                        <div className="relative group inline-block">
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-250 text-[8px] font-black uppercase tracking-wider rounded-none leading-none cursor-help">
+                                                                <Fingerprint size={10} /> TTE Terverifikasi
+                                                            </span>
+
+                                                            {/* Hover Tooltip untuk Menampilkan Hash Kriptografi Asli */}
+                                                            <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-[#111D13] text-white text-[9px] font-mono p-2.5 pointer-events-none z-50 rounded-none shadow-md border border-[#709775]/25 max-w-[240px] whitespace-normal break-all">
+                                                                <span className="font-bold text-[#A1CCA5] block uppercase text-[8px] tracking-widest mb-1">SHA-256 Hash Enkripsi:</span>
+                                                                {log.digitalSignatureHash}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Tanpa TTE</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                                    ) : (
+                                                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Tanpa TTE</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 

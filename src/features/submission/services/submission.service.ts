@@ -3,8 +3,8 @@
  * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts]
  * ============================================================================
  * Peran: Menangani seluruh komunikasi HTTP REST API dengan server backend.
- *        Diperbarui penuh untuk mendukung payload metrik usulan pemohon (proposed)
- *        dan pengiriman hasil audit dinas beserta dynamic checklist (verified).
+ *        Diperbarui penuh untuk mendukung payload metrik usulan pemohon (proposed),
+ *        pengiriman hasil audit dinas beserta data verifikator per aspek (verified_by_id, verified_at).
  * ============================================================================
  */
 
@@ -86,7 +86,7 @@ export const SubmissionService = {
   /**
    * ─── REVISI: UPDATE STATUS & KIRIM HASIL AUDIT TEKNIS SPASIAL MANUAL ───
    * Mengirimkan keputusan verifikasi, angka hitung ulang dinas (KDB/GSB),
-   * serta dynamic checklist ke API `/verify` di backend.
+   * serta dynamic checklist ke API `/verify` di backend dengan audit verifikator lengkap.
    */
   updateStatus: async (
     id: string,
@@ -96,7 +96,7 @@ export const SubmissionService = {
     passphrase?: string,
     signatureBase64?: string,
     // Override jenis keputusan pengembalian berkas internal
-    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE',
+    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE' | 'OVERRIDE_VERDICT' | 'SAVE_TECHNICAL_MATRIX',
 
     // Parameter Teknis Verifikasi Lapisan Dinas (Verified)
     kkpr_verdict?: string,
@@ -114,10 +114,12 @@ export const SubmissionService = {
     const actor_name = nameMatch ? nameMatch[1].trim() : actor;
     const rawRole = roleMatch ? roleMatch[1].trim() : 'Pemohon';
 
-    // Map role FE ke model string enum di database backend
+    // Map role FE ke model string enum di database backend secara presisi (SoD Alignment)
     let role = 'ADMIN';
     if (rawRole.toUpperCase().includes('KABID') || rawRole.toUpperCase().includes('BIDANG')) {
       role = 'KABID_PUPR';
+    } else if (rawRole.toUpperCase().includes('KADIS') || rawRole.toUpperCase().includes('DINAS')) {
+      role = 'KADIS'; // Pemetaan Otoritas TTE Kepala Dinas
     } else if (rawRole.toUpperCase().includes('TEKNIS')) {
       role = 'TIM_TEKNIS';
     } else if (rawRole.toUpperCase().includes('PEMOHON')) {
@@ -128,18 +130,25 @@ export const SubmissionService = {
     const action_type: string = actionTypeOverride ?? (status === 'Ditolak' ? 'REJECT' : 'APPROVE');
 
     // 2. Transformasikan key checklist FE (camelCase) ke BE (snake_case)
+    // Serta menambatkan data audit (verified_by_id, verified_at) secara langsung
     const formattedChecklist = checklist_items?.map((item) => ({
       aspek_code: item.aspekCode,
       aspek_label: item.aspekLabel,
       status_kelayakan: item.statusKelayakan,
       catatan_verifikator: item.catatanVerifikator || null,
-      attachment_url: item.attachmentUrl || null
+      attachment_url: item.attachmentUrl || null,
+      verified_by_id: item.verifiedById || null,
+      // ─── KOREKSI: PENGHAPUSAN OPERATOR INSTANCEOF DARI TIPE PRIMITIF STRING ───
+      verified_at: item.verifiedAt || null
     })) || [];
+
+    // Mengaitkan NIP Pejabat Penandatangan / Pengesah secara default
+    const resolvedNip = role === 'KADIS' ? '197503112000031001' : (role === 'KABID_PUPR' ? '198402122010011003' : undefined);
 
     const payload = {
       actor_name,
       role,
-      nip: role === 'KABID_PUPR' ? '198402122010011003' : undefined,
+      nip: resolvedNip,
       passphrase: passphrase || undefined,
       signature_base64: signatureBase64 || undefined,
       action_type,

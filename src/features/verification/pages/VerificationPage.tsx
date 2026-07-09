@@ -16,7 +16,15 @@ export default function VerificationPage() {
   // Ambil data antrean pengajuan yang saat ini berada dalam tahapan evaluasi/verifikasi dinas
   const verificationQueue = useMemo(() =>
     submissions.filter((s) =>
-      ['Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Menunggu Persetujuan'].includes(s.status)
+      [
+        'Draft',
+        'Menunggu Verifikasi',
+        'Verifikasi Administrasi',
+        'Verifikasi Teknis',
+        'Menunggu Rekomendasi',
+        'Menunggu Persetujuan',
+        'Disetujui'
+      ].includes(s.status)
     ),
     [submissions]
   );
@@ -43,7 +51,7 @@ export default function VerificationPage() {
           Evaluasi & Verifikasi Berkas
         </h1>
         <p className="text-xs text-slate-500 mt-2">
-          Kelola pemeriksaan dokumen administratif (Admin SIPAS) dan audit kesesuaian spasial CAD/GIS (Tim Teknis).
+          Urutan proses: Pengajuan dokumen → Verifikasi Administrasi → Verifikasi Teknis → draft SK persetujuan siteplan → permohonan disetujui sk terbit.
         </p>
       </div>
 

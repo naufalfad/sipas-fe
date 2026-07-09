@@ -43,18 +43,26 @@ export const CADGeoreferenceWizard = ({
       // Simulasi perhitungan parameter matriks Helmert 2D [Jakarta 5]
       const scale = 1.0024;
       const rotation = 0.4812; // rad (~27.5 derajat)
-      const Tx = 106.816629;
-      const Ty = -6.595189;
+      const Tx = 106.8400;
+      const Ty = -6.4800;
       const A = scale * Math.cos(rotation);
       const B = scale * Math.sin(rotation);
 
       // Hasil poligon georeferenced bumi nyata [Longitude, Latitude]
       const transformedPolygon: [number, number][] = [
-        [106.8160, -6.5945],
-        [106.8175, -6.5945],
-        [106.8175, -6.5960],
-        [106.8160, -6.5960],
-        [106.8160, -6.5945]
+        [106.8400, -6.4800],
+        [106.8413, -6.4798],
+        [106.8414, -6.4804],
+        [106.8422, -6.4802],
+        [106.8420, -6.4793],
+        [106.8426, -6.4789],
+        [106.8417, -6.4785],
+        [106.8410, -6.4789],
+        [106.8407, -6.4787],
+        [106.8396, -6.4791],
+        [106.8398, -6.4795],
+        [106.8394, -6.4797],
+        [106.8400, -6.4800]
       ];
 
       onComplete({ A, B, Tx, Ty, scale, rotation, polygon: transformedPolygon });
@@ -105,7 +113,7 @@ export const CADGeoreferenceWizard = ({
             <div className="absolute top-3 left-3 z-10 bg-white border border-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-700 uppercase tracking-widest leading-none">
               Peta Spasial Target (GIS)
             </div>
-            <GISMapContainer center={[-6.595189, 106.816629]} zoom={16}>
+            <GISMapContainer center={[-6.4800, 106.8400]} zoom={16}>
               {/* Titik Jangkar Peta */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-2 pointer-events-none">
                 {step === 1 && (

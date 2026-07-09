@@ -4,7 +4,8 @@
  * ============================================================================
  * Peran: Kontrak tipe data (Single Source of Truth) untuk permohonan site plan.
  *        Diperbarui penuh untuk mendukung perbandingan metrik tiga sisi,
- *        dynamic checklist evaluasi dinas, dan metadata verifikasi KKPR.
+ *        dynamic checklist evaluasi dinas, metadata verifikasi KKPR, peran baru,
+ *        serta snapshot metadata dokumen Telaah Staf.
  * ============================================================================
  */
 
@@ -13,6 +14,7 @@ export type SubmissionStatus =
   | 'Menunggu Verifikasi'
   | 'Verifikasi Administrasi'
   | 'Verifikasi Teknis'
+  | 'Menunggu Rekomendasi'   // Tambahan (Fase 3: Tahap Peninjauan & Veto Kabid)
   | 'Menunggu Persetujuan'
   | 'Proses TTE'
   | 'Disetujui'
@@ -94,6 +96,7 @@ export interface TechnicalDetails {
   roadRowMain?: string;
   roadRowLocal?: string;
   waterSystem?: string;
+  waterSource?: string;
 
   // Non-Perumahan
   buildingBlocks?: number;
@@ -160,11 +163,15 @@ export interface StatementDetails {
 }
 
 export interface EvaluationChecklistItem {
-  aspekCode: string;               // e.g., 'REQ_ZONING', 'REQ_LEGAL', 'REQ_KDB'
-  aspekLabel: string;              // e.g., "Kesesuaian dengan RTRW/RDTR"
-  statusKelayakan: ChecklistStatus; // 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai' | 'Pending'
-  catatanVerifikator?: string;     // Justifikasi penolakan atau instruksi bersyarat
-  attachmentUrl?: string;          // PDF coretan/bukti kalkulasi dinas dari AutoCAD
+  aspekCode: string;                 // e.g., 'REQ_ZONING', 'REQ_LEGAL', 'REQ_KDB'
+  aspekLabel: string;                // e.g., "Kesesuaian dengan RTRW/RDTR"
+  statusKelayakan: ChecklistStatus;   // 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai' | 'Pending'
+  catatanVerifikator?: string;       // Justifikasi penolakan atau instruksi bersyarat
+  attachmentUrl?: string;            // PDF coretan/bukti kalkulasi dinas dari AutoCAD
+
+  // ─── AMANDEMEN: REVISI TRACEABILITY AUDIT ───
+  verifiedById?: number;             // FK ke ID user pengisi evaluasi
+  verifiedAt?: string;               // ISO 8601 Timestamp pengisian evaluasi
 }
 
 export interface Submission {
@@ -180,6 +187,7 @@ export interface Submission {
   signatureHash?: string;
   signedPdfUrl?: string;
   kabidSignature?: string;
+  kadisSignature?: string;
 
   // Penambahan parameter hasil hitung sistem lama (Baku Backwards-compatibility)
   kdbPercent?: number;
@@ -237,4 +245,14 @@ export interface Submission {
 
   // ─── REVISI: DYNAMIC CHECKLIST EVALUASI MANDIRI DINAS ───
   evaluationChecklist?: EvaluationChecklistItem[];
+
+  // ─── AMANDEMEN: SNAPSHOT METADATA DOKUMEN TELAAH STAF (Fase 2) ───
+  telaahStaf?: {
+    idTelaah: string;
+    verdict: string;
+    isOverridden: boolean;
+    overrideReason?: string | null;
+    createdAt: string;
+    payload: any;
+  };
 }

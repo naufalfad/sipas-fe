@@ -9,7 +9,7 @@ import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, Loader2, UploadCloud,
   FileSignature, AlertTriangle, ShieldCheck,
-  ChevronDown, Trash2, Info
+  ChevronDown, Trash2, Info, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -61,6 +61,24 @@ export default function SubmissionVerificationPage() {
     enabled: !!id,
   });
 
+  // ─── FILTERED ASPECTS BY CATEGORY ───
+  const filteredAspects = useMemo(() => {
+    if (!sub) return VERIFICATION_ASPECTS;
+    const category = sub.submissionDetails?.category || 'PERUMAHAN';
+
+    return VERIFICATION_ASPECTS.filter((aspect) => {
+      // 1. Perumahan: tidak ada amdal (REQ_ENV_IMPACT)
+      if (category === 'PERUMAHAN') {
+        return aspect.code !== 'REQ_ENV_IMPACT';
+      }
+      // 2. Fasum: adanya andalin (REQ_TRAFFIC), tidak ada amdal (REQ_ENV_IMPACT)
+      if (category === 'FASUM') {
+        return aspect.code !== 'REQ_ENV_IMPACT';
+      }
+      return true;
+    });
+  }, [sub]);
+
   /* STREAMING_CHUNK:Syncing baseline parameters from database schema */
   useEffect(() => {
     if (sub) {
@@ -83,7 +101,7 @@ export default function SubmissionVerificationPage() {
         setChecklistStates(mappedStates);
       } else {
         const defaultStates: typeof checklistStates = {};
-        VERIFICATION_ASPECTS.forEach((aspect) => {
+        filteredAspects.forEach((aspect) => {
           defaultStates[aspect.code] = {
             status: 'Sesuai',
             catatan: ''
@@ -92,7 +110,7 @@ export default function SubmissionVerificationPage() {
         setChecklistStates(defaultStates);
       }
     }
-  }, [sub]);
+  }, [sub, filteredAspects]);
 
   const checklistStatesMapped = useMemo(() => {
     const output: Record<string, {
@@ -100,20 +118,24 @@ export default function SubmissionVerificationPage() {
       statusKelayakan: 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai';
       catatanVerifikator: string;
       attachmentUrl?: string;
+      verifiedById?: number;
+      verifiedAt?: string;
     }> = {};
 
-    VERIFICATION_ASPECTS.forEach((aspect) => {
+    filteredAspects.forEach((aspect) => {
       const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
       output[aspect.code] = {
         aspekLabel: aspect.label,
         statusKelayakan: state.status,
         catatanVerifikator: state.catatan,
-        attachmentUrl: state.attachmentUrl
+        attachmentUrl: state.attachmentUrl,
+        verifiedById: userProfile?.id || undefined,
+        verifiedAt: new Date().toISOString()
       };
     });
 
     return output;
-  }, [checklistStates]);
+  }, [checklistStates, userProfile, filteredAspects]);
 
   const kkpr_verdict_final = useMemo(() => kkprVerdict, [kkprVerdict]);
   const verified_kdb_final = useMemo(() => (verifiedKdb === '' ? undefined : verifiedKdb), [verifiedKdb]);
@@ -131,14 +153,16 @@ export default function SubmissionVerificationPage() {
     }: {
       status: SubmissionStatus;
       notes: string;
-      actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE';
+      actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE' | 'OVERRIDE_VERDICT' | 'SAVE_TECHNICAL_MATRIX';
     }) => {
       const checklistItemsPayload = Object.entries(checklistStatesMapped).map(([code, item]) => ({
         aspekCode: code,
         aspekLabel: item.aspekLabel,
         statusKelayakan: item.statusKelayakan,
         catatanVerifikator: item.catatanVerifikator,
-        attachmentUrl: item.attachmentUrl
+        attachmentUrl: item.attachmentUrl,
+        verifiedById: item.verifiedById,
+        verifiedAt: item.verifiedAt
       }));
 
       return SubmissionService.updateStatus(
@@ -163,11 +187,12 @@ export default function SubmissionVerificationPage() {
         queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true }),
         queryClient.invalidateQueries({ queryKey: ['submissions'] })
       ]);
-      toast.success('Hasil verifikasi teknis berhasil dikirim!');
-      navigate(`/pengajuan/detail/${id}`);
+      toast.success('Penyimpanan matriks berhasil! Membuka halaman draf Telaah Staf.');
+      // Dialihkan langsung ke halaman pratinjau Telaah Staf
+      navigate(`/pengajuan/verifikasi/${id}/preview-telaah`);
     },
     onError: (error: Error) => {
-      toast.error(`Gagal mengirim verifikasi: ${error.message}`);
+      toast.error(`Gagal memproses draf dokumen telaah: ${error.message}`);
     }
   });
 
@@ -221,17 +246,16 @@ export default function SubmissionVerificationPage() {
     }
   };
 
-  const handleTriggerSubmissionVerification = () => {
+  const handleCreateStaffAnalysisDraft = () => {
     if (!notes.trim()) {
       toast.warning('Tolong isi Catatan Penilaian Global / Justifikasi terlebih dahulu.');
       return;
     }
-    const targetStatus: SubmissionStatus = kkprVerdict === 'Tidak Sesuai / Ditolak' ? 'Ditolak' : 'Menunggu Persetujuan';
-    const actionOverride = kkprVerdict === 'Tidak Sesuai / Ditolak' ? 'REJECT' as const : 'APPROVE' as const;
+
+    // Mengunci status permohonan agar tetap di 'Verifikasi Teknis' untuk proses peninjauan final
     mutation.mutate({
-      status: targetStatus,
+      status: 'Verifikasi Teknis',
       notes: notes.trim(),
-      actionTypeOverride: actionOverride
     });
   };
 
@@ -534,16 +558,16 @@ export default function SubmissionVerificationPage() {
         <div className="lg:col-span-7 space-y-6">
           <div className="border-b border-slate-300 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Checklist Evaluasi 13 Aspek</h2>
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Checklist Evaluasi Aspek Spasial</h2>
               <p className="text-[10px] text-slate-500 mt-0.5">Lakukan evaluasi kelayakan spasial secara mendetail per parameter.</p>
             </div>
             <div className="px-3 py-1 bg-slate-100 border border-slate-400 text-slate-800 font-mono text-[10px] font-bold rounded-none uppercase">
-              {Object.values(checklistStates).filter(v => v.status === 'Sesuai').length} / 13 Sesuai
+              {Object.keys(checklistStates).filter(k => filteredAspects.some(a => a.code === k) && checklistStates[k].status === 'Sesuai').length} / {filteredAspects.length} Sesuai
             </div>
           </div>
 
           <div className="divide-y divide-slate-300 border-b border-slate-300">
-            {VERIFICATION_ASPECTS.map((aspect) => {
+            {filteredAspects.map((aspect) => {
               const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
               const isExpanded = expandedAspect === aspect.code;
               const isSesuai = state.status === 'Sesuai';
@@ -568,8 +592,6 @@ export default function SubmissionVerificationPage() {
                     </button>
 
                     <div className="flex items-center gap-3 shrink-0">
-                      {/* STREAMING_CHUNK:Rendering dynamic checklist items */}
-                      {/* Segmented Toggle Control (Custom Pill Switch Toggle) */}
                       <button
                         type="button"
                         onClick={() => handleToggleAspect(aspect.code, isSesuai ? 'Tidak Sesuai' : 'Sesuai')}
@@ -684,11 +706,15 @@ export default function SubmissionVerificationPage() {
             <button
               type="button"
               disabled={mutation.isPending}
-              onClick={handleTriggerSubmissionVerification}
+              onClick={handleCreateStaffAnalysisDraft}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 border border-slate-900 text-white hover:bg-slate-800 text-xs font-bold uppercase tracking-widest transition-all rounded-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Kirim Hasil Keputusan
+              {mutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+              ) : (
+                <FileText className="h-3.5 w-3.5 mr-1" />
+              )}
+              Buat Dokumen Telaah
             </button>
           </div>
 
