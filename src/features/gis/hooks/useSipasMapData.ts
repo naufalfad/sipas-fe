@@ -56,6 +56,7 @@ export function useSipasMapData(localZoom: number) {
     roadPolygons?: number[][][];
     rthPolygons?: number[][][];
     psuPolygons?: number[][][];
+    kavlingPolygons?: number[][][];
   } | null>(null);
 
   const { data: submissions = [] } = useQuery<Submission[]>({
@@ -216,7 +217,14 @@ export function useSipasMapData(localZoom: number) {
         const polygon = sub.location.polygon as [number, number][] | undefined;
         if (polygon && polygon.length >= 3) {
           try {
-            const centroid = polygonCentroid(polygon);
+            // Convert polygon coordinates to leaflet [lat, lng] format first
+            const leafletPolygon = polygon.map((p) => {
+              if (p[0] >= 90 && p[0] <= 145 && p[1] >= -15 && p[1] <= 10) {
+                return [p[1], p[0]] as [number, number];
+              }
+              return p as [number, number];
+            });
+            const centroid = polygonCentroid(leafletPolygon);
             if (centroid) {
               centroidLat = centroid[0];
               centroidLng = centroid[1];
@@ -280,6 +288,7 @@ export function useSipasMapData(localZoom: number) {
       if (activeGeometries.roadPolygons) addPoly(activeGeometries.roadPolygons, '#cbd5e1', 'road');
       if (activeGeometries.rthPolygons) addPoly(activeGeometries.rthPolygons, '#10b981', 'rth');
       if (activeGeometries.psuPolygons) addPoly(activeGeometries.psuPolygons, '#14b8a6', 'psu');
+      if (activeGeometries.kavlingPolygons) addPoly(activeGeometries.kavlingPolygons, '#64748b', 'kavling');
     } else {
       processedSubmissions.forEach((sub) => {
         const loc = sub.location;

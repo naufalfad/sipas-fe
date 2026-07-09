@@ -43,7 +43,7 @@ export interface SpatialAuditResult {
 //   sungai       = Buffer sempadan sungai 25m — PP No. 38/2011
 // ──────────────────────────────────────────────────────────────────────────────
 
-type ZonaType = 'sawah' | 'pasir' | 'kebun' | 'ladang' | 'pemukiman' | 'sungai';
+type ZonaType = 'sawah' | 'pasir' | 'kebun' | 'ladang' | 'pemukiman' | 'sungai' | 'relka';
 type SeverityLevel = 'danger' | 'warning' | 'info';
 
 interface ZoningRule {
@@ -53,6 +53,13 @@ interface ZoningRule {
 }
 
 const ZONING_MATRIX: Record<ZonaType, Record<string, ZoningRule>> = {
+    relka: {
+        _default: {
+            severity: 'danger',
+            reason: 'Kawasan sempadan rel kereta api 20m adalah zona bahaya keselamatan umum. Tidak ada pembangunan apapun yang diizinkan.',
+            dasar_hukum: 'UU No. 23/2007 tentang Perkeretaapian'
+        }
+    },
     sungai: {
         // Sempadan sungai adalah mutlak — SEMUA kategori dilarang
         _default: {
@@ -320,6 +327,7 @@ export function useSpatialValidator() {
                 // ── Jalankan semua pemeriksaan secara paralel ─────────────────
                 await Promise.all([
                     checkLayer('sungai',    'Sempadan Sungai 25m',          () => import('@/assets/geojson/bogor/SUNGAI_LN_25K.json'),          { meters: 25 }),
+                    checkLayer('relka',     'Sempadan Jalur Kereta Api 20m', () => import('@/assets/geojson/kab bogor/RELKA_LN_25K.json'),       { meters: 20 }),
                     checkLayer('pasir',     'Kawasan Konservasi Gumuk Pasir',() => import('@/assets/geojson/kab bogor/PASIR_AR_25K.json')),
                     checkLayer('sawah',     'Lahan Sawah Dilindungi (LSD)', () => import('@/assets/geojson/bogor/AGRISAWAH_AR_25K.json')),
                     checkLayer('kebun',     'Kawasan Perkebunan',           () => import('@/assets/geojson/bogor/AGRIKEBUN_AR_25K.json')),
