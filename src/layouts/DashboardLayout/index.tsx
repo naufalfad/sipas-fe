@@ -43,18 +43,18 @@ const menuItems: MenuItem[] = [
     title: 'Dashboard',
     path: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
   },
   {
     title: 'Pengajuan Site Plan',
     icon: ClipboardList,
-    roles: ['Pemohon', 'Admin SIPAS', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
     submenu: [
       {
         title: 'Daftar Pengajuan',
         path: '/pengajuan/daftar',
         icon: ClipboardList,
-        roles: ['Pemohon', 'Admin SIPAS', 'Super Admin'],
+        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
       },
       {
         title: 'Pengajuan Baru',
@@ -67,13 +67,13 @@ const menuItems: MenuItem[] = [
   {
     title: 'Site Plan',
     icon: Layers,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
     submenu: [
       {
         title: 'Daftar Site Plan',
         path: '/siteplan/daftar',
         icon: Layers,
-        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
+        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
       },
     ],
   },
@@ -81,28 +81,27 @@ const menuItems: MenuItem[] = [
     title: 'Verifikasi',
     path: '/verifikasi',
     icon: ShieldAlert,
-    // SOD: Super Admin tidak boleh mengakses panel verifikasi fungsional.
-    // Hanya pejabat operasional (Admin SIPAS, Tim Teknis, Kepala Bidang) yang berwenang.
-    roles: ['Admin SIPAS', 'Tim Teknis', 'Kepala Bidang'],
+    // SOD: Hanya pejabat operasional penilai (Admin SIPAS dan Tim Teknis) yang berwenang.
+    roles: ['Admin SIPAS', 'Tim Teknis'],
   },
   {
     title: 'Persetujuan TTE',
     path: '/persetujuan',
     icon: ShieldCheck,
-    // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Bidang PUPR.
-    roles: ['Kepala Bidang'],
+    // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Dinas (Kadis).
+    roles: ['Kadis'],
   },
   {
     title: 'GIS Viewer',
     path: '/gis',
     icon: Map,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
   },
   {
     title: 'Laporan',
     path: '/laporan',
     icon: FileBarChart2,
-    roles: ['Admin SIPAS', 'Kepala Bidang', 'Super Admin'],
+    roles: ['Admin SIPAS', 'Kepala Bidang', 'Kadis', 'Super Admin'],
   },
   {
     title: 'Master Data',

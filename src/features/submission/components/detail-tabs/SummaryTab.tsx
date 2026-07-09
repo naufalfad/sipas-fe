@@ -14,6 +14,11 @@ const getDocCategoryLabel = (key?: string) => {
   return 'Dokumen Lampiran Pendukung';
 };
 
+const getDocFormatLabel = (type?: string) => {
+  if (!type) return 'Tidak diketahui';
+  return type.toUpperCase();
+};
+
 interface SummaryTabProps {
   sub: any;
 }
@@ -79,22 +84,22 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
         {openDocs && (
           <div className="space-y-3">
             <div className="max-h-56 overflow-y-auto pr-2">
-              {sub.documents.map((doc: any) => (
-                <div key={doc.id} className="flex items-center justify-between p-3.5 bg-slate-50/50 hover:bg-slate-100/50 border border-border/40 transition-colors text-left">
+              {(sub.documents ?? []).map((doc: any) => (
+                <div key={doc?.id ?? doc?.name ?? Math.random()} className="flex items-center justify-between p-3.5 bg-slate-50/50 hover:bg-slate-100/50 border border-border/40 transition-colors text-left">
                   <div className="flex items-center space-x-3 min-w-0">
                     <div className="p-2 bg-white border border-border text-primary shrink-0">
                       <File className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
                       <span className="text-[8px] font-black uppercase tracking-wider text-teal-600 block mb-0.5">
-                        {getDocCategoryLabel(doc.key)}
+                        {getDocCategoryLabel(doc?.key)}
                       </span>
-                      <h5 className="font-bold text-xs text-[#111D13] truncate" title={doc.name}>{doc.name}</h5>
-                      <span className="text-[10px] text-slate-400 block mt-1">Format: {doc.type.toUpperCase()} • Diunggah: {doc.uploadedAt}</span>
+                      <h5 className="font-bold text-xs text-[#111D13] truncate" title={doc?.name}>{doc?.name || 'Berkas tanpa nama'}</h5>
+                      <span className="text-[10px] text-slate-400 block mt-1">Format: {getDocFormatLabel(doc?.type)} • Diunggah: {doc?.uploadedAt || '-'}</span>
                     </div>
                   </div>
                   <a
-                    href={doc.url}
+                    href={doc?.url}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs font-bold text-primary hover:underline shrink-0 pl-3"

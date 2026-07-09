@@ -1,7 +1,9 @@
+// --- FILE: src/features/approval/pages/ApprovalQueuePage.tsx ---
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
+import { API_BASE_URL } from '@/config'; // IMPOR BARU: Mengambil basis URL backend tepercaya
 import {
   ShieldCheck,
   FileCheck2,
@@ -17,20 +19,20 @@ export default function ApprovalQueuePage() {
   const [activeSubTab, setActiveSubTab] = useState<'antrean' | 'riwayat'>('antrean');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch all submissions from service layer to get reactive mock updates
+  // Fetch all submissions dari service layer
   const { data: submissions = [], isLoading } = useQuery({
     queryKey: ['submissions'],
     queryFn: SubmissionService.getAll
   });
 
-  // Filter lists based on status
+  // Filter list permohonan berdasarkan status
   const queueSubmissions = submissions.filter(s => s.status === 'Menunggu Persetujuan');
   const historySubmissions = submissions.filter(s => s.status === 'Disetujui');
   const rejectedSubmissions = submissions.filter(s => s.status === 'Ditolak');
 
   const activeList = activeSubTab === 'antrean' ? queueSubmissions : historySubmissions;
 
-  // Filter list based on search query
+  // Filter list permohonan berdasarkan kueri pencarian teks
   const filteredList = activeList.filter(s =>
     s.submissionNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.housingName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -97,21 +99,19 @@ export default function ApprovalQueuePage() {
           <div className="flex border border-border p-0.5 bg-slate-50 select-none">
             <button
               onClick={() => { setActiveSubTab('antrean'); setSearchQuery(''); }}
-              className={`px-4 py-1.5 font-bold text-xs transition-colors rounded-none cursor-pointer ${
-                activeSubTab === 'antrean'
-                  ? 'bg-white text-primary border border-border shadow-[0px_1px_2px_rgba(0,0,0,0.03)]'
-                  : 'text-slate-400 hover:text-slate-700'
-              }`}
+              className={`px-4 py-1.5 font-bold text-xs transition-colors rounded-none cursor-pointer ${activeSubTab === 'antrean'
+                ? 'bg-white text-primary border border-border shadow-[0px_1px_2px_rgba(0,0,0,0.03)]'
+                : 'text-slate-400 hover:text-slate-700'
+                }`}
             >
               Antrean TTE Aktif ({queueSubmissions.length})
             </button>
             <button
               onClick={() => { setActiveSubTab('riwayat'); setSearchQuery(''); }}
-              className={`px-4 py-1.5 font-bold text-xs transition-colors rounded-none cursor-pointer ${
-                activeSubTab === 'riwayat'
-                  ? 'bg-white text-primary border border-border shadow-[0px_1px_2px_rgba(0,0,0,0.03)]'
-                  : 'text-slate-400 hover:text-slate-700'
-              }`}
+              className={`px-4 py-1.5 font-bold text-xs transition-colors rounded-none cursor-pointer ${activeSubTab === 'riwayat'
+                ? 'bg-white text-primary border border-border shadow-[0px_1px_2px_rgba(0,0,0,0.03)]'
+                : 'text-slate-400 hover:text-slate-700'
+                }`}
             >
               Riwayat Pengesahan ({historySubmissions.length})
             </button>
@@ -163,7 +163,7 @@ export default function ApprovalQueuePage() {
                     </td>
 
                     {/* Rencana Tapak / Developer */}
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5 text-left">
                       <div>
                         <div className="font-semibold text-slate-800">{sub.housingName}</div>
                         <div className="text-[10px] text-slate-400 mt-0.5">{sub.developerName}</div>
@@ -192,13 +192,16 @@ export default function ApprovalQueuePage() {
                         </Link>
                       ) : (
                         <div className="flex items-center justify-end gap-2.5">
-                          <button
-                            onClick={() => window.alert(`Mengunduh Salinan Digital SK Terbit (${sub.submissionNo}-SK.pdf)...`)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-emerald-100 bg-emerald-50 hover:bg-emerald-100 text-[#415D43] font-bold text-[10px] transition-all rounded-none cursor-pointer"
+                          {/* ─── UPDATE TAHAP 5: INTEGRASI LINK DOWNLOAD DOKUMEN SK ASLI DARI BE ─── */}
+                          <a
+                            href={`${API_BASE_URL}/api/v1/submissions/${sub.id}/download`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-emerald-100 bg-emerald-50 hover:bg-emerald-100 text-[#415D43] font-bold text-[10px] transition-all rounded-none decoration-none"
                           >
                             <Download className="h-3.5 w-3.5" />
                             SK PDF
-                          </button>
+                          </a>
                           <Link
                             to={`/pengajuan/detail/${sub.id}`}
                             className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-50 transition-colors border border-border"
@@ -222,8 +225,8 @@ export default function ApprovalQueuePage() {
           <ShieldCheck className="h-4 w-4 text-primary" />
           Kepatuhan Otoritas Hukum
         </h5>
-        <p className="text-[10px] text-slate-500 leading-relaxed mt-1">
-          Pengesahan dokumen tapak melalui halaman ini terintegrasi langsung dengan Balai Sertifikasi Elektronik (BSrE). Penandatanganan secara elektronik setara secara hukum dengan tanda tangan basah berdasarkan UU ITE Pasal 11.
+        <p className="text-[10px] text-slate-500 leading-relaxed mt-1 text-justify">
+          Pengesahan dokumen tapak melalui halaman ini terintegrasi langsung dengan Balai Sertifikasi Elektronik (BSrE) BSSN. Penandatanganan secara elektronik setara secara hukum dengan tanda tangan basah berdasarkan UU ITE No. 11 Pasal 11.
         </p>
       </div>
     </div>

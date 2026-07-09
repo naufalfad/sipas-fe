@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * GEOSIPAS PORTAL — Kabid Review & SK Generator Page [SubmissionKabidReviewPage.tsx]
+ * GEOSIPAS PORTAL — Kabid Review & SK Generator Page [SubmissionKabidReviewPage.tsx] (REVISED v2)
  * ============================================================================
  * Peran  : Halaman khusus Kepala Bidang (KABID_PUPR) untuk meninjau berkas PDF
  *          Telaah Staf teknis, membubuhkan paraf visual, merakit dictums, serta
@@ -13,14 +13,14 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import { API_BASE_URL } from '@/config';
 import {
-    ArrowLeft, Loader2, FileText, Send, ShieldCheck, Info,
-    Reply, XCircle, FileSignature, CheckCircle, AlertTriangle
+    ArrowLeft, Loader2, FileText, Info,
+    Reply, XCircle, FileSignature, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -99,6 +99,7 @@ export default function SubmissionKabidReviewPage() {
 
     // ─── ACTION HANDLERS ─────────────────────────────────────────────────────
 
+    // REVISI COMPILATION: handleStandardEndorse tidak membutuhkan parameter biner approved
     const handleStandardEndorse = () => {
         if (!kabidAgreed) {
             toast.warning('Pernyataan konfirmasi peninjauan wajib dicentang.');
@@ -211,7 +212,7 @@ export default function SubmissionKabidReviewPage() {
                             File Rekomendasi Teknis (Telaah_Staf_{sub.id}.pdf)
                         </span>
                         <a
-                            href={`${API_BASE_URL}/docs/Telaah_Staf_${sub.id}.pdf`}
+                            href={`${API_BASE_URL}/docs/Telaah_Staf_{sub.id}.pdf`}
                             target="_blank"
                             rel="noreferrer"
                             className="text-[9px] font-black text-teal-700 hover:underline uppercase"
@@ -348,7 +349,7 @@ export default function SubmissionKabidReviewPage() {
                                 <button
                                     type="button"
                                     disabled={mutation.isPending || !kabidAgreed || !signature}
-                                    onClick={() => handleStandardEndorse(true)}
+                                    onClick={handleStandardEndorse} // PERBAIKAN TS2554: Memanggil handler standard endorse murni tanpa argumen
                                     className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer disabled:opacity-50 shadow-md"
                                 >
                                     {mutation.isPending ? (
