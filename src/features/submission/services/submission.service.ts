@@ -23,19 +23,57 @@ const getAuthHeaders = (extraHeaders?: Record<string, string>) => {
   };
 };
 
+export interface SubmissionListParams {
+  search?: string;
+  status?: string;
+  category?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedSubmissions {
+  data: Submission[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
 export const SubmissionService = {
   /**
-   * Mengambil semua daftar permohonan aktif dari server backend.
+   * Mengambil daftar permohonan aktif dengan pencarian, penapisan, dan paginasi.
    */
-  getAll: async (): Promise<Submission[]> => {
-    const response = await fetch(API_BASE_URL, {
-      headers: getAuthHeaders()
-    });
+  getAll: async (params: SubmissionListParams = {}): Promise<PaginatedSubmissions> => {
+    const query = new URLSearchParams();
+    if (params.search)    query.set('search', params.search);
+    if (params.status && params.status !== 'Semua') query.set('status', params.status);
+    if (params.category)  query.set('category', params.category);
+    if (params.page)      query.set('page', String(params.page));
+    if (params.limit)     query.set('limit', String(params.limit));
+
+    const url = query.toString() ? `${API_BASE_URL}?${query.toString()}` : API_BASE_URL;
+    const response = await fetch(url, { headers: getAuthHeaders() });
     if (!response.ok) {
       const errText = await response.text();
       throw new Error(errText || `Gagal memuat daftar permohonan (HTTP ${response.status})`);
     }
     return await response.json();
+  },
+
+  /**
+   * Mengambil SEMUA permohonan tanpa paginasi (untuk GIS, dashboard, dan verifikasi).
+   * Mengembalikan array Submission[] langsung.
+   */
+  getAllList: async (): Promise<Submission[]> => {
+    const url = `${API_BASE_URL}?limit=1000&page=1`;
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat daftar permohonan (HTTP ${response.status})`);
+    }
+    const result = await response.json();
+    // Jika endpoint mengembalikan envelope terpaginasi, ekstrak .data
+    return Array.isArray(result) ? result : (result.data ?? []);
   },
 
   /**

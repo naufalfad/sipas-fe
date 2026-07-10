@@ -231,4 +231,10 @@
 @keyframes sonarRipple {
   0%   { transform: scale(0.5); opacity: 0.8; }
   100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Sembunyikan ikon mata reveal bawaan browser Microsoft Edge / IE */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
 }

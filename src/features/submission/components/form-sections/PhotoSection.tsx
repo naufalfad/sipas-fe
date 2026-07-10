@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { CheckCircle2, Loader2, UploadCloud } from 'lucide-react';
+import { CheckCircle2, Loader2, UploadCloud, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { uploadFileToBackend } from '../../utils/upload';
@@ -62,6 +62,17 @@ export const PhotoSection = () => {
         </h3>
         <p className="text-[10px] text-slate-400 mt-1">
           Sertakan dokumentasi foto kondisi riil rona tapak di lapangan dari 5 penjuru arah mata angin.
+        </p>
+      </div>
+
+      {/* Box Informasi Penting: Watermark Koordinat GPS */}
+      <div className="bg-amber-50/40 border border-amber-200 p-4 text-left select-none">
+        <h5 className="text-[10px] font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5 mb-1">
+          <Info size={14} className="text-amber-600 shrink-0" />
+          Ketentuan Watermark Koordinat & Lokasi
+        </h5>
+        <p className="text-[10px] text-amber-800 leading-relaxed">
+          Seluruh foto fisik rona lapangan yang diunggah <strong>wajib ditambahkan watermark koordinat GPS (latitude, longitude)</strong> dan penanda tanggal/waktu pengambilan gambar (metadata lokasi) langsung pada citra foto secara jelas untuk kebutuhan validasi lapangan oleh tim teknis dinas.
         </p>
       </div>
 

@@ -326,4 +326,29 @@ export interface Submission {
 
   // ─── BARU TAHAP 1: SNAPSHOT METADATA KEPUTUSAN DRAF SK (TAHAP 5 INTEGRASI) ───
   skDraft?: SkDraft | null;
+
+  // ─── BARU FASE 2: DETAIL TPU & KOMPENSASI DEKLARASI MANDIRI ───
+  tpu?: {
+    method: 'MANDIRI' | 'EKSISTING' | 'KERJASAMA' | 'KOMPENSASI_UANG' | 'INTEGRASI_WARGA';
+    area?: number;
+    namaTpu?: string;
+    pengurusTpu?: string;
+    noPks?: string;
+    nominalKompensasi?: number;
+    alamat?: string;
+    statusVerifikasi?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    catatanVerifikasi?: string;
+    diverifikasiOleh?: string;
+    diverifikasiPada?: string;
+  };
+  compensations?: {
+    id: string;
+    type: 'LAHAN_SAWAH' | 'LAHAN_MAKAM_FISIK' | 'LAHAN_MAKAM_UANG' | 'PSU_FISIK_TAMBAHAN';
+    requiredAreaM2: number;
+    fulfillmentMethod: 'PENYEDIAAN_FISIK_OFFSITE' | 'KOMPENSASI_UANG' | 'KERJASAMA_PIHAK_KETIGA';
+    locationAddress?: string;
+    nominalAmount?: number;
+    documentUrl?: string;
+    status: 'BELUM_TERPENUHI' | 'PROSES_VERIFIKASI' | 'TERPENUHI';
+  }[];
 }

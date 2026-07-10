@@ -15,12 +15,10 @@ import { cn } from "@/lib/utils";
  * Mengambil data secara asinkron dari data mock terdaftar [sipas-fe.txt].
  */
 export default function SubmissionListPanel() {
-    const {
-        openPanel,
-        closePanelsToTheRight,
-        selectedCompanyId,
-        setSelectedCompanyId
-    } = useGisUIStore();
+    const openPanel = useGisUIStore((s) => s.openPanel);
+    const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
+    const selectedCompanyId = useGisUIStore((s) => s.selectedCompanyId);
+    const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
 
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -36,8 +34,8 @@ export default function SubmissionListPanel() {
     ];
 
     const { data: submissions = [] } = useQuery<Submission[]>({
-        queryKey: ['submissions'],
-        queryFn: SubmissionService.getAll,
+        queryKey: ['submissions-all'],
+        queryFn: SubmissionService.getAllList,
     });
 
     // Penapisan Gabungan (Pencarian Teks & Status Pengajuan) [sipas-fe.txt]

@@ -17,7 +17,8 @@ interface BaseMapItem {
 }
 
 export default function BasemapPanel() {
-    const { activeBaseMap, setActiveBaseMap } = useGisUIStore();
+    const activeBaseMap = useGisUIStore((s) => s.activeBaseMap);
+    const setActiveBaseMap = useGisUIStore((s) => s.setActiveBaseMap);
 
     // Katalog Peta Dasar (Basemaps) yang Didukung oleh GEOSIPAS
     const baseMaps: BaseMapItem[] = [

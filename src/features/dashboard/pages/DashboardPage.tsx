@@ -11,8 +11,8 @@ export default function DashboardPage() {
   const { activeRole } = useUIStore();
 
   const { data: submissions = [], isLoading } = useQuery({
-    queryKey: ['submissions'],
-    queryFn: SubmissionService.getAll,
+    queryKey: ['submissions-all'],
+    queryFn: SubmissionService.getAllList,
   });
 
   // Kalkulasi statistik data

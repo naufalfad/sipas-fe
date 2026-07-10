@@ -156,8 +156,11 @@ const SPATIAL_LAYERS: LayerDef[] = [
 const SPATIAL_LAYER_IDS = SPATIAL_LAYERS.map((l) => l.id);
 
 export default function LayerPanel() {
-    const { activeLayers, toggleLayer, mapOpacity, setMapOpacity, mapZoom } =
-        useGisUIStore();
+    const activeLayers = useGisUIStore((s) => s.activeLayers);
+    const toggleLayer = useGisUIStore((s) => s.toggleLayer);
+    const mapOpacity = useGisUIStore((s) => s.mapOpacity);
+    const setMapOpacity = useGisUIStore((s) => s.setMapOpacity);
+    const mapZoom = useGisUIStore((s) => s.mapZoom);
 
     const allSpatialActive = SPATIAL_LAYER_IDS.every((id) =>
         activeLayers.includes(id)

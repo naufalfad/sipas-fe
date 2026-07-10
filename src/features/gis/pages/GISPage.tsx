@@ -15,18 +15,14 @@ import PanelOrchestrator from '../components/PanelOrchestrator';
 import MapHUD from '../components/MapHUD';
 import ZoningHorizontalLegend from '../components/ZoningHorizontalLegend';
 
-// --- (3D BIM ENGINE DIPINDAHKAN KE HALAMAN TERSENDIRI) ---
 
 export default function GISPage() {
   const { user } = useAuthStore();
   const activeRole = user ? (normalizeRole(user.role) as UserRole) : 'Super Admin';
 
-  // Tarik ID perumahan terpilih dari store spasial
-  useGisUIStore();
 
   const isExecutive = activeRole === 'Kepala Bidang' || activeRole === 'Super Admin' || activeRole === 'Tim Teknis';
 
-  // Resolusi nama perumahan secara dinamis untuk dikirim sebagai judul modal 3D
 
   useEffect(() => {
     toast.info(`Kanvas Geospasial GEOSIPAS aktif sebagai: ${activeRole}`);
@@ -36,7 +32,7 @@ export default function GISPage() {
     <main className="relative h-screen w-screen overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased select-none">
 
       {/* =====================================================================
-          LAYER 0: THE INFINITE CANVAS (PETA UTAMA 2D/3D - LEAFLET)
+          LAYER 0: THE INFINITE CANVAS (PETA UTAMA 2D - LEAFLET)
           Berada di dasar (z-0) dan mengonsumsi 100% ruang viewport monitor.
       ====================================================================== */}
       <SipasMap />

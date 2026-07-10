@@ -299,10 +299,6 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     )}
                 </div>
 
-                <div className="px-4 py-3 border-b border-slate-100 bg-yellow-50 text-yellow-800 text-xs font-semibold uppercase tracking-wider">
-                    3D BIM viewer dinonaktifkan sementara. Fitur 3D sedang dalam pengembangan.
-                </div>
-
                 {/* STREAMING_CHUNK:Rendering high-density loss parameters comparison ledger */}
                 <div className="text-left">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">

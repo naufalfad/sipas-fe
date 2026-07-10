@@ -21,8 +21,8 @@ export default function ApprovalQueuePage() {
 
   // Fetch all submissions dari service layer
   const { data: submissions = [], isLoading } = useQuery({
-    queryKey: ['submissions'],
-    queryFn: SubmissionService.getAll
+    queryKey: ['submissions-all'],
+    queryFn: SubmissionService.getAllList
   });
 
   // Filter list permohonan berdasarkan status

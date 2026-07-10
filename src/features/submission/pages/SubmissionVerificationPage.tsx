@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { uploadFileToBackend } from '@/features/submission/utils/upload';
 import { VERIFICATION_ASPECTS } from '../constants/verificationAspects';
+import { MiniMap } from '@/features/submission/components/MiniMap';
 
 const getDocCategoryLabel = (key?: string) => {
   if (key === 'legalDoc') return 'Sertifikat Tanah & KTP';
@@ -66,6 +67,11 @@ export default function SubmissionVerificationPage() {
     const category = sub.submissionDetails?.category || 'PERUMAHAN';
 
     return VERIFICATION_ASPECTS.filter((aspect) => {
+      // TPU (tech_cemetery) hanya berlaku untuk perumahan
+      if (aspect.code === 'tech_cemetery' && category !== 'PERUMAHAN') {
+        return false;
+      }
+
       // 1. Perumahan: tidak ada amdal (REQ_ENV_IMPACT)
       if (category === 'PERUMAHAN') {
         return aspect.code !== 'REQ_ENV_IMPACT';
@@ -97,6 +103,18 @@ export default function SubmissionVerificationPage() {
             attachmentUrl: item.attachmentUrl
           };
         });
+        // Map compensations if not explicitly in evaluationChecklist yet
+        if (sub.compensations) {
+          sub.compensations.forEach((comp: any) => {
+            if (!mappedStates[comp.id]) {
+              mappedStates[comp.id] = {
+                status: comp.status === 'TERPENUHI' ? 'Sesuai' : 'Tidak Sesuai',
+                catatan: '',
+                attachmentUrl: comp.documentUrl
+              };
+            }
+          });
+        }
         setChecklistStates(mappedStates);
       } else {
         const defaultStates: typeof checklistStates = {};
@@ -106,6 +124,14 @@ export default function SubmissionVerificationPage() {
             catatan: ''
           };
         });
+        if (sub.compensations) {
+          sub.compensations.forEach((comp: any) => {
+            defaultStates[comp.id] = {
+              status: comp.status === 'TERPENUHI' ? 'Sesuai' : 'Tidak Sesuai',
+              catatan: ''
+            };
+          });
+        }
         setChecklistStates(defaultStates);
       }
     }
@@ -133,8 +159,49 @@ export default function SubmissionVerificationPage() {
       };
     });
 
+    if (sub?.compensations) {
+      sub.compensations.forEach((comp: any) => {
+        const state = checklistStates[comp.id] || { status: comp.status === 'TERPENUHI' ? 'Sesuai' : 'Tidak Sesuai', catatan: '' };
+        output[comp.id] = {
+          aspekLabel: `Kompensasi: Lahan ${comp.type.replace(/_/g, ' ')} (${comp.requiredAreaM2} m²)`,
+          statusKelayakan: state.status,
+          catatanVerifikator: state.catatan,
+          attachmentUrl: comp.documentUrl,
+          verifiedById: userProfile?.id || undefined,
+          verifiedAt: new Date().toISOString()
+        };
+      });
+    }
+
     return output;
-  }, [checklistStates, userProfile, filteredAspects]);
+  }, [checklistStates, userProfile, filteredAspects, sub]);
+
+  const allAspectsToRender = useMemo(() => {
+    const list = [...filteredAspects.map(a => ({ ...a, isComp: false }))];
+    if (sub?.compensations) {
+      sub.compensations.forEach((comp: any) => {
+        list.push({
+          code: comp.id,
+          label: `Kompensasi: Lahan ${comp.type.replace(/_/g, ' ')} (${comp.requiredAreaM2} m²)`,
+          helpText: `Kewajiban kompensasi alih fungsi lahan yang dideklarasikan oleh pemohon di ${comp.locationAddress || 'luar kawasan perumahan'}. Nominal retribusi/denda: Rp ${(comp.nominalAmount || 0).toLocaleString('id-ID')}.`,
+          isComp: true
+        } as any);
+      });
+    }
+    return list;
+  }, [filteredAspects, sub]);
+
+  const centerCoord = useMemo<[number, number]>(() => {
+    if (sub?.location?.lat !== undefined && sub?.location?.lng !== undefined) {
+      return [sub.location.lat, sub.location.lng];
+    }
+    return [-6.595189, 106.816629]; // Cibinong default
+  }, [sub]);
+
+  const polygonLatLngs = useMemo<[number, number][]>(() => {
+    if (!sub?.location?.polygon) return [];
+    return sub.location.polygon.map((pt: [number, number]) => [pt[1], pt[0]] as [number, number]);
+  }, [sub]);
 
   const kkpr_verdict_final = useMemo(() => kkprVerdict, [kkprVerdict]);
   const verified_kdb_final = useMemo(() => (verifiedKdb === '' ? undefined : verifiedKdb), [verifiedKdb]);
@@ -516,6 +583,93 @@ export default function SubmissionVerificationPage() {
             </div>
           </div>
 
+          {/* Section: Mini-Map Visualisasi Spasial Tapak */}
+          <div className="space-y-4 pt-4 border-t border-slate-300 text-left">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Visualisasi Georeferensi Tapak</h2>
+            <MiniMap
+              center={centerCoord}
+              polygon={polygonLatLngs}
+              housingName={sub.housingName}
+            />
+          </div>
+
+          {/* Section: Rincian TPU Pemohon */}
+          {sub.tpu && (
+            <div className="space-y-4 pt-4 border-t border-slate-300 text-left">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Detail TPU Rencana</h2>
+              <div className="bg-[#e8f2ea]/20 p-4 border border-[#DAE4DB] space-y-3 text-xs">
+                <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                  <span className="text-slate-500">Metode TPU</span>
+                  <span className="font-bold text-slate-800 uppercase">{sub.tpu.method?.replace(/_/g, ' ')}</span>
+                </div>
+                {sub.tpu.method === 'MANDIRI' && (
+                  <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                    <span className="text-slate-500">Luas TPU</span>
+                    <span className="font-mono font-bold text-slate-800">{sub.tpu.area?.toLocaleString('id-ID')} m²</span>
+                  </div>
+                )}
+                {sub.tpu.method === 'EKSISTING' && (
+                  <>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">Nama TPU Pemda</span>
+                      <span className="font-bold text-slate-800">{sub.tpu.namaTpu}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">Alamat TPU</span>
+                      <span className="font-medium text-slate-700">{sub.tpu.alamat}</span>
+                    </div>
+                  </>
+                )}
+                {(sub.tpu.method === 'KERJASAMA' || sub.tpu.method === 'INTEGRASI_WARGA') && (
+                  <>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">Nama Makam</span>
+                      <span className="font-bold text-slate-800">{sub.tpu.namaTpu}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">Pengurus Makam</span>
+                      <span className="font-bold text-slate-800">{sub.tpu.pengurusTpu}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">No. PKS</span>
+                      <span className="font-mono font-bold text-slate-800">{sub.tpu.noPks}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">Lokasi</span>
+                      <span className="font-medium text-slate-700">{sub.tpu.alamat}</span>
+                    </div>
+                  </>
+                )}
+                {sub.tpu.method === 'KOMPENSASI_UANG' && (
+                  <>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">Nominal Retribusi</span>
+                      <span className="font-mono font-bold text-slate-800">Rp {(sub.tpu.nominalKompensasi || 0).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-dashed border-[#DAE4DB] pb-1.5">
+                      <span className="text-slate-500">Keterangan</span>
+                      <span className="font-medium text-slate-700">{sub.tpu.alamat}</span>
+                    </div>
+                  </>
+                )}
+                {sub.tpu.buktiDokumenUrl && (
+                  <div className="flex justify-between pt-1.5 items-center">
+                    <span className="text-slate-500">Dokumen Bukti TPU</span>
+                    <a
+                      href={sub.tpu.buktiDokumenUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-700 hover:text-emerald-800 hover:underline font-bold flex items-center gap-1 text-[11px]"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Lihat Dokumen
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Section: Berkas Unggahan Pemohon */}
           <div className="space-y-4 pt-4 border-t border-slate-300">
             <div>
@@ -562,12 +716,12 @@ export default function SubmissionVerificationPage() {
               <p className="text-[10px] text-slate-500 mt-0.5">Lakukan evaluasi kelayakan spasial secara mendetail per parameter.</p>
             </div>
             <div className="px-3 py-1 bg-slate-100 border border-slate-400 text-slate-800 font-mono text-[10px] font-bold rounded-none uppercase">
-              {Object.keys(checklistStates).filter(k => filteredAspects.some(a => a.code === k) && checklistStates[k].status === 'Sesuai').length} / {filteredAspects.length} Sesuai
+              {Object.keys(checklistStates).filter(k => allAspectsToRender.some(a => a.code === k) && checklistStates[k].status === 'Sesuai').length} / {allAspectsToRender.length} Sesuai
             </div>
           </div>
 
           <div className="divide-y divide-slate-300 border-b border-slate-300">
-            {filteredAspects.map((aspect) => {
+            {allAspectsToRender.map((aspect) => {
               const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
               const isExpanded = expandedAspect === aspect.code;
               const isSesuai = state.status === 'Sesuai';

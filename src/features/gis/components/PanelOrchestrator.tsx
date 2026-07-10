@@ -34,7 +34,9 @@ const getPanelCategoryLabel = (type: GisPanelType): string => {
 };
 
 export default function PanelOrchestrator() {
-    const { activePanels, closePanel, closePanelsToTheRight } = useGisUIStore();
+    const activePanels = useGisUIStore((s) => s.activePanels);
+    const closePanel = useGisUIStore((s) => s.closePanel);
+    const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {

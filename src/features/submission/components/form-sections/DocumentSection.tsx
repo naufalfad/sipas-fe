@@ -32,6 +32,8 @@ export const DocumentSection = () => {
   const cadDoc = watch('document.cadDoc');
   const ktpDoc = watch('document.ktpDoc');
   const nibDoc = watch('document.nibDoc');
+  const tpuMethod = watch('tpu.method');
+  const tpuDoc = watch('tpu.buktiDokumenUrl');
 
   // ─── DEKLARATIF CHECKLIST MATRIX (Protected Variations) ───────────────
   const docSummary = [];
@@ -100,6 +102,24 @@ export const DocumentSection = () => {
     docSummary.push({
       name: 'Persetujuan Teknis Pembuangan & Pengolahan Air Limbah',
       value: supportDoc2,
+      mandatory: true
+    });
+  }
+
+  // 5b. Validasi Dokumen TPU (Khusus Perumahan dengan Metode Non-Mandiri)
+  if (submissionCategory === 'PERUMAHAN' && tpuMethod && tpuMethod !== 'MANDIRI') {
+    let docName = 'Dokumen Bukti PKS / Izin Penggunaan TPU';
+    if (tpuMethod === 'KERJASAMA' || tpuMethod === 'INTEGRASI_WARGA') {
+      docName = 'Dokumen Perjanjian Kerja Sama (PKS) TPU';
+    } else if (tpuMethod === 'KOMPENSASI_UANG') {
+      docName = 'Bukti Setor Retribusi Kas Daerah TPU';
+    } else if (tpuMethod === 'EKSISTING') {
+      docName = 'Surat Rekomendasi / Izin Penggunaan TPU Pemda';
+    }
+
+    docSummary.push({
+      name: docName,
+      value: tpuDoc,
       mandatory: true
     });
   }

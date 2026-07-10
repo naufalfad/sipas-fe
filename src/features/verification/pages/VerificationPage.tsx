@@ -9,8 +9,8 @@ import {
 
 export default function VerificationPage() {
   const { data: submissions = [] } = useQuery<Submission[]>({
-    queryKey: ['submissions'],
-    queryFn: SubmissionService.getAll,
+    queryKey: ['submissions-all'],
+    queryFn: SubmissionService.getAllList,
   });
 
   // Ambil data antrean pengajuan yang saat ini berada dalam tahapan evaluasi/verifikasi dinas

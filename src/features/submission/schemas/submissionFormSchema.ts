@@ -193,6 +193,26 @@ export const statementSchema = z.object({
   })
 });
 
+export const tpuSchema = z.object({
+  method: z.enum(['MANDIRI', 'EKSISTING', 'KERJASAMA', 'KOMPENSASI_UANG', 'INTEGRASI_WARGA']).optional(),
+  area: z.preprocess(numericPreprocess, z.number().min(0).optional()),
+  namaTpu: z.string().optional(),
+  pengurusTpu: z.string().optional(),
+  noPks: z.string().optional(),
+  nominalKompensasi: z.preprocess(numericPreprocess, z.number().min(0).optional()),
+  alamat: z.string().optional(),
+  buktiDokumenUrl: z.union([z.string(), z.any()]).optional(),
+}).optional();
+
+export const compensationItemSchema = z.object({
+  type: z.enum(['LAHAN_SAWAH', 'LAHAN_MAKAM_FISIK', 'LAHAN_MAKAM_UANG', 'PSU_FISIK_TAMBAHAN']),
+  requiredAreaM2: z.preprocess(numericPreprocess, z.number().min(0)),
+  fulfillmentMethod: z.enum(['PENYEDIAAN_FISIK_OFFSITE', 'KOMPENSASI_UANG', 'KERJASAMA_PIHAK_KETIGA']),
+  locationAddress: z.string().optional(),
+  nominalAmount: z.preprocess(numericPreprocess, z.number().min(0).optional()),
+  documentUrl: z.union([z.string(), z.any()]).optional(),
+});
+
 /* STREAMING_CHUNK:Consolidating unified submission schema and type declarations */
 export const fullSubmissionSchema = z.object({
   id_permohonan: z.string().optional(),
@@ -206,6 +226,8 @@ export const fullSubmissionSchema = z.object({
   document: documentSchema,
   photo: photoSchema,
   statement: statementSchema,
+  tpu: tpuSchema,
+  compensations: z.array(compensationItemSchema).optional(),
 });
 
 export type FullSubmissionFormValues = z.infer<typeof fullSubmissionSchema>;

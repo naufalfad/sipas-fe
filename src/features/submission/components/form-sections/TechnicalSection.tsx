@@ -15,8 +15,16 @@ export const TechnicalSection = () => {
   const category = watch('submission.category') || 'PERUMAHAN';
   const landArea = watch('location.landArea') || 0;
 
-  const cemeteryAreaVal = watch('technical.cemeteryArea');
+  const cemeteryAreaVal = watch('tpu.area') || watch('technical.cemeteryArea');
   const [cemeteryPercent, setCemeteryPercent] = useState<string>('');
+
+  const tpuMethod = watch('tpu.method') || 'MANDIRI';
+
+  useEffect(() => {
+    if (!watch('tpu.method')) {
+      setValue('tpu.method', 'MANDIRI');
+    }
+  }, []);
 
   /* STREAMING_CHUNK:Defining cemetery ratio calculation handlers */
   const handleCemeteryLuasChangeVal = (val: number | undefined) => {
@@ -228,36 +236,170 @@ export const TechnicalSection = () => {
             </select>
           </div>
 
-          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border border-[#DAE4DB] bg-[#f4f7f4]/20 p-4">
-            <div className="flex flex-col justify-between h-full">
-              <LabelWithInfo label="Luas Unit Makam / TPU Rencana (m²)" helpText={`Penyediaan area makam fisik / TPU rencana (wajib minimal 2% dari total luas lahan perumahan: ${landArea > 0 ? (landArea * 0.02).toLocaleString('id-ID') : '0'} m²).`} />
-              <FormattedInput name="technical.cemeteryArea" placeholder="Penyediaan 2% dari luas total" unit="m²" onChangeCustom={handleCemeteryLuasChangeVal} />
-              {errors.technical?.cemeteryArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.cemeteryArea.message}</p>}
+          {/* ─── MODUL PENYEDIAAN TEMPAT PEMAKAMAN UMUM (TPU) TERSTRUKTUR ─── */}
+          <div className="md:col-span-2 border border-[#DAE4DB] bg-[#f4f7f4]/20 p-5 space-y-4">
+            <div>
+              <LabelWithInfo 
+                label="Metode Pemenuhan Kewajiban TPU" 
+                helpText="Pilih metode pemenuhan kewajiban Tempat Pemakaman Umum (TPU) sesuai kesepakatan tata ruang dan perda setempat." 
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                {[
+                  { id: 'MANDIRI', label: 'Mandiri (Fisik On-Site)', desc: 'Menyediakan TPU fisik mandiri di dalam lokasi perumahan' },
+                  { id: 'EKSISTING', label: 'TPU Eksisting Pemda', desc: 'Menggunakan TPU milik Pemda yang sudah ada' },
+                  { id: 'KERJASAMA', label: 'Kerja Sama Makam', desc: 'Bekerja sama secara resmi dengan makam pihak ketiga/ulayat' },
+                  { id: 'INTEGRASI_WARGA', label: 'Integrasi Makam Warga', desc: 'Makam bersatu dengan lahan pemakaman warga sekitar' },
+                  { id: 'KOMPENSASI_UANG', label: 'Kompensasi Uang', desc: 'Membayar denda retribusi kompensasi ke Kas Daerah Pemda' },
+                ].map((m) => {
+                  const isSelected = tpuMethod === m.id;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => setValue('tpu.method', m.id as any)}
+                      className={cn(
+                        "border p-3 cursor-pointer transition-all duration-200 select-none flex flex-col justify-between min-h-[90px]",
+                        isSelected 
+                          ? "border-primary bg-[#e8f2ea]/40 ring-1 ring-primary shadow-sm" 
+                          : "border-border hover:border-slate-400 bg-white"
+                      )}
+                    >
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 block">{m.label}</span>
+                        <span className="text-[10px] text-slate-500 mt-1 block leading-tight">{m.desc}</span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-end">
+                        <input
+                          type="radio"
+                          checked={isSelected}
+                          onChange={() => {}} // handled by parent onClick
+                          className="h-3 w-3 text-primary border-slate-300 focus:ring-primary cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="flex flex-col justify-between h-full">
-              <LabelWithInfo label="Kalkulator Persentase TPU (%)" helpText={`Masukkan target persentase atau hitung otomatis. Luas Lahan Aktif: ${landArea.toLocaleString('id-ID')} m².`} />
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={cemeteryPercent}
-                  onChange={handleCemeteryPercentChange}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  className={inputClass}
-                  placeholder="Contoh: 2"
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 select-none">%</span>
-              </div>
-              {cemeteryPercent && !isNaN(Number(cemeteryPercent)) && (
-                <span className={cn(
-                  "text-[10px] font-bold mt-1 block",
-                  Number(cemeteryPercent) >= 2 ? "text-primary" : "text-rose-600"
-                )}>
-                  {Number(cemeteryPercent) >= 2 ? "✓ Memenuhi standar minimal 2%" : "⚠ Kurang dari standar minimal 2%"}
-                </span>
+            {/* Conditional Input Fields TPU */}
+            <div className="p-4 border border-dashed border-[#DAE4DB] bg-white space-y-4">
+              {tpuMethod === 'MANDIRI' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo 
+                      label="Luas Lahan Makam Rencana (m²)" 
+                      helpText={`Penyediaan area makam fisik mandiri (wajib minimal 2% dari total luas lahan perumahan: ${(landArea * 0.02).toLocaleString('id-ID')} m²).`} 
+                    />
+                    <FormattedInput 
+                      name="tpu.area" 
+                      placeholder="Penyediaan 2% dari luas total" 
+                      unit="m²" 
+                      onChangeCustom={(val) => {
+                        setValue('tpu.area', val);
+                        setValue('technical.cemeteryArea', val); // Sinkronkan ke kolom legacy
+                        handleCemeteryLuasChangeVal(val);
+                      }} 
+                    />
+                    {errors.tpu?.area && <p className="text-xs text-rose-500 mt-1">{errors.tpu.area.message}</p>}
+                  </div>
+
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo 
+                      label="Persentase Terhadap Luas Perumahan (%)" 
+                      helpText={`Dihitung otomatis. Target minimal 2%. Luas Lahan Aktif: ${landArea.toLocaleString('id-ID')} m².`} 
+                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        readOnly
+                        value={cemeteryPercent ? `${cemeteryPercent}%` : '0%'}
+                        className={cn(inputClass, "bg-slate-100 font-bold text-slate-700")}
+                      />
+                    </div>
+                    {cemeteryPercent && !isNaN(Number(cemeteryPercent)) && (
+                      <span className={cn(
+                        "text-[10px] font-bold mt-1 block",
+                        Number(cemeteryPercent) >= 2 ? "text-primary" : "text-rose-600"
+                      )}>
+                        {Number(cemeteryPercent) >= 2 ? "✓ Memenuhi standar minimal 2%" : "⚠ Kurang dari standar minimal 2%"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {tpuMethod === 'EKSISTING' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo label="Nama TPU Pemda Eksisting" helpText="Nama Tempat Pemakaman Umum (TPU) resmi milik Pemda." />
+                    <input type="text" {...register('tpu.namaTpu')} className={inputClass} placeholder="Contoh: TPU Pondok Rajeg" />
+                  </div>
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo label="Alamat / Lokasi TPU" helpText="Kecamatan dan kelurahan lokasi TPU Pemda." />
+                    <input type="text" {...register('tpu.alamat')} className={inputClass} placeholder="Contoh: Kec. Cibinong, Kel. Pondok Rajeg" />
+                  </div>
+                  <div className="col-span-1 md:col-span-2 mt-2 text-left">
+                    <ContextualUploadBox
+                      label="Unggah Surat Rekomendasi / Bukti Izin Penggunaan TPU Pemda"
+                      fieldKey="tpu.buktiDokumenUrl"
+                      helpText="Unggah surat persetujuan dari Dinas Pemakaman atau UPTD terkait untuk pemanfaatan TPU Pemda dalam format PDF/Gambar."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(tpuMethod === 'KERJASAMA' || tpuMethod === 'INTEGRASI_WARGA') && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo label="Nama Makam Ulayat / Warga" helpText="Nama kompleks pemakaman warga sekitar." />
+                    <input type="text" {...register('tpu.namaTpu')} className={inputClass} placeholder="Contoh: Makam Kramat Sukasari" />
+                  </div>
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo label="Nama Ketua Pengurus Makam" helpText="Nama penanggung jawab ulayat/pengurus makam." />
+                    <input type="text" {...register('tpu.pengurusTpu')} className={inputClass} placeholder="Contoh: Haji Mulyadi" />
+                  </div>
+                  <div className="flex flex-col justify-between h-full col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col justify-between h-full">
+                      <LabelWithInfo label="Nomor Perjanjian Kerja Sama (PKS)" helpText="Nomor surat perjanjian kerja sama legal." />
+                      <input type="text" {...register('tpu.noPks')} className={inputClass} placeholder="Contoh: PKS/05/VIII/2026" />
+                    </div>
+                    <div className="flex flex-col justify-between h-full">
+                      <LabelWithInfo label="Alamat Kompleks Makam" helpText="Alamat lokasi makam fisik berada." />
+                      <input type="text" {...register('tpu.alamat')} className={inputClass} placeholder="Contoh: Kampung Sukasari RT 02/RW 03, Jonggol" />
+                    </div>
+                  </div>
+                  <div className="col-span-1 md:col-span-2 mt-2 text-left">
+                    <ContextualUploadBox
+                      label="Unggah Dokumen Perjanjian Kerja Sama (PKS) TPU"
+                      fieldKey="tpu.buktiDokumenUrl"
+                      helpText="Unduh dan unggah dokumen perjanjian tertulis (PKS) pemanfaatan lahan makam dengan pengurus TPU atau warga sekitar dalam format PDF/Gambar."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {tpuMethod === 'KOMPENSASI_UANG' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo label="Nominal Uang Kompensasi (Rp)" helpText="Jumlah uang retribusi kompensasi TPU yang disetor ke Kas Daerah." />
+                    <FormattedInput 
+                      name="tpu.nominalKompensasi" 
+                      placeholder="Contoh: 150.000.000" 
+                      prefix="Rp " 
+                    />
+                  </div>
+                  <div className="flex flex-col justify-between h-full">
+                    <LabelWithInfo label="Keterangan Penyetoran" helpText="Catatan tambahan mengenai transfer kas daerah." />
+                    <input type="text" {...register('tpu.alamat')} className={inputClass} placeholder="Contoh: Transfer via BJB Cabang Cibinong" />
+                  </div>
+                  <div className="col-span-1 md:col-span-2 mt-2 text-left">
+                    <ContextualUploadBox
+                      label="Unggah Bukti Setoran Retribusi Kas Daerah"
+                      fieldKey="tpu.buktiDokumenUrl"
+                      helpText="Unggah scan slip transfer/bukti pembayaran denda retribusi kompensasi pemakaman daerah dalam format PDF/Gambar."
+                    />
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -279,7 +421,13 @@ export const TechnicalSection = () => {
           </div>
           <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Sumber Air Bersih" helpText="Sumber penyediaan air minum bagi warga kawasan tapak perumahan." />
-            <input {...register('technical.waterSource')} type="text" className={inputClass} placeholder="Contoh: PDAM / Sumur Bor Komunal" />
+            <select {...register('technical.waterSource')} className={inputClass}>
+              <option value="PDAM">PDAM</option>
+              <option value="SUMUR_KOMUNAL">Sumur Komunal</option>
+              <option value="SUMUR_PER_UNIT">Sumur per-unit</option>
+              <option value="PENGOLAHAN_MANDIRI_KOMUNAL">Pengolahan air bersih mandiri (komunal)</option>
+              <option value="LAIN_LAIN">Lain-lain</option>
+            </select>
           </div>
 
           {/* ─── DYNAMIC UPLOAD: Dokumen Rencana PSU ─── */}

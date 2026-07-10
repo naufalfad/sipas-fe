@@ -6,7 +6,8 @@ import { inputClass } from './styles';
 export const FormattedInput = ({
   name,
   placeholder,
-  unit = 'm²',
+  unit = '',
+  prefix = '',
   min = 0,
   isDecimal = false,
   onChangeCustom,
@@ -14,6 +15,7 @@ export const FormattedInput = ({
   name: string;
   placeholder?: string;
   unit?: string;
+  prefix?: string;
   min?: number;
   isDecimal?: boolean;
   onChangeCustom?: (val: number | undefined) => void;
@@ -33,7 +35,7 @@ export const FormattedInput = ({
           displayVal = numVal !== undefined ? String(numVal) : '';
         } else {
           displayVal = numVal !== undefined
-            ? `${numVal.toLocaleString('id-ID', { maximumFractionDigits: isDecimal ? 2 : 0 })} ${unit}`.trim()
+            ? `${prefix}${numVal.toLocaleString('id-ID', { maximumFractionDigits: isDecimal ? 2 : 0 })} ${unit}`.trim()
             : '';
         }
 
@@ -47,7 +49,11 @@ export const FormattedInput = ({
         };
 
         const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-          const cleanText = e.target.value.replace(/[^0-9.-]/g, '');
+          // Hanya izinkan angka (dan satu titik desimal jika desimal)
+          const cleanText = isDecimal
+            ? e.target.value.replace(/[^0-9.]/g, '')
+            : e.target.value.replace(/[^0-9]/g, '');
+          
           const num = Number(cleanText);
           if (cleanText === '' || isNaN(num)) {
             onChange(undefined);
@@ -60,6 +66,7 @@ export const FormattedInput = ({
         };
 
         const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
+          e.preventDefault();
           (e.target as HTMLInputElement).blur();
         };
 

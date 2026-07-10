@@ -15,10 +15,9 @@ import { cn } from "@/lib/utils";
  * Termasuk: Legenda, Koordinat Kursor + Elevasi, Zoom/Pitch/Bearing, tombol kontrol.
  */
 export default function MapHUD() {
-    const {
-        activeLayers, mapZoom,
-        cursorCoords
-    } = useGisUIStore();
+    const activeLayers = useGisUIStore((s) => s.activeLayers);
+    const mapZoom = useGisUIStore((s) => s.mapZoom);
+    const cursorCoords = useGisUIStore((s) => s.cursorCoords);
 
     const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isCoordsOpen, setIsCoordsOpen] = useState(false);

@@ -60,8 +60,8 @@ export function useSipasMapData(localZoom: number) {
   } | null>(null);
 
   const { data: submissions = [] } = useQuery<Submission[]>({
-    queryKey: ['submissions'],
-    queryFn: SubmissionService.getAll,
+    queryKey: ['submissions-all'],
+    queryFn: SubmissionService.getAllList,
   });
 
   useEffect(() => {

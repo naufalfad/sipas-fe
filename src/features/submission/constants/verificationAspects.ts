@@ -17,5 +17,6 @@ export const VERIFICATION_ASPECTS: AspectDefinition[] = [
   { code: 'REQ_UTILITY', label: 'Prasarana & Utilitas Kota', helpText: 'Ketersediaan jaringan listrik PLN, gardu penunjang, pembuangan sampah mandiri, dan suplai air minum.' },
   { code: 'REQ_ENV_IMPACT', label: 'Dampak Lingkungan (AMDAL / UKL-UPL)', helpText: 'Penyertaan dokumen kelayakan lingkungan AMDAL resmi untuk kawasan industri/skala besar.' },
   { code: 'REQ_TRAFFIC', label: 'Dampak Lalu Lintas (Andalalin)', helpText: 'Penyertaan surat persetujuan andalalin dari Dishub guna mencegah kemacetan sirkulasi jalan.' },
-  { code: 'REQ_PSU', label: 'Sarana Utilitas Umum / Fasum / Fasos', helpText: 'Penyediaan lahan pemakaman (TPU 2%) dan penyerahan PSU untuk perumahan (Purworejo 8).' },
+  { code: 'tech_cemetery', label: 'Penyediaan Lahan TPU / Makam', helpText: 'Kewajiban penyediaan Tempat Pemakaman Umum (TPU) minimal 2% dari luas perumahan atau denda kompensasi.' },
+  { code: 'REQ_PSU', label: 'Sarana Utilitas Umum / Fasum / Fasos', helpText: 'Penyediaan sarana ibadah, olahraga, kesehatan, dan penyerahan PSU untuk perumahan.' },
 ];

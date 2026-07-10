@@ -15,7 +15,7 @@ import SitePlanListPage from '@/features/siteplan/pages/SitePlanListPage';
 import SitePlanDetailPage from '@/features/siteplan/pages/SitePlanDetailPage';
 import VerificationPage from '@/features/verification/pages/VerificationPage';
 import GISPage from '@/features/gis/pages/GISPage';
-import BimViewerPage from '@/features/gis/pages/BimViewerPage';
+
 import ReportsPage from '@/features/approval/pages/ReportsPage';
 import ApprovalQueuePage from '@/features/approval/pages/ApprovalQueuePage';
 import UsersPage from '@/features/users/pages/UsersPage';
@@ -228,14 +228,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-  {
-    path: '/gis/bim/:id',
-    element: (
-      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin']}>
-        <BimViewerPage />
-      </ProtectedRoute>
-    ),
-  },
+
 
   // 4. FALLBACK REDIRECT (Fail-Safe Routing)
   {

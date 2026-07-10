@@ -4,9 +4,10 @@ import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 
 export default function ZoningHorizontalLegend() {
-    const {
-        activeLayers, activePanels, mapZoom, mapPitch, mapBearing, cursorCoords,
-    } = useGisUIStore();
+    const activeLayers = useGisUIStore((s) => s.activeLayers);
+    const activePanels = useGisUIStore((s) => s.activePanels);
+    const mapZoom = useGisUIStore((s) => s.mapZoom);
+    const cursorCoords = useGisUIStore((s) => s.cursorCoords);
     const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
     const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -56,9 +57,6 @@ export default function ZoningHorizontalLegend() {
     const triggerResetView = () => window.dispatchEvent(new Event("map-reset-view"));
 
     const zoomLabel = mapZoom < 10 ? "KAB." : mapZoom < 14 ? "KEC." : "DETAIL";
-    const bearingNorm = Math.round(((mapBearing % 360) + 360) % 360);
-    const dirs = ["U", "TL", "T", "TG", "S", "BD", "B", "BL"];
-    const compassLabel = dirs[Math.round(bearingNorm / 45) % 8];
 
     return (
         <div
@@ -74,14 +72,6 @@ export default function ZoningHorizontalLegend() {
                             <span className="text-slate-400">ZOOM</span>{" "}
                             <span className="text-slate-700">{Math.round(mapZoom)}</span>
                             <span className="text-slate-400 ml-1.5">{zoomLabel}</span>
-                        </span>
-                        <span className="px-2.5">
-                            <span className="text-slate-400">PITCH</span>{" "}
-                            <span className="text-slate-700">{Math.round(mapPitch)}°</span>
-                        </span>
-                        <span className="px-2.5">
-                            <span className="text-slate-400">ARAH</span>{" "}
-                            <span className="text-slate-700">{compassLabel} {bearingNorm}°</span>
                         </span>
                         {cursorCoords && (
                             <span className="pl-2.5 flex items-center gap-1 text-teal-700">

@@ -11,7 +11,9 @@ interface NavigationItem {
 }
 
 export default function GisSidebar() {
-    const { openPanel, activePanels, closePanelsToTheRight } = useGisUIStore();
+    const openPanel = useGisUIStore((s) => s.openPanel);
+    const activePanels = useGisUIStore((s) => s.activePanels);
+    const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
 
     // 1. Konfigurasi Navigasi Taktis (Rata Kiri, Siku Kaku)
     const navigationItems = useMemo<NavigationItem[]>(() => [
