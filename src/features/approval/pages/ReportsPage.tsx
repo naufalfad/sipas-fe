@@ -75,7 +75,7 @@ export default function ReportsPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `laporan_geosipas_${selectedStartMonth}_${selectedStartYear}_${selectedEndMonth}_${selectedEndYear}.csv`;
+      a.download = `laporan_geosipas_${selectedStartMonth}_${selectedStartYear}_${selectedEndMonth}_${selectedEndYear}.xls`;
       document.body.appendChild(a);
       a.click();
       a.remove();
