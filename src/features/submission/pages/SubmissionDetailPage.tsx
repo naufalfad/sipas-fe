@@ -23,6 +23,8 @@ import {
   TechnicalTab, CompensationTab, PhotosTab
 } from '../components/detail-tabs';
 
+// Impor Komponen Peta Baru Berbasis Canvas & PostGIS (Fase 3)
+
 // ─── STYLING CONSTANTS (PROTECTED VARIATIONS) ──────────────────────────────────
 const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
 const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
@@ -137,6 +139,8 @@ export default function SubmissionDetailPage() {
       }
     }
   }, [sub]);
+
+  // Center Koordinat Peta
 
   // Mutation untuk Admin SIPAS (Administrasi)
   const mutation = useMutation({

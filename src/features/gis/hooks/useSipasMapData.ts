@@ -1,10 +1,22 @@
+/**
+ * ============================================================================
+ * GEOSIPAS GIS HOOK — Map Data Orchestrator [useSipasMapData.ts] (REVISED v9)
+ * ============================================================================
+ * Peran  : Hook utama untuk mengelola pemuatan asinkron seluruh layer geospasial,
+ *          menangani cluster, dan menyelaraskan state spasial dengan Zustand store.
+ *          Telah diamandemen penuh untuk memindahkan beban pemrosesan koordinat
+ *          berat dari browser UI thread ke level PostGIS database.
+ * ============================================================================
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Supercluster from 'supercluster';
 import type { BBox, GeoJsonProperties } from 'geojson';
-import { useGisUIStore, type LahanKompensasi } from '@/app/store/useGisUIStore';
+import { useGisUIStore } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { Submission } from '@/features/submission/types';
+import { API_BASE_URL } from '@/config';
 import {
   leafletRingToGeoJSON,
   polygonCentroid,
@@ -25,9 +37,12 @@ export function useSipasMapData(localZoom: number) {
   const activeLayers = useGisUIStore((s) => s.activeLayers);
   const selectedCompanyId = useGisUIStore((s) => s.selectedCompanyId);
   const activeKompensasi = useGisUIStore((s) => s.activeKompensasi);
-  const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
-  const openPanel = useGisUIStore((s) => s.openPanel);
-  const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
+
+  // Ambil state tembolok spasial global terbaru dari Zustand
+  const activeSubmissionGeoJson = useGisUIStore((s) => s.activeSubmissionGeoJson);
+  const visibleSubLayers = useGisUIStore((s) => s.visibleSubLayers);
+  const setActiveSubmissionGeoJson = useGisUIStore((s) => s.setActiveSubmissionGeoJson);
+  const clearSpatialCache = useGisUIStore((s) => s.clearSpatialCache);
 
   const [sungaiData, setSungaiData] = useState<any>(null);
   const [konturData, setKonturData] = useState<any>(null);
@@ -52,33 +67,57 @@ export function useSipasMapData(localZoom: number) {
   const [popupInfo, setPopupInfo] = useState<ProcessedSubmission | null>(null);
   const [viewBBox, setViewBBox] = useState<BBox>([-180, -85, 180, 85]);
   const [clashGeoJSON, setClashGeoJSON] = useState<any>(null);
-  const [activeGeometries, setActiveGeometries] = useState<{
-    roadPolygons?: number[][][];
-    rthPolygons?: number[][][];
-    psuPolygons?: number[][][];
-    kavlingPolygons?: number[][][];
-  } | null>(null);
 
   const { data: submissions = [] } = useQuery<Submission[]>({
     queryKey: ['submissions-all'],
     queryFn: SubmissionService.getAllList,
   });
 
+  // ─── AUDIT: PEMBERSIHAN TEMBOLOK SPASIAL OTOMATIS SAAT BERPINDAH HALAMAN ───
+  useEffect(() => {
+    return () => {
+      // Membersihkan data spasial, kursor, dan filter sub-layer dari memori Zustand
+      // untuk menjamin performa peramban tetap stabil tanpa kebocoran memori (leak-proof)
+      clearSpatialCache();
+    };
+  }, [clearSpatialCache]);
+
+  // ─── AMANDEMEN: FETCH GEOJSON SITE PLAN DARI BACKEND SECARA STATELESS ───
   useEffect(() => {
     if (!selectedCompanyId) {
-      setActiveGeometries(null);
+      setActiveSubmissionGeoJson(null);
       return;
     }
+
     let active = true;
-    SubmissionService.getGeometries(selectedCompanyId).then((data) => {
-      if (active && data) {
-        setActiveGeometries(data);
+
+    const fetchActiveGeoJson = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/api/v1/submissions/${selectedCompanyId}/geojson`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (active) {
+            setActiveSubmissionGeoJson(data);
+          }
+        }
+      } catch (err) {
+        console.warn(`[useSipasMapData] Gagal memuat GeoJSON untuk permohonan ${selectedCompanyId}:`, err);
       }
-    });
+    };
+
+    fetchActiveGeoJson();
+
     return () => {
       active = false;
     };
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, setActiveSubmissionGeoJson]);
 
   // ─── DYNAMIC LOAD EFFECTS ───
   useEffect(() => {
@@ -211,13 +250,11 @@ export function useSipasMapData(localZoom: number) {
   const processedSubmissions = useMemo<ProcessedSubmission[]>(() =>
     submissions
       .map((sub: Submission) => {
-        // Hitung centroid polygon batas lahan menggunakan formula centroid poligon
         let centroidLat = sub.location.lat;
         let centroidLng = sub.location.lng;
         const polygon = sub.location.polygon as [number, number][] | undefined;
         if (polygon && polygon.length >= 3) {
           try {
-            // Convert polygon coordinates to leaflet [lat, lng] format first
             const leafletPolygon = polygon.map((p) => {
               if (p[0] >= 90 && p[0] <= 145 && p[1] >= -15 && p[1] <= 10) {
                 return [p[1], p[0]] as [number, number];
@@ -229,7 +266,7 @@ export function useSipasMapData(localZoom: number) {
               centroidLat = centroid[0];
               centroidLng = centroid[1];
             }
-          } catch { /* fallback ke location.lat/lng */ }
+          } catch { /* fallback */ }
         }
         return {
           ...sub,
@@ -269,49 +306,20 @@ export function useSipasMapData(localZoom: number) {
     return { type: 'FeatureCollection' as const, features };
   }, [processedSubmissions]);
 
+  // ─── OPTIMASI FILTER SUB-LAYERS DI SISI FRONTEND (ZERO CPU-BOUND BLOCKS) ───
   const subPolygonsGeoJSON = useMemo(() => {
-    const features: any[] = [];
+    if (!activeSubmissionGeoJson) return null;
 
-    if (activeGeometries && selectedCompanyId) {
-      const addPoly = (rings: number[][][], color: string, type: string) => {
-        rings.forEach((ring) => {
-          try {
-            const geoJSONRing = leafletRingToGeoJSON(ring as [number, number][]);
-            features.push({
-              type: 'Feature',
-              geometry: { type: 'Polygon', coordinates: [geoJSONRing] },
-              properties: { id: selectedCompanyId, color, type, submissionId: selectedCompanyId },
-            });
-          } catch { /* skip */ }
-        });
-      };
-      if (activeGeometries.roadPolygons) addPoly(activeGeometries.roadPolygons, '#cbd5e1', 'road');
-      if (activeGeometries.rthPolygons) addPoly(activeGeometries.rthPolygons, '#10b981', 'rth');
-      if (activeGeometries.psuPolygons) addPoly(activeGeometries.psuPolygons, '#14b8a6', 'psu');
-      if (activeGeometries.kavlingPolygons) addPoly(activeGeometries.kavlingPolygons, '#64748b', 'kavling');
-    } else {
-      processedSubmissions.forEach((sub) => {
-        const loc = sub.location;
-        const addPoly = (rings: [number, number][][], color: string, type: string) => {
-          rings.forEach((ring) => {
-            try {
-              const geoJSONRing = leafletRingToGeoJSON(ring);
-              features.push({
-                type: 'Feature',
-                geometry: { type: 'Polygon', coordinates: [geoJSONRing] },
-                properties: { id: sub.id, color, type, submissionId: sub.id },
-              });
-            } catch { /* skip */ }
-          });
-        };
-        if (loc.roadPolygons) addPoly(loc.roadPolygons, '#cbd5e1', 'road');
-        if (loc.rthPolygons) addPoly(loc.rthPolygons, '#10b981', 'rth');
-        if (loc.psuPolygons) addPoly(loc.psuPolygons, '#14b8a6', 'psu');
-        if (loc.kavlingPolygons) addPoly(loc.kavlingPolygons, '#64748b', 'kavling');
-      });
-    }
-    return { type: 'FeatureCollection' as const, features };
-  }, [processedSubmissions, activeGeometries, selectedCompanyId]);
+    // Filter fitur GeoJSON secara aman berdasarkan sub-layer yang sedang di-toggle aktif oleh pengguna
+    const filteredFeatures = activeSubmissionGeoJson.features.filter((f: any) =>
+      visibleSubLayers.includes(f.properties?.layer_name)
+    );
+
+    return {
+      ...activeSubmissionGeoJson,
+      features: filteredFeatures
+    };
+  }, [activeSubmissionGeoJson, visibleSubLayers]);
 
   const compensationGeoJSON = useMemo(() => {
     if (!activeKompensasi || !activeKompensasi.polygon || activeKompensasi.polygon.length < 3) return null;
@@ -339,7 +347,6 @@ export function useSipasMapData(localZoom: number) {
     const sc = new Supercluster<GeoJsonProperties>({ radius: 80, maxZoom: 12, minZoom: 0 });
     sc.load(processedSubmissions.map((sub) => ({
       type: 'Feature' as const,
-      // Gunakan centroid polygon (pre-computed di processedSubmissions)
       geometry: { type: 'Point' as const, coordinates: [sub.centroidLng, sub.centroidLat] },
       properties: {
         submissionId: sub.id, color: sub.color,
@@ -348,8 +355,6 @@ export function useSipasMapData(localZoom: number) {
     })));
     return sc;
   }, [processedSubmissions]);
-
-
 
   const intZoom = Math.floor(localZoom);
   useEffect(() => {

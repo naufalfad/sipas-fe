@@ -15,7 +15,9 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { uploadFileToBackend } from '@/features/submission/utils/upload';
 import { VERIFICATION_ASPECTS } from '../constants/verificationAspects';
-import { MiniMap } from '@/features/submission/components/MiniMap';
+
+// Impor Komponen Peta Baru Berbasis Canvas & PostGIS (Fase 3)
+import SitePlanViewerMap from '@/components/maps/SitePlanViewerMap';
 
 const getDocCategoryLabel = (key?: string) => {
   if (key === 'legalDoc') return 'Sertifikat Tanah & KTP';
@@ -198,11 +200,6 @@ export default function SubmissionVerificationPage() {
     return [-6.595189, 106.816629]; // Cibinong default
   }, [sub]);
 
-  const polygonLatLngs = useMemo<[number, number][]>(() => {
-    if (!sub?.location?.polygon) return [];
-    return sub.location.polygon.map((pt: [number, number]) => [pt[1], pt[0]] as [number, number]);
-  }, [sub]);
-
   const kkpr_verdict_final = useMemo(() => kkprVerdict, [kkprVerdict]);
   const verified_kdb_final = useMemo(() => (verifiedKdb === '' ? undefined : verifiedKdb), [verifiedKdb]);
   const verified_klb_final = useMemo(() => (verifiedKlb === '' ? undefined : verifiedKlb), [verifiedKlb]);
@@ -258,7 +255,7 @@ export default function SubmissionVerificationPage() {
       navigate(`/pengajuan/verifikasi/${id}/preview-telaah`);
     },
     onError: (error: Error) => {
-      toast.error(`Gagal memproses draf dokumen telaah: ${error.message}`);
+      toast.error(`Gagal memproses draf draf dokumen telaah: ${error.message}`);
     }
   });
 
@@ -586,10 +583,11 @@ export default function SubmissionVerificationPage() {
           {/* Section: Mini-Map Visualisasi Spasial Tapak */}
           <div className="space-y-4 pt-4 border-t border-slate-300 text-left">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Visualisasi Georeferensi Tapak</h2>
-            <MiniMap
+            {/* SINKRONISASI BARU FASE 3: MENGGUNAKAN SITEPLANVIEWERMAP SEBAGAI PENGGANTI MINIMAP */}
+            <SitePlanViewerMap
+              idPermohonan={sub.id}
               center={centerCoord}
-              polygon={polygonLatLngs}
-              housingName={sub.housingName}
+              className="h-[220px] w-full border border-border"
             />
           </div>
 

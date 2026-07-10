@@ -336,6 +336,7 @@ export interface Submission {
     noPks?: string;
     nominalKompensasi?: number;
     alamat?: string;
+    buktiDokumenUrl?: string;   // URL bukti dokumen PKS/setoran retribusi TPU
     statusVerifikasi?: 'PENDING' | 'APPROVED' | 'REJECTED';
     catatanVerifikasi?: string;
     diverifikasiOleh?: string;

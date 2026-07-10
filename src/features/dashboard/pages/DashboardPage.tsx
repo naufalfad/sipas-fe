@@ -120,7 +120,7 @@ export default function DashboardPage() {
                       <h4 className="font-bold text-slate-800 text-xs truncate">{sub.housingName}</h4>
                       <p className="text-[10px] text-slate-400 mt-0.5">{sub.developerName}</p>
                       <div className="flex items-center space-x-3 mt-1.5 text-[10px] text-slate-400">
-                        <span className="flex items-center"><MapPin className="h-3 w-3 mr-1 text-[#709775]" /> {sub.location.address.split(',')[0]}</span>
+                        <span className="flex items-center"><MapPin className="h-3 w-3 mr-1 text-[#709775]" /> {sub.location?.address?.split(',')[0] ?? '—'}</span>
                         <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {sub.submissionDate}</span>
                       </div>
                     </div>

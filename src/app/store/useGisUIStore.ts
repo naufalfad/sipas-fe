@@ -72,6 +72,10 @@ interface GisUIState {
     selectedCompanyId: string | null;
     activeKompensasi: LahanKompensasi | null;
 
+    // ── SPASIAL TEMBOLOK (ACTIVE GEOMETRIES CACHE) ───────────────────────────
+    activeSubmissionGeoJson: any | null; // Menyimpan data GeoJSON FeatureCollection aktif [Fase 3]
+    visibleSubLayers: string[];          // Kontrol visibilitas sub-layer dinas (KDB, Jalan, RTH, Makam)
+
     // ── Kamera Peta ──────────────────────────────────────────────────────────
     mapZoom: number;
     /** Format [latitude, longitude] — tetap dipertahankan untuk kompatibilitas komponen lain */
@@ -106,6 +110,11 @@ interface GisUIState {
     setActiveKompensasi: (kompensasi: LahanKompensasi | null) => void;
     updateKompensasiStatus: (idKompensasi: string, status: LahanKompensasi['statusPemenuhan']) => void;
 
+    // ── Actions: Spasial Tembolok & Sub-layer ────────────────────────────────
+    setActiveSubmissionGeoJson: (geoJson: any | null) => void;
+    toggleSubLayer: (subLayerName: string) => void;
+    clearSpatialCache: () => void; // Aksi pembersih spasial terpadu saat berpindah halaman [Fase 3]
+
     // ── Actions: Kamera ──────────────────────────────────────────────────────
     setMapZoom: (zoom: number) => void;
     setMapCenter: (center: [number, number]) => void;
@@ -139,6 +148,11 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     clashGeoJson: null,
     selectedCompanyId: null,
     activeKompensasi: null,
+
+    // Spasial Tembolok & Sub-layer Default
+    activeSubmissionGeoJson: null,
+    visibleSubLayers: ['PTSP_KDB', 'PTSP_PSU_JALAN', 'PTSP_KDH', 'PTSP_PSU_MAKAM'],
+
     mapZoom: 11,
     mapCenter: [-6.4816, 106.8560],   // [lat, lng] — format Leaflet
     cursorCoords: null,
@@ -187,6 +201,24 @@ export const useGisUIStore = create<GisUIState>((set) => ({
             ? { ...state.activeKompensasi, statusPemenuhan: status }
             : state.activeKompensasi
     })),
+
+    // ── Implementasi Actions: Spasial Tembolok & Sub-layer ───────────────────
+
+    setActiveSubmissionGeoJson: (activeSubmissionGeoJson) => set({ activeSubmissionGeoJson }),
+
+    toggleSubLayer: (subLayerName) => set((state) => ({
+        visibleSubLayers: state.visibleSubLayers.includes(subLayerName)
+            ? state.visibleSubLayers.filter((name) => name !== subLayerName)
+            : [...state.visibleSubLayers, subLayerName]
+    })),
+
+    clearSpatialCache: () => set({
+        activeSubmissionGeoJson: null,
+        selectedCompanyId: null,
+        activeKompensasi: null,
+        clashGeoJson: null,
+        visibleSubLayers: ['PTSP_KDB', 'PTSP_PSU_JALAN', 'PTSP_KDH', 'PTSP_PSU_MAKAM']
+    }),
 
     // ── Implementasi Actions: Kamera ─────────────────────────────────────────
 

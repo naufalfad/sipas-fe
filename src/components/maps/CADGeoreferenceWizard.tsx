@@ -7,13 +7,14 @@
  *          Helmert 2D Conformal Transformation [Jakarta 5].
  * 
  * Desain : Menggunakan arsitektur modular terkecil (Atomic Design) [sipas-fe.txt].
- *          Sisi Kiri  : react-map-gl (MapLibre) untuk memilih titik kontrol bumi [sipas-fe.txt].
- *          Sisi Kanan : SVG Viewport untuk memilih titik jangkar denah CAD [sipas-fe.txt].
+ *          Sisi Kiri  : react-leaflet untuk memilih titik kontrol bumi nyata.
+ *          Sisi Kanan : SVG Viewport untuk memilih titik jangkar denah CAD lokal.
  * ============================================================================
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { Marker, Source, Layer } from 'react-map-gl/maplibre';
+import { Polygon, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
 import { Settings2, Compass, RefreshCw, Loader2 } from 'lucide-react';
 import GISMapContainer from './GISMapContainer';
 import { cn } from '@/lib/utils';
@@ -92,42 +93,64 @@ export default function CADGeoreferenceWizard({
     const [point1, setPoint1] = useState<ControlPointState>({ cadCoords: null, mapCoords: null });
     const [point2, setPoint2] = useState<ControlPointState>({ cadCoords: null, mapCoords: null });
 
-    // Peta acuan bidang tanah GeoJSON target untuk panel kiri [sipas-fe.txt]
-    const targetBoundaryGeoJSON = useMemo(() => ({
-        type: 'FeatureCollection' as const,
-        features: [{
-            type: 'Feature' as const,
-            geometry: {
-                type: 'Polygon' as const,
-                coordinates: [[
-                    [106.8400, -6.4800],
-                    [106.8413, -6.4798],
-                    [106.8414, -6.4804],
-                    [106.8422, -6.4802],
-                    [106.8420, -6.4793],
-                    [106.8426, -6.4789],
-                    [106.8417, -6.4785],
-                    [106.8410, -6.4789],
-                    [106.8407, -6.4787],
-                    [106.8396, -6.4791],
-                    [106.8398, -6.4795],
-                    [106.8394, -6.4797],
-                    [106.8400, -6.4800]
-                ]]
-            },
-            properties: {}
-        }]
-    }), []);
+    // ─── MATEMATIKA SPASIAL: PROYEKSI DINAMIS MARKER BUMI BPN ────────────────
+    // Menghasilkan koordinat bumi nyata WGS84 di sekitar wilayah seeder Cibinong [sipas-be.txt]
+    const projectedMapPoints = useMemo(() => {
+        const base_lon = 106.802744;
+        const base_lat = -6.471861;
+        const rotation_deg = 12.0;
+
+        const rad = (rotation_deg * Math.PI) / 180;
+        const lat_len = 111132.95;
+        const lon_len = 111132.95 * Math.cos((base_lat * Math.PI) / 180);
+
+        const project = (x: number, y: number): [number, number] => {
+            const x_rot = x * Math.cos(rad) - y * Math.sin(rad);
+            const y_rot = x * Math.sin(rad) + y * Math.cos(rad);
+            const lon = base_lon + (x_rot / lon_len);
+            const lat = base_lat + (y_rot / lat_len);
+            return [lon, lat]; // Mengembalikan [Longitude, Latitude]
+        };
+
+        return {
+            p1: project(110.0, 55.0),  // Titik lokal tengah CAD
+            p2: project(250.0, 55.0)   // Titik lokal timur CAD
+        };
+    }, []);
+
+    // ─── MATEMATIKA SPASIAL: PROYEKSI POLIGON BATAS LUAR RIIL UNTUK WIZARD ─────
+    // Membuat visualisasi batas lahan BPN agar tampil presisi sebagai panduan Kabid/Tim Teknis
+    const targetBoundaryCoords = useMemo<[number, number][]>(() => {
+        const vertices = [
+            [0, 0], [140, 15], [155, -45], [240, -30], [220, 70], [280, 110],
+            [190, 160], [110, 115], [80, 140], [-40, 100], [-20, 50], [-60, 30], [0, 0]
+        ];
+        const base_lon = 106.802744;
+        const base_lat = -6.471861;
+        const rotation_deg = 12.0;
+
+        const rad = (rotation_deg * Math.PI) / 180;
+        const lat_len = 111132.95;
+        const lon_len = 111132.95 * Math.cos((base_lat * Math.PI) / 180);
+
+        return vertices.map(([x, y]) => {
+            const x_rot = x * Math.cos(rad) - y * Math.sin(rad);
+            const y_rot = x * Math.sin(rad) + y * Math.cos(rad);
+            const lon = base_lon + (x_rot / lon_len);
+            const lat = base_lat + (y_rot / lat_len);
+            return [lat, lon]; // Format Leaflet Polygon: [Latitude, Longitude]
+        });
+    }, []);
 
     // ── HANDLER INTERAKSI: PEMILIHAN TITIK CAD (KANAN) ──────────────────────────
 
     const handleSelectCadPoint = (pointNum: 1 | 2, x: number, y: number) => {
         if (pointNum === 1) {
             setPoint1(prev => ({ ...prev, cadCoords: [x, y] }));
-            toast.info('Titik CAD 1 terkunci! Silakan pilih titik pasangan yang cocok di Peta GIS sebelah kiri.');
+            toast.info('Titik CAD 1 terkunci! Silakan klik tombol "1" di Peta GIS sebelah kiri.');
         } else {
             setPoint2(prev => ({ ...prev, cadCoords: [x, y] }));
-            toast.info('Titik CAD 2 terkunci! Silakan pilih titik pasangan yang cocok di Peta GIS sebelah kiri.');
+            toast.info('Titik CAD 2 terkunci! Silakan klik tombol "2" di Peta GIS sebelah kiri.');
         }
     };
 
@@ -156,7 +179,6 @@ export default function CADGeoreferenceWizard({
     // ── PROSES KALIBRASI MATEMATIS HELMERT 2D ─────────────────────────────────────
 
     const handleRunCalibration = useCallback(() => {
-        // [TS-SAFE] Dekomposisi koordinat ke variabel lokal untuk penyempitan tipe (Type Narrowing)
         const c1 = point1.cadCoords;
         const c2 = point2.cadCoords;
         const m1 = point1.mapCoords;
@@ -171,25 +193,34 @@ export default function CADGeoreferenceWizard({
 
         setTimeout(() => {
             try {
+                // Eksekusi rumus Helmert 2D Conformal
                 const result = solveHelmert2D(c1, c2, m1, m2);
 
-                // Menghasilkan poligon akhir yang ter-georeference dalam standard GeoJSON [Longitude, Latitude] secara acak/irregular
-                const dx = m2[0] - m1[0];
-                const dy = m2[1] - m1[1];
-                const calibratedPolygon: [number, number][] = [
-                    [m1[0], m1[1]],
-                    [m1[0] + dx * 0.4, m1[1] + dy * 0.1],
-                    [m1[0] + dx * 0.5, m1[1] + dy * 0.6],
-                    [m1[0] + dx * 0.9, m1[1] + dy * 0.5],
-                    [m1[0] + dx * 0.8, m1[1] + dy * 0.8],
-                    [m1[0] + dx * 1.1, m1[1] + dy * 1.0],
-                    [m1[0] + dx * 0.7, m1[1] + dy * 1.2],
-                    [m1[0] + dx * 0.3, m1[1] + dy * 0.9],
-                    [m1[0] + dx * 0.1, m1[1] + dy * 0.7],
-                    [m1[0] - dx * 0.2, m1[1] + dy * 0.4],
-                    [m1[0] - dx * 0.1, m1[1] + dy * 0.2],
-                    [m1[0], m1[1]]
+                // Poligon dasar rencana tapak (Sesuai BOUNDARY_VERTICES_1)
+                const localVertices = [
+                    [0, 0], [140, 15], [155, -45], [240, -30], [220, 70], [280, 110],
+                    [190, 160], [110, 115], [80, 140], [-40, 100], [-20, 50], [-60, 30], [0, 0]
                 ];
+
+                const rad = result.rotation;
+                const lat_len = 111132.95;
+                const lon_len = 111132.95 * Math.cos((m1[1] * Math.PI) / 180);
+
+                // Transformasikan seluruh vertex CAD lokal relatif terhadap titik kontrol
+                const calibratedPolygon: [number, number][] = localVertices.map(([x, y]) => {
+                    // 1. Shift relatif ke titik kontrol 1 CAD (110.0, 55.0)
+                    const dx_local = x - 110.0;
+                    const dy_local = y - 55.0;
+
+                    // 2. Rotasi & Skala
+                    const x_rot = (dx_local * Math.cos(rad) - dy_local * Math.sin(rad)) * result.scale;
+                    const y_rot = (dx_local * Math.sin(rad) + dy_local * Math.cos(rad)) * result.scale;
+
+                    // 3. Translasi ke titik kontrol 1 Peta WGS84
+                    const lon = m1[0] + (x_rot / lon_len);
+                    const lat = m1[1] + (y_rot / lat_len);
+                    return [lon, lat]; // Mengembalikan format standard GeoJSON: [Longitude, Latitude]
+                });
 
                 onComplete({
                     A: result.A,
@@ -246,74 +277,62 @@ export default function CADGeoreferenceWizard({
                 {/* SPLIT SCREEN WORKSPACE PANELS */}
                 <div className="flex-1 flex divide-x divide-slate-200 min-h-0">
 
-                    {/* PANEL KIRI: TARGET BUMI NYATA (MAPLIBRE WEB GIS) [sipas-fe.txt] */}
+                    {/* PANEL KIRI: TARGET BUMI NYATA (LEAFLET WEB GIS) [sipas-fe.txt] */}
                     <div className="w-1/2 h-full relative">
-                        <div className="absolute top-3 left-3 z-10 bg-white border border-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-700 uppercase tracking-widest leading-none">
+                        <div className="absolute top-3 left-3 z-50 bg-white border border-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-700 uppercase tracking-widest leading-none">
                             Peta Spasial Target (WGS 84 / GIS)
                         </div>
 
-                        <GISMapContainer center={[-6.4800, 106.8400]} zoom={16}>
-                            {/* Batas Bidang Tanah Target */}
-                            <Source id="target-boundary" type="geojson" data={targetBoundaryGeoJSON}>
-                                <Layer
-                                    id="target-boundary-layer"
-                                    type="line"
-                                    paint={{
-                                        'line-color': '#10b981',
-                                        'line-width': 2.5,
-                                        'line-dasharray': [2, 2]
-                                    }}
-                                />
-                            </Source>
+                        {/* Menggunakan GISMapContainer Leaflet murni agar terhindar dari crash react-map-gl */}
+                        <GISMapContainer center={[-6.4718, 106.8027]} zoom={17}>
+                            {/* Render Poligon Batas Lahan BPN Spasial Sebenarnya */}
+                            <Polygon 
+                                positions={targetBoundaryCoords}
+                                pathOptions={{
+                                    color: '#10b981',
+                                    weight: 2.5,
+                                    dashArray: '5, 5',
+                                    fillColor: '#10b981',
+                                    fillOpacity: 0.05
+                                }}
+                            />
 
                             {/* Titik Anchor Interaktif 1 di Peta */}
                             <Marker
-                                longitude={106.8400}
-                                latitude={-6.4800}
-                                anchor="center"
+                                position={[projectedMapPoints.p1[1], projectedMapPoints.p1[0]]}
+                                icon={L.divIcon({
+                                    className: '',
+                                    iconSize: [24, 24],
+                                    html: `<div class="h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all bg-white border-teal-500 text-teal-600 font-sans font-bold text-[10px] shadow-md ${step === 1 ? 'animate-pulse scale-110' : ''}">1</div>`
+                                })}
+                                eventHandlers={{
+                                    click: () => handleSelectMapPoint(1, projectedMapPoints.p1[0], projectedMapPoints.p1[1])
+                                }}
                             >
-                                <button
-                                    type="button"
-                                    disabled={step !== 1 || !point1.cadCoords}
-                                    onClick={() => handleSelectMapPoint(1, 106.8400, -6.4800)}
-                                    className={cn(
-                                        "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
-                                        point1.mapCoords
-                                            ? "bg-teal-600 border-white text-white shadow-lg"
-                                            : "bg-white border-teal-500 text-teal-600 hover:scale-115 animate-pulse"
-                                    )}
-                                >
-                                    <span className="text-[9px] font-black leading-none">1</span>
-                                </button>
+                                <Popup>Titik Ikat Barat Laut (1)</Popup>
                             </Marker>
 
                             {/* Titik Anchor Interaktif 2 di Peta */}
                             <Marker
-                                longitude={106.8415}
-                                latitude={-6.4815}
-                                anchor="center"
+                                position={[projectedMapPoints.p2[1], projectedMapPoints.p2[0]]}
+                                icon={L.divIcon({
+                                    className: '',
+                                    iconSize: [24, 24],
+                                    html: `<div class="h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all bg-white border-amber-500 text-amber-600 font-sans font-bold text-[10px] shadow-md ${step === 2 ? 'animate-pulse scale-110' : ''}">2</div>`
+                                })}
+                                eventHandlers={{
+                                    click: () => handleSelectMapPoint(2, projectedMapPoints.p2[0], projectedMapPoints.p2[1])
+                                }}
                             >
-                                <button
-                                    type="button"
-                                    disabled={step !== 2 || !point2.cadCoords}
-                                    onClick={() => handleSelectMapPoint(2, 106.8415, -6.4815)}
-                                    className={cn(
-                                        "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
-                                        point2.mapCoords
-                                            ? "bg-amber-600 border-white text-white shadow-lg"
-                                            : "bg-white border-amber-500 text-amber-600 hover:scale-115"
-                                    )}
-                                >
-                                    <span className="text-[9px] font-black leading-none">2</span>
-                                </button>
+                                <Popup>Titik Ikat Tenggara (2)</Popup>
                             </Marker>
                         </GISMapContainer>
                     </div>
 
-                    {/* PANEL KANAN: GAMBAR KERJA CAD (KOORDINAT LOKAL) [sipas-fe.txt] */}
+                    {/* PANEL KANAN: GAMBAR KERJA CAD (KOORDINAT LOKAL MURNI) [sipas-fe.txt] */}
                     <div className="w-1/2 h-full bg-slate-950 relative flex items-center justify-center overflow-hidden">
                         <div className="absolute top-3 left-3 z-10 bg-slate-900 border border-slate-700 px-2.5 py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">
-                            Gambar Kerja CAD (Lokal 0,0)
+                            Gambar Kerja CAD (Lokal Meter)
                         </div>
 
                         {/* Canvas Gambar CAD Vektor */}
@@ -323,11 +342,11 @@ export default function CADGeoreferenceWizard({
                             <div className="w-48 h-48 border-2 border-dashed border-teal-500/40 bg-teal-500/5 relative flex items-center justify-center">
                                 <span className="text-[10px] font-mono text-teal-500/20 select-none">LAY_PTSP_KDB</span>
 
-                                {/* Titik Anchor CAD 1 (Barat Laut) */}
+                                {/* Titik Anchor CAD 1 (Tengah Lahan Lokal: x=110, y=55) */}
                                 <button
                                     type="button"
                                     disabled={step !== 1}
-                                    onClick={() => handleSelectCadPoint(1, 10, 10)}
+                                    onClick={() => handleSelectCadPoint(1, 110.0, 55.0)}
                                     className={cn(
                                         "absolute -top-3 -left-3 h-6 w-6 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
                                         point1.cadCoords
@@ -338,11 +357,11 @@ export default function CADGeoreferenceWizard({
                                     <span className="text-[9px] font-black leading-none">1</span>
                                 </button>
 
-                                {/* Titik Anchor CAD 2 (Tenggara) */}
+                                {/* Titik Anchor CAD 2 (Timur Lahan Lokal: x=250, y=55) */}
                                 <button
                                     type="button"
                                     disabled={step !== 2}
-                                    onClick={() => handleSelectCadPoint(2, 190, 190)}
+                                    onClick={() => handleSelectCadPoint(2, 250.0, 55.0)}
                                     className={cn(
                                         "absolute -bottom-3 -right-3 h-6 w-6 rounded-none border-2 flex items-center justify-center transition-all cursor-pointer outline-none",
                                         point2.cadCoords
@@ -385,7 +404,7 @@ export default function CADGeoreferenceWizard({
                         ) : (
                             <div className="flex items-center gap-1.5">
                                 <RefreshCw className="h-4 w-4" />
-                                <span>Kalkulasi & Sinkronisasi Spasial</span>
+                                <span>Kalkulasi &amp; Sinkronisasi Spasial</span>
                             </div>
                         )}
                     </button>

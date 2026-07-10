@@ -65,8 +65,8 @@ export const SubmissionService = {
    * Mengembalikan array Submission[] langsung.
    */
   getAllList: async (): Promise<Submission[]> => {
-    const url = `${API_BASE_URL}?limit=1000&page=1`;
-    const response = await fetch(url, { headers: getAuthHeaders() });
+    const query = new URLSearchParams({ limit: '1000', page: '1' });
+    const response = await fetch(`${API_BASE_URL}?${query.toString()}`, { headers: getAuthHeaders() });
     if (!response.ok) {
       const errText = await response.text();
       throw new Error(errText || `Gagal memuat daftar permohonan (HTTP ${response.status})`);
