@@ -180,7 +180,7 @@ export const router = createBrowserRouter([
       {
         path: 'laporan',
         element: (
-          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Kepala Bidang', 'Super Admin']}>
+          <ProtectedRoute allowedRoles={['Admin SIPAS', 'Kepala Bidang', 'Super Admin', 'Kadis']}>
             <ReportsPage />
           </ProtectedRoute>
         ),

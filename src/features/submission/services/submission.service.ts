@@ -213,5 +213,18 @@ export const SubmissionService = {
       console.warn(`[SubmissionService] Gagal memuat detail geometri spasial ID ${id_permohonan} dari API backend:`, err);
       return undefined;
     }
+  },
+  /**
+   * Mengambil statistik laporan eksekutif berdasarkan rentang bulan/tahun awal hingga bulan/tahun akhir.
+   */
+  getReportStats: async (startMonth: number, startYear: number, endMonth: number, endYear: number): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/reports/stats?start_month=${startMonth}&start_year=${startYear}&end_month=${endMonth}&end_year=${endYear}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat statistik laporan (HTTP ${response.status})`);
+    }
+    return await response.json();
   }
 };
