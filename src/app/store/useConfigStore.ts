@@ -17,6 +17,11 @@ export interface ConfigState {
   maintenanceMessage: string;
   slideBanners: SlideBanner[];
   rotationInterval: number; // in seconds
+  appName: string;
+  appLogo: string | null;
+  mapCenterLat: number;
+  mapCenterLng: number;
+  mapZoom: number;
   
   fetchConfig: () => Promise<void>;
   updateSessionConfig: (duration: number, timeout: number) => void;
@@ -25,6 +30,8 @@ export interface ConfigState {
   deleteSlide: (id: string) => void;
   updateSlide: (id: string, slide: Partial<Omit<SlideBanner, 'id'>>) => void;
   updateRotationInterval: (interval: number) => void;
+  updateBrandingConfig: (appName: string, appLogo: string | null) => Promise<void>;
+  updateMapConfig: (lat: number, lng: number, zoom: number) => Promise<void>;
 }
 
 const DEFAULT_SLIDES: SlideBanner[] = [
@@ -64,7 +71,12 @@ const saveToBackend = async () => {
         isMaintenance: state.isMaintenance,
         maintenanceMessage: state.maintenanceMessage,
         slideBanners: state.slideBanners,
-        rotationInterval: state.rotationInterval
+        rotationInterval: state.rotationInterval,
+        appName: state.appName,
+        appLogo: state.appLogo,
+        mapCenterLat: state.mapCenterLat,
+        mapCenterLng: state.mapCenterLng,
+        mapZoom: state.mapZoom
       })
     });
   } catch (err) {
@@ -81,6 +93,11 @@ export const useConfigStore = create<ConfigState>()(
       maintenanceMessage: 'Sistem sedang dalam pemeliharaan berkala untuk peningkatan performa. Silakan coba beberapa saat lagi.',
       slideBanners: DEFAULT_SLIDES,
       rotationInterval: 5,
+      appName: 'GEOSIPAS',
+      appLogo: null,
+      mapCenterLat: -6.4816,
+      mapCenterLng: 106.8560,
+      mapZoom: 11,
 
       fetchConfig: async () => {
         try {
@@ -93,7 +110,12 @@ export const useConfigStore = create<ConfigState>()(
               isMaintenance: data.isMaintenance,
               maintenanceMessage: data.maintenanceMessage,
               slideBanners: data.slideBanners,
-              rotationInterval: data.rotationInterval
+              rotationInterval: data.rotationInterval,
+              appName: data.appName || 'GEOSIPAS',
+              appLogo: data.appLogo || null,
+              mapCenterLat: data.mapCenterLat || -6.4816,
+              mapCenterLng: data.mapCenterLng || 106.8560,
+              mapZoom: data.mapZoom || 11
             });
           }
         } catch (err) {
@@ -129,6 +151,14 @@ export const useConfigStore = create<ConfigState>()(
       },
       updateRotationInterval: async (interval) => {
         set({ rotationInterval: interval });
+        await saveToBackend();
+      },
+      updateBrandingConfig: async (appName, appLogo) => {
+        set({ appName, appLogo });
+        await saveToBackend();
+      },
+      updateMapConfig: async (lat, lng, zoom) => {
+        set({ mapCenterLat: lat, mapCenterLng: lng, mapZoom: zoom });
         await saveToBackend();
       }
     }),

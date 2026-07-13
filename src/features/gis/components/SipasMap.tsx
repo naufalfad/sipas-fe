@@ -19,6 +19,7 @@ import type { Map as LeafletMap, LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 import { useGisUIStore } from '@/app/store/useGisUIStore';
+import { useConfigStore } from '@/app/store/useConfigStore';
 import { ClusterMarker, PinMarker } from './markers';
 import { SpatialGeoJSONLayers } from './layers/SpatialGeoJSONLayers';
 import { useSipasMapData, type ProcessedSubmission } from '../hooks/useSipasMapData';
@@ -104,6 +105,7 @@ function MapController({
   const map = useMap();
   const mapRef = useRef<LeafletMap>(map);
   mapRef.current = map;
+  const { mapCenterLat, mapCenterLng, mapZoom } = useConfigStore();
 
   // Derived layer visibility
   const showSungai = activeLayers.includes('layer-river') && localZoom >= 10;
@@ -137,7 +139,7 @@ function MapController({
   useEffect(() => {
     const handleZoomIn = () => map.zoomIn();
     const handleZoomOut = () => map.zoomOut();
-    const handleReset = () => map.flyTo(INITIAL_CENTER, INITIAL_ZOOM, { duration: 1.2, animate: true });
+    const handleReset = () => map.flyTo([mapCenterLat, mapCenterLng], mapZoom, { duration: 1.2, animate: true });
     const handleFlyTo = (e: Event) => {
       const ev = e as CustomEvent<{ lat: number; lng: number }>;
       if (ev.detail) map.flyTo([ev.detail.lat, ev.detail.lng], 18, { duration: 1.8, animate: true });
@@ -351,8 +353,16 @@ export default function SipasMap() {
   const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
   const clearFlyTo = useGisUIStore((s) => s.clearFlyTo);
 
+  const { mapCenterLat, mapCenterLng, mapZoom } = useConfigStore();
+
   // Local zoom state (react-leaflet doesn't have viewState like react-map-gl)
-  const [localZoom, setLocalZoom] = React.useState(INITIAL_ZOOM);
+  const [localZoom, setLocalZoom] = React.useState(mapZoom || INITIAL_ZOOM);
+
+  useEffect(() => {
+    if (mapZoom) {
+      setLocalZoom(mapZoom);
+    }
+  }, [mapZoom]);
 
   const mapData = useSipasMapData(localZoom);
   const opacity = mapOpacity / 100;
@@ -380,8 +390,9 @@ export default function SipasMap() {
   return (
     <div className="absolute inset-0 z-0">
       <MapContainer
-        center={INITIAL_CENTER}
-        zoom={INITIAL_ZOOM}
+        key={`${mapCenterLat}-${mapCenterLng}-${mapZoom}`}
+        center={[mapCenterLat, mapCenterLng]}
+        zoom={mapZoom}
         minZoom={4}
         maxZoom={18}
         zoomControl={false}

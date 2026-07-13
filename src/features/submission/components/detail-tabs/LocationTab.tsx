@@ -1,14 +1,31 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Landmark, MapPin } from 'lucide-react';
 import { GeoJSON } from 'react-leaflet';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
+import { API_BASE_URL } from '@/config';
 
 interface LocationTabProps {
   sub: any;
 }
 
 export const LocationTab = ({ sub }: LocationTabProps) => {
+  const [cadGeoJson, setCadGeoJson] = useState<any>(null);
+
+  useEffect(() => {
+    if (!sub?.id) return;
+    const token = sessionStorage.getItem('token');
+    fetch(`${API_BASE_URL}/api/v1/submissions/${sub.id}/geojson`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setCadGeoJson(data))
+      .catch(err => console.error(err));
+  }, [sub?.id]);
+
   // Memetakan batas luar bidang tanah site plan
   const outerBoundaryGeoJSON = useMemo(() => {
     if (!sub?.location?.polygon || sub.location.polygon.length === 0) return null;
@@ -26,31 +43,6 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
       console.warn('[DetailMap] Gagal memetakan polygon batas luar:', e);
       return null;
     }
-  }, [sub]);
-
-  // Memetakan detail denah tapak (jalan, RTH, PSU, kaveling)
-  const siteplanFeaturesGeoJSON = useMemo(() => {
-    const features: any[] = [];
-    const loc = sub?.location;
-    if (!loc) return { type: 'FeatureCollection' as const, features };
-
-    const addPoly = (rings: [number, number][][], color: string, label: string) => {
-      rings.forEach((ring) => {
-        try {
-          features.push({
-            type: 'Feature',
-            geometry: { type: 'Polygon', coordinates: [leafletRingToGeoJSON(ring)] },
-            properties: { color, label },
-          });
-        } catch { /* skip */ }
-      });
-    };
-    if (loc.roadPolygons) addPoly(loc.roadPolygons, '#cbd5e1', 'Jalan');
-    if (loc.rthPolygons) addPoly(loc.rthPolygons, '#10b981', 'RTH');
-    if (loc.psuPolygons) addPoly(loc.psuPolygons, '#14b8a6', 'PSU');
-    if (loc.kavlingPolygons) addPoly(loc.kavlingPolygons, '#64748b', 'Kaveling');
-
-    return { type: 'FeatureCollection' as const, features };
   }, [sub]);
 
   return (
@@ -203,16 +195,19 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
                 )}
 
                 {/* Render Site Plan Vectors */}
-                {siteplanFeaturesGeoJSON.features.length > 0 && (
+                {cadGeoJson && cadGeoJson.features?.length > 0 && (
                   <GeoJSON
-                    key="siteplan-features"
-                    data={siteplanFeaturesGeoJSON}
-                    style={(feature) => ({
-                      color: '#ffffff',
-                      weight: 1,
-                      fillColor: feature?.properties?.color || '#0d9488',
-                      fillOpacity: 0.65,
-                    })}
+                    key={`cad-features-${sub.id}-${cadGeoJson.features.length}`}
+                    data={cadGeoJson}
+                    style={(feature) => {
+                      const color = feature?.properties?.color ?? '#14b8a6';
+                      return {
+                        color: '#ffffff',
+                        weight: 1,
+                        fillColor: color,
+                        fillOpacity: feature?.properties?.layer_name === 'PTSP_PSU_JALAN' ? 0.35 : 0.65
+                      };
+                    }}
                   />
                 )}
               </GISMapContainer>
