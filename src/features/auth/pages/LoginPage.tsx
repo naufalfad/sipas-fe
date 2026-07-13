@@ -9,7 +9,8 @@ import { useUIStore } from '@/app/store/useUIStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import type { UserRole } from '@/app/store/useUIStore';
 import { Lock, User, Layers, ArrowRight } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useConfigStore } from '@/app/store/useConfigStore';
 
 const loginSchema = z.object({
   username: z.string().min(3, 'Username minimal 3 karakter'),
@@ -24,6 +25,11 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const fetchConfig = useConfigStore((s) => s.fetchConfig);
+
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
@@ -55,14 +61,22 @@ export default function LoginPage() {
       }
 
       const resData = await response.json();
+      const userRole = normalizeRole(resData.user.role, resData.user.username);
+
+      // Check Maintenance Mode
+      const isMaintenance = useConfigStore.getState().isMaintenance;
+      if (isMaintenance && userRole !== 'Super Admin') {
+        throw new Error('Login ditolak: Sistem sedang dalam mode pemeliharaan oleh Super Admin.');
+      }
+
       login(resData.access_token, resData.user);
 
       // Sync UI simulator role & profile with authenticated user so pages
       // that read `useUIStore.activeRole` reflect the real login role.
       try {
-        const displayRole = normalizeRole(resData.user.role) as UserRole;
-        // setActiveRole may perform a demo sync; call it to align UI state.
-        setActiveRole(displayRole);
+        const displayRole = normalizeRole(resData.user.role, resData.user.username) as UserRole;
+        // setActiveRole may perform a demo sync; call it with skipFetch=true to align UI state without hitting API.
+        setActiveRole(displayRole, true);
         setUserProfile({
           name: resData.user.full_name,
           email: resData.user.email,
@@ -100,6 +114,15 @@ export default function LoginPage() {
             Sistem Informasi Pelayanan Pengesahan Site Plan Digital Kabupaten Bogor
           </p>
         </div>
+
+        {/* Warning Maintenance Mode */}
+        {useConfigStore.getState().isMaintenance && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 text-left space-y-1">
+            <p className="font-bold">Mode Pemeliharaan Aktif</p>
+            <p className="text-[10px] text-slate-500 leading-normal">{useConfigStore.getState().maintenanceMessage}</p>
+            <p className="text-[10px] font-bold text-amber-700">Hanya akun Super Admin yang dapat masuk saat ini.</p>
+          </div>
+        )}
 
         {/* Formulir Input */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">

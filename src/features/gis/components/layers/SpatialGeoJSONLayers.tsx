@@ -1,5 +1,5 @@
 import { GeoJSON } from 'react-leaflet';
-import type { PathOptions, StyleFunction } from 'leaflet';
+import type { PathOptions } from 'leaflet';
 
 interface SpatialGeoJSONLayersProps {
   opacity: number;
@@ -23,7 +23,6 @@ interface SpatialGeoJSONLayersProps {
   showSemak: boolean;
   showPunggungBukit: boolean;
   showRelka: boolean;
-  showDetail: boolean;
   bangunanData: any;
   // GeoJSON Datas
   pemukimanData: any;
@@ -93,7 +92,6 @@ export const SpatialGeoJSONLayers = ({
   showSemak,
   showPunggungBukit,
   showRelka,
-  showDetail,
   bangunanData,
   pemukimanData,
   konturData,

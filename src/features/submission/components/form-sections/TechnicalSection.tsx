@@ -35,13 +35,7 @@ export const TechnicalSection = () => {
     }
   };
 
-  const handleCemeteryPercentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const percent = Math.max(0, Number(e.target.value));
-    setCemeteryPercent(e.target.value === '' ? '' : String(percent));
-    if (landArea > 0 && !isNaN(percent)) {
-      setValue('technical.cemeteryArea', Math.round((percent / 100) * landArea));
-    }
-  };
+
 
   useEffect(() => {
     if (landArea > 0 && cemeteryAreaVal) {
@@ -362,7 +356,7 @@ export const TechnicalSection = () => {
                     <LabelWithInfo label="Nama Ketua Pengurus Makam" helpText="Nama penanggung jawab ulayat/pengurus makam." />
                     <input type="text" {...register('tpu.pengurusTpu')} className={inputClass} placeholder="Contoh: Haji Mulyadi" />
                   </div>
-                  <div className="flex flex-col justify-between h-full col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex flex-col justify-between h-full">
                       <LabelWithInfo label="Nomor Perjanjian Kerja Sama (PKS)" helpText="Nomor surat perjanjian kerja sama legal." />
                       <input type="text" {...register('tpu.noPks')} className={inputClass} placeholder="Contoh: PKS/05/VIII/2026" />

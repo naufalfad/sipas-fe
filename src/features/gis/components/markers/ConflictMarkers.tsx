@@ -3,6 +3,6 @@
 // sesuai permintaan pengguna. Komponen dipertahankan sebagai stub kosong
 // agar tidak ada breaking import di SipasMap.tsx.
 
-export default function ConflictMarkers({ conflicts }: { conflicts: any[] }) {
+export default function ConflictMarkers({ conflicts: _conflicts }: { conflicts: any[] }) {
   return null;
 }

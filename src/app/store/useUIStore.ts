@@ -56,7 +56,7 @@ interface UIState {
   // ── Actions: Kontrol Sidebar & Akun ───────────────────────────────────────
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
-  setActiveRole: (role: UserRole) => void | Promise<void>;
+  setActiveRole: (role: UserRole, skipFetch?: boolean) => void | Promise<void>;
   setUserProfile: (profile: UserProfile) => void;
 
   // ── Actions: Audit Trail Logging [Bogor 7] ────────────────────────────────
@@ -108,7 +108,8 @@ const getInitialUIState = (): { activeRole: UserRole; userProfile: UserProfile }
       const user = JSON.parse(savedUserStr);
       const r = user.role.toUpperCase().trim();
       let activeRole: UserRole = 'Super Admin';
-      if (r === 'PEMOHON') activeRole = 'Pemohon';
+      if (user.username === 'superadmin@geocitra.com') activeRole = 'Super Admin';
+      else if (r === 'PEMOHON') activeRole = 'Pemohon';
       else if (r === 'ADMIN' || r === 'ADMIN SIPAS' || r === 'ADMIN_SIPAS') activeRole = 'Admin SIPAS';
       else if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') activeRole = 'Tim Teknis';
       else if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') activeRole = 'Kepala Bidang';
@@ -178,32 +179,34 @@ export const useUIStore = create<UIState>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-  setActiveRole: async (role) => {
-    let username = 'kabid@geocitra.com';
-    if (role === 'Pemohon') username = 'pemohon@geocitra.com';
-    else if (role === 'Admin SIPAS') username = 'admin@geocitra.com';
-    else if (role === 'Tim Teknis') username = 'tim_teknis@geocitra.com';
-    else if (role === 'Kepala Bidang') username = 'kabid@geocitra.com';
-    else if (role === 'Kadis') username = 'kadis@geocitra.com'; // Sinkronisasi ke kredensial KADIS di seeder
-    else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
+  setActiveRole: async (role, skipFetch = false) => {
+    if (!skipFetch) {
+      let username = 'kabid@geocitra.com';
+      if (role === 'Pemohon') username = 'pemohon@geocitra.com';
+      else if (role === 'Admin SIPAS') username = 'admin@geocitra.com';
+      else if (role === 'Tim Teknis') username = 'tim_teknis@geocitra.com';
+      else if (role === 'Kepala Bidang') username = 'kabid@geocitra.com';
+      else if (role === 'Kadis') username = 'kadis@geocitra.com'; // Sinkronisasi ke kredensial KADIS di seeder
+      else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          username,
-          password: 'password123'
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Update useAuthStore secara transaksional
-        useAuthStore.getState().login(data.access_token, data.user);
-        console.log(`[useUIStore] Berhasil sinkronisasi login JWT untuk role: ${role}`);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            username,
+            password: 'password123'
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // Update useAuthStore secara transaksional
+          useAuthStore.getState().login(data.access_token, data.user);
+          console.log(`[useUIStore] Berhasil sinkronisasi login JWT untuk role: ${role}`);
+        }
+      } catch (err) {
+        console.warn(`[useUIStore] Gagal sinkronisasi token dengan BE untuk role: ${role}`, err);
       }
-    } catch (err) {
-      console.warn(`[useUIStore] Gagal sinkronisasi token dengan BE untuk role: ${role}`, err);
     }
 
     set({

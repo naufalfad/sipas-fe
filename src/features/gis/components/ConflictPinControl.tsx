@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useUIStore } from '../../../app/store/useUIStore';
+
 import { useAuthStore } from '../../../app/store/useAuthStore';
 import { normalizeRole } from '../../../components/auth/ProtectedRoute';
 import type { UserRole } from '../../../app/store/useUIStore';

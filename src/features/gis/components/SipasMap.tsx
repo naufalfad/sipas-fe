@@ -17,7 +17,6 @@ import {
 } from 'react-leaflet';
 import type { Map as LeafletMap, LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { toast } from 'sonner';
 
 import { useGisUIStore } from '@/app/store/useGisUIStore';
 import { ClusterMarker, PinMarker } from './markers';
@@ -75,14 +74,13 @@ interface MapControllerProps {
   isDroneLayerActive: boolean;
   droneLayerOpacity: number;
   spatialConflicts: any[];
-  activeBaseMap: string;
   flyToTarget: any;
   clearFlyTo: () => void;
   setMapZoom: (z: number) => void;
   setMapCenter: (c: [number, number]) => void;
   setCursorCoords: (c: { lat: number; lng: number; elevation: null } | null) => void;
   onMarkerClick: (sub: ProcessedSubmission) => void;
-  onClusterExpand: (clusterId: number, lng: number, lat: number, currentZoom: number) => void;
+  onClusterExpand: (clusterId: number, lng: number, lat: number) => void;
 }
 
 function MapController({
@@ -95,7 +93,6 @@ function MapController({
   isDroneLayerActive,
   droneLayerOpacity,
   spatialConflicts,
-  activeBaseMap,
   flyToTarget,
   clearFlyTo,
   setMapZoom,
@@ -126,7 +123,6 @@ function MapController({
   const showSemak = activeLayers.includes('layer-semak') && localZoom >= 10;
   const showPunggungBukit = activeLayers.includes('layer-punggungbukit') && localZoom >= 10;
   const showRelka = activeLayers.includes('layer-relka') && localZoom >= 8;
-  const showDetail = localZoom >= 14;
   const showClusters = localZoom < 13;
 
   // FlyTo handler
@@ -221,7 +217,6 @@ function MapController({
         showSemak={showSemak}
         showPunggungBukit={showPunggungBukit}
         showRelka={showRelka}
-        showDetail={showDetail}
         bangunanData={mapData.bangunanData}
         pemukimanData={mapData.pemukimanData}
         konturData={mapData.konturData}
@@ -306,7 +301,7 @@ function MapController({
             mapData.popupInfo.centroidLat ?? mapData.popupInfo.location.lat,
             mapData.popupInfo.centroidLng ?? mapData.popupInfo.location.lng,
           ]}
-          onClose={() => mapData.setPopupInfo(null)}
+          eventHandlers={{ remove: () => mapData.setPopupInfo(null) }}
           offset={[0, -28]}
           className="sipas-popup"
         >
@@ -369,7 +364,7 @@ export default function SipasMap() {
   }, [setSelectedCompanyId, closePanelsToTheRight, openPanel]);
 
   const handleClusterExpand = useCallback((
-    clusterId: number, lng: number, lat: number, currentZoom: number,
+    clusterId: number, lng: number, lat: number
   ) => {
     try {
       const z = mapData.supercluster.getClusterExpansionZoom(clusterId);
@@ -412,7 +407,6 @@ export default function SipasMap() {
           isDroneLayerActive={isDroneLayerActive}
           droneLayerOpacity={droneLayerOpacity}
           spatialConflicts={spatialConflicts}
-          activeBaseMap={activeBaseMap}
           flyToTarget={flyToTarget}
           clearFlyTo={clearFlyTo}
           setMapZoom={setMapZoom}

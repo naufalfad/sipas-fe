@@ -2,11 +2,10 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
     MapPin, CheckCircle2,
-    AlertTriangle, Calculator, Percent, Ruler, RotateCw,
+    AlertTriangle, Calculator, Percent, Ruler,
     Globe, Crosshair, Loader2
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { useNavigate } from 'react-router-dom';
 import { useSpatialValidator } from '../../hooks/useSpatialValidator';
 import { toast } from 'sonner';
 
@@ -34,7 +33,6 @@ const getStatusBadgeClass = (status: string) => {
 
 export default function DetailSubmissionPanel({ submissionData }: DetailSubmissionPanelProps) {
     /* STREAMING_CHUNK:Initializing hooks and clear clash triggers */
-    const navigate = useNavigate();
     const { validateRiverBuffer, isProcessing: isChecking } = useSpatialValidator();
     const [auditResult, setAuditResult] = useState<any>(null);
 
