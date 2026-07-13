@@ -117,21 +117,25 @@ export const TechnicalSection = () => {
           <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Luas Lantai Dasar (m²)" helpText="Total luasan tapak lantai dasar bangunan rencana untuk kalkulasi KDB." />
             <FormattedInput name="technical.applicantBuildingArea" placeholder="Contoh: 6000" />
+            {errors.technical?.applicantBuildingArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantBuildingArea.message}</p>}
           </div>
 
           <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Total Luas Lantai (m²)" helpText="Akumulasi luas seluruh lantai bangunan (Lantai 1 + Lantai 2 + dst) untuk kalkulasi KLB." />
             <FormattedInput name="technical.totalFloorArea" placeholder="Contoh: 12000" />
+            {errors.technical?.totalFloorArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.totalFloorArea.message}</p>}
           </div>
 
           <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Luas Hijau Resapan (RTH - m²)" helpText="Total luasan pekarangan hijau alami (tanpa semen/perkerasan) untuk kalkulasi KDH." />
             <FormattedInput name="technical.applicantRthArea" placeholder="Contoh: 1500" />
+            {errors.technical?.applicantRthArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantRthArea.message}</p>}
           </div>
 
           <div className="flex flex-col justify-between h-full">
             <LabelWithInfo label="Garis Sempadan (GSB - m)" helpText="Batas penarikan mundur minimal dinding bangunan terluar dari rencana as jalan." />
             <FormattedInput name="technical.applicantGsb" placeholder="Contoh: 5" unit="meter" />
+            {errors.technical?.applicantGsb && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantGsb.message}</p>}
           </div>
         </div>
 
