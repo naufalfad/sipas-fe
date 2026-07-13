@@ -27,7 +27,7 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -79,7 +79,7 @@ export default function UsersPage() {
     if (window.confirm(`Apakah Anda yakin ingin menonaktifkan akun ${name}?`)) {
       const toastId = toast.loading('Memproses penonaktifan akun...');
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/v1/auth/users/${username}/status`, {
           method: 'PUT',
           headers: {

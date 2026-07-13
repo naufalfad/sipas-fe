@@ -9,7 +9,7 @@ import './index.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppProviders>
-      <Toaster position="top-right" expand={false} richColors />
+      <Toaster position="top-right" expand={false} richColors style={{ top: '72px' }} />
       <RouterProvider router={router} />
     </AppProviders>
   </StrictMode>,

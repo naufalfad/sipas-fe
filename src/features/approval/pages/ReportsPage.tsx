@@ -64,7 +64,7 @@ export default function ReportsPage() {
   const handleExportCsv = async () => {
     setIsExportingCsv(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/submissions/reports/export/csv?start_month=${selectedStartMonth}&start_year=${selectedStartYear}&end_month=${selectedEndMonth}&end_year=${selectedEndYear}`, {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -91,7 +91,7 @@ export default function ReportsPage() {
   const handleExportPdf = async () => {
     setIsExportingPdf(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/submissions/reports/export/pdf?start_month=${selectedStartMonth}&start_year=${selectedStartYear}&end_month=${selectedEndMonth}&end_year=${selectedEndYear}`, {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})

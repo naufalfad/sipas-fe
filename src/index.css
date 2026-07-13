@@ -237,4 +237,23 @@
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
+}
+
+/* ============================================================================
+   PREMIUM SMOOTH TRANSITION FOR SONNER TOASTS (Seamless Right-to-Left)
+   ============================================================================ */
+li[data-sonner-toast] {
+  /* Menggunakan cubic-bezier penyeimbang gerakan melambat (out-expo) yang sangat halus */
+  transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1), 
+              opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), 
+              height 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.6s ease !important;
+}
+
+/* Pastikan saat keluar juga memiliki efek meredup dan bergeser kembali ke kanan dengan halus */
+li[data-sonner-toast][data-removed="true"] {
+  opacity: 0 !important;
+  transform: translateX(100%) !important;
+  transition: transform 0.6s cubic-bezier(0.75, 0, 0.25, 1),
+              opacity 0.6s cubic-bezier(0.75, 0, 0.25, 1) !important;
 }

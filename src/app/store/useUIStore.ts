@@ -100,13 +100,49 @@ const roleProfiles: Record<UserRole, UserProfile> = {
   },
 };
 
+// Helper to get initial UI state from sessionStorage to keep it synced on refresh
+const getInitialUIState = (): { activeRole: UserRole; userProfile: UserProfile } => {
+  try {
+    const savedUserStr = sessionStorage.getItem('user');
+    if (savedUserStr) {
+      const user = JSON.parse(savedUserStr);
+      const r = user.role.toUpperCase().trim();
+      let activeRole: UserRole = 'Super Admin';
+      if (r === 'PEMOHON') activeRole = 'Pemohon';
+      else if (r === 'ADMIN' || r === 'ADMIN SIPAS' || r === 'ADMIN_SIPAS') activeRole = 'Admin SIPAS';
+      else if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') activeRole = 'Tim Teknis';
+      else if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') activeRole = 'Kepala Bidang';
+      else if (r === 'KADIS' || r === 'KEPALA DINAS') activeRole = 'Kadis';
+      else if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') activeRole = 'Super Admin';
+
+      const defaultProfile = roleProfiles[activeRole] || roleProfiles['Super Admin'];
+      const userProfile: UserProfile = {
+        name: user.full_name || defaultProfile.name,
+        email: user.email || defaultProfile.email,
+        avatar: user.role === 'PEMOHON'
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces'
+          : defaultProfile.avatar
+      };
+      return { activeRole, userProfile };
+    }
+  } catch (e) {
+    console.error("Failed to parse user from session storage for UI initial state", e);
+  }
+  return {
+    activeRole: 'Super Admin',
+    userProfile: roleProfiles['Super Admin']
+  };
+};
+
+const initialUI = getInitialUIState();
+
 // ─── IMPLEMENTASI DETIL STORE ──────────────────────────────────────────────────
 
 export const useUIStore = create<UIState>((set) => ({
   // ── State Awal ───────────────────────────────────────────────────────────
   sidebarOpen: true,
-  activeRole: 'Super Admin',
-  userProfile: roleProfiles['Super Admin'],
+  activeRole: initialUI.activeRole,
+  userProfile: initialUI.userProfile,
 
   auditTrailLogs: [
     // Data dummy riwayat log awal untuk melengkapi fungsionalitas visual tabel audit

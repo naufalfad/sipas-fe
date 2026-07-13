@@ -59,7 +59,7 @@ export default function SitePlanViewerMap({
             setIsLoading(true);
             setError(null);
             try {
-                const token = localStorage.getItem('token');
+                const token = sessionStorage.getItem('token');
                 const response = await fetch(`${API_BASE_URL}/api/v1/submissions/${idPermohonan}/geojson`, {
                     headers: {
                         'Content-Type': 'application/json',

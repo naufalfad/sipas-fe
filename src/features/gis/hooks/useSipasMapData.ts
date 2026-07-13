@@ -93,7 +93,7 @@ export function useSipasMapData(localZoom: number) {
 
     const fetchActiveGeoJson = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/v1/submissions/${selectedCompanyId}/geojson`, {
           headers: {
             'Content-Type': 'application/json',

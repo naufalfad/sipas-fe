@@ -15,7 +15,7 @@ import { API_BASE_URL as API_BASE_URL_CONFIG } from '@/config';
 const API_BASE_URL = `${API_BASE_URL_CONFIG}/api/v1/submissions`;
 
 const getAuthHeaders = (extraHeaders?: Record<string, string>) => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),

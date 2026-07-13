@@ -80,10 +80,10 @@ interface AuthState {
   hasPermission: (permission: AppPermission) => boolean;
 }
 
-// Helper to safely parse user from localStorage
+// Helper to safely parse user from sessionStorage
 const getSavedUser = (): UserAuthProfile | null => {
   try {
-    const saved = localStorage.getItem('user');
+    const saved = sessionStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
   } catch {
     return null;
@@ -91,19 +91,19 @@ const getSavedUser = (): UserAuthProfile | null => {
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: localStorage.getItem('token'),
+  token: sessionStorage.getItem('token'),
   user: getSavedUser(),
-  isAuthenticated: !!localStorage.getItem('token'),
+  isAuthenticated: !!sessionStorage.getItem('token'),
 
   login: (token, user) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('user', JSON.stringify(user));
     set({ token, user, isAuthenticated: true });
   },
 
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     set({ token: null, user: null, isAuthenticated: false });
   },
 
@@ -111,7 +111,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set((state) => {
       if (!state.user) return {};
       const newUser = { ...state.user, ...updatedFields };
-      localStorage.setItem('user', JSON.stringify(newUser));
+      sessionStorage.setItem('user', JSON.stringify(newUser));
       return { user: newUser };
     });
   },

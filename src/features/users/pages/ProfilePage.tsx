@@ -55,7 +55,7 @@ export default function ProfilePage() {
     const toastId = toast.loading('Sedang memperbarui profil...');
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/profile`, {
         method: 'PUT',
         headers: {
