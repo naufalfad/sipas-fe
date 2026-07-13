@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { CheckCircle2 } from 'lucide-react';
+import { API_BASE_URL } from '@/config';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import bogorRegions from '../../data/bogorRegions.json';
 import { LabelWithInfo } from './LabelWithInfo';
@@ -12,9 +13,34 @@ export const LocationSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   const selectedDistrict = watch('location.district');
 
-  // Cari desa/kelurahan yang sesuai dari kecamatan terpilih di bogorRegions.json
-  const activeDistrictObj = bogorRegions.find((r) => r.nama_kecamatan === selectedDistrict);
-  const villagesList = activeDistrictObj ? activeDistrictObj.desa_kelurahan.map((d) => d.nama) : [];
+  const [dbRegions, setDbRegions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadRegions = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/config/regions`);
+        if (response.ok) {
+          const data = await response.json();
+          setDbRegions(data);
+        }
+      } catch (err) {
+        console.warn("Failed to load regions from DB, using fallback JSON", err);
+      }
+    };
+    loadRegions();
+  }, []);
+
+  const hasDbRegions = dbRegions && dbRegions.length > 0;
+
+  // 1. Get unique districts
+  const districtsList = hasDbRegions
+    ? Array.from(new Set(dbRegions.map((r) => r.district)))
+    : bogorRegions.map((r) => r.nama_kecamatan);
+
+  // 2. Get villages for selected district
+  const villagesList = hasDbRegions
+    ? dbRegions.filter((r) => r.district === selectedDistrict).map((r) => r.village)
+    : (bogorRegions.find((r) => r.nama_kecamatan === selectedDistrict)?.desa_kelurahan.map((d) => d.name || d.nama) || []);
 
   // Saat Kecamatan berubah, kosongkan Desa/Kelurahan jika tidak berada di daftar yang sesuai
   useEffect(() => {
@@ -33,13 +59,15 @@ export const LocationSection = () => {
   const city = watch('location.city');
 
   useEffect(() => {
-    if (!province) {
+    if (hasDbRegions) {
+      const first = dbRegions[0];
+      setValue('location.province', first.province);
+      setValue('location.city', first.regency);
+    } else {
       setValue('location.province', 'Jawa Barat');
-    }
-    if (!city) {
       setValue('location.city', 'Kabupaten Bogor');
     }
-  }, [province, city, setValue]);
+  }, [hasDbRegions, dbRegions, setValue]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -83,12 +111,12 @@ export const LocationSection = () => {
         </div>
 
         <div>
-          <LabelWithInfo label="Kecamatan" helpText="Nama Kecamatan tempat lokasi proyek di Kabupaten Bogor." />
+          <LabelWithInfo label="Kecamatan" helpText="Nama Kecamatan tempat lokasi proyek." />
           <select {...register('location.district')} className={inputClass}>
             <option value="">-- Pilih Kecamatan --</option>
-            {bogorRegions.map((region) => (
-              <option key={region.id_kecamatan} value={region.nama_kecamatan}>
-                {region.nama_kecamatan}
+            {districtsList.map((districtName) => (
+              <option key={districtName} value={districtName}>
+                {districtName}
               </option>
             ))}
           </select>
