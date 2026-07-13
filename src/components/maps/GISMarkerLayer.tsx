@@ -57,7 +57,7 @@ export default function GISMarkerLayer({ data, markerColor = '#14b8a6' }: GISMar
                         }}
                     >
                         {activeId === marker.id && (
-                            <Popup onClose={() => setActiveId(null)}>
+                            <Popup eventHandlers={{ remove: () => setActiveId(null) }}>
                                 <div className="p-1 space-y-1 text-xs min-w-[160px]">
                                     <h4 className="font-bold text-slate-800 text-sm leading-tight">{marker.housingName}</h4>
                                     <p className="text-slate-500 font-medium">{marker.developerName}</p>

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
 import type { UserRole } from '@/app/store/useUIStore';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import { SubmissionService } from '@/features/submission/services/submission.service';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -22,7 +23,9 @@ import {
   LogOut,
   ChevronDown,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Briefcase,
+  Settings
 } from 'lucide-react';
 
 interface MenuItem {
@@ -43,37 +46,37 @@ const menuItems: MenuItem[] = [
     title: 'Dashboard',
     path: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
   },
   {
     title: 'Pengajuan Site Plan',
     icon: ClipboardList,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
     submenu: [
       {
         title: 'Daftar Pengajuan',
         path: '/pengajuan/daftar',
         icon: ClipboardList,
-        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
+        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
       },
       {
         title: 'Pengajuan Baru',
         path: '/pengajuan/tambah',
         icon: ClipboardList,
-        roles: ['Pemohon', 'Super Admin'],
+        roles: ['Pemohon'],
       },
     ],
   },
   {
     title: 'Site Plan',
     icon: Layers,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
     submenu: [
       {
         title: 'Daftar Site Plan',
         path: '/siteplan/daftar',
         icon: Layers,
-        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
+        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
       },
     ],
   },
@@ -95,13 +98,13 @@ const menuItems: MenuItem[] = [
     title: 'GIS Viewer',
     path: '/gis',
     icon: Map,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
   },
   {
     title: 'Laporan',
     path: '/laporan',
     icon: FileBarChart2,
-    roles: ['Admin SIPAS', 'Kepala Bidang', 'Kadis', 'Super Admin'],
+    roles: ['Admin SIPAS', 'Kepala Bidang', 'Kadis'],
   },
   {
     title: 'Master Data',
@@ -110,21 +113,28 @@ const menuItems: MenuItem[] = [
     roles: ['Super Admin'],
     submenu: [
       {
-        title: 'User',
+        title: 'Akun (User)',
         path: '/master/pengguna',
         icon: Users,
         roles: ['Super Admin'],
       },
       {
-        title: 'Role',
+        title: 'Karyawan Staf',
+        path: '/master/karyawan',
+        icon: Briefcase,
+        roles: ['Super Admin'],
+      },
+      {
+        title: 'Role & Otoritas',
         path: '/master/role',
         icon: ShieldCheck,
         roles: ['Super Admin'],
       },
+
       {
-        title: 'Referensi',
-        path: '/master/referensi',
-        icon: Bookmark,
+        title: 'Konfigurasi Sistem',
+        path: '/master/konfigurasi',
+        icon: Settings,
         roles: ['Super Admin'],
       },
     ],
@@ -147,6 +157,134 @@ export default function DashboardLayout() {
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (profileOpen || notifOpen) {
+      document.body.classList.add('header-dropdown-open');
+    } else {
+      document.body.classList.remove('header-dropdown-open');
+    }
+    return () => {
+      document.body.classList.remove('header-dropdown-open');
+    };
+  }, [profileOpen, notifOpen]);
+
+  React.useEffect(() => {
+    let active = true;
+    const loadDynamicNotifications = async () => {
+      try {
+        const submissions = await SubmissionService.getAllList();
+        if (!active) return;
+        
+        const notifs: any[] = [];
+        let idCounter = 1;
+        
+        submissions.forEach((sub) => {
+          const subNo = sub.submissionNo || sub.id;
+          const housingName = sub.housingName || 'Proyek';
+          
+          if (activeRole === 'Admin SIPAS') {
+            if (sub.status === 'Menunggu Verifikasi') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Pengajuan Baru',
+                desc: `Berkas ${housingName} (${subNo}) memerlukan verifikasi administrasi.`,
+                type: 'info',
+                time: sub.submissionDate ? new Date(sub.submissionDate).toLocaleDateString('id-ID') : 'Baru saja'
+              });
+            }
+          } else if (activeRole === 'Tim Teknis') {
+            if (sub.status === 'Verifikasi Administrasi') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Evaluasi Spasial',
+                desc: `Berkas ${housingName} (${subNo}) lolos administrasi, siap verifikasi teknis/spasial.`,
+                type: 'info',
+                time: 'Perlu tinjauan'
+              });
+            }
+          } else if (activeRole === 'Kepala Bidang') {
+            if (sub.status === 'Menunggu Rekomendasi' || sub.status === 'Verifikasi Teknis') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Tinjauan Telaah Staf',
+                desc: `Draf rekomendasi/evaluasi ${housingName} (${subNo}) siap ditinjau Kabid.`,
+                type: 'warning',
+                time: 'Mendesak'
+              });
+            }
+          } else if (activeRole === 'Kadis') {
+            if (sub.status === 'Proses TTE' || sub.status === 'Menunggu Persetujuan') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Antrean TTE Kadis',
+                desc: `Draf SK ${housingName} (${subNo}) menunggu tanda tangan elektronik (TTE).`,
+                type: 'warning',
+                time: 'Butuh TTE'
+              });
+            }
+          } else if (activeRole === 'Pemohon') {
+            if (sub.status === 'Ditolak') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Catatan Revisi',
+                desc: `Pengajuan ${housingName} (${subNo}) ditolak/butuh perbaikan berkas.`,
+                type: 'warning',
+                time: 'Penting'
+              });
+            } else if (sub.status === 'Disetujui') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Verifikasi Sukses',
+                desc: `Selamat! SK Site Plan ${housingName} (${subNo}) telah disetujui & terbit.`,
+                type: 'success',
+                time: 'Selesai'
+              });
+            }
+          } else if (activeRole === 'Super Admin') {
+            if (sub.status === 'Menunggu Verifikasi') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Pengajuan Baru',
+                desc: `Pemohon membuat pengajuan baru ${housingName} (${subNo}).`,
+                type: 'info',
+                time: 'Baru saja'
+              });
+            }
+            if (sub.status === 'Ditolak') {
+              notifs.push({
+                id: `notif-${idCounter++}`,
+                title: 'Pengajuan Ditolak',
+                desc: `Ajuan ${housingName} (${subNo}) berstatus ditolak oleh petugas.`,
+                type: 'warning',
+                time: 'Log Sistem'
+              });
+            }
+          }
+        });
+
+        if (notifs.length === 0) {
+          notifs.push({
+            id: 'notif-empty',
+            title: 'Tidak Ada Tugas Aktif',
+            desc: 'Kotak masuk Anda bersih. Tidak ada pengajuan yang membutuhkan tindakan Anda saat ini.',
+            type: 'success',
+            time: '-'
+          });
+        }
+        
+        setNotifications(notifs);
+      } catch (err) {
+        console.warn('Gagal memuat notifikasi dinamis:', err);
+      }
+    };
+
+    loadDynamicNotifications();
+    return () => {
+      active = false;
+    };
+  }, [activeRole]);
 
   // Filter menu secara dinamis berdasarkan wewenang peran aktif.
   // KEBIJAKAN SOD: Tidak ada peran yang mendapat bypass universal — setiap item
@@ -165,11 +303,11 @@ export default function DashboardLayout() {
     return item;
   });
 
-  const mockNotifs = [
-    { id: 1, title: 'Pengajuan Baru', desc: 'Berkas SIPAS-2026-001 butuh verifikasi.', type: 'info', time: '10 m yang lalu' },
-    { id: 2, title: 'Verifikasi Sukses', desc: 'Administrasi SIPAS-2026-003 disetujui.', type: 'success', time: '1 j yang lalu' },
-    { id: 3, title: 'Catatan Revisi', desc: 'SIPAS-2026-005 dikembalikan ke Developer.', type: 'warning', time: '1 d yang lalu' },
-  ];
+  // Dynamic notifications handled in state
+
+  if (activeRole === 'Super Admin' && (location.pathname === '/dashboard' || location.pathname === '/')) {
+    return <Navigate to="/master/pengguna" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex text-foreground font-sans selection:bg-accent/30 select-none">
@@ -301,7 +439,9 @@ export default function DashboardLayout() {
                 className="p-2 rounded-none text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all relative cursor-pointer outline-none border-none bg-transparent"
               >
                 <Bell className="h-4.5 w-4.5" />
-                <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-rose-500 rounded-full" />
+                {notifications.length > 0 && notifications[0]?.id !== 'notif-empty' && (
+                  <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-rose-500 rounded-full" />
+                )}
               </button>
 
               {notifOpen && (
@@ -313,7 +453,7 @@ export default function DashboardLayout() {
                       <span className="text-[10px] text-primary font-bold cursor-pointer hover:underline uppercase tracking-wider">Tandai Dibaca</span>
                     </div>
                     <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                      {mockNotifs.map(n => (
+                      {notifications.map(n => (
                         <div key={n.id} className="p-3.5 hover:bg-slate-50 transition-colors flex space-x-3">
                           {n.type === 'success' ? (
                             <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5" />

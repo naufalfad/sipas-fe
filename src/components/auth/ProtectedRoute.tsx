@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/app/store/useAuthStore';
+import { useConfigStore } from '@/app/store/useConfigStore';
 import { toast } from 'sonner';
 
 interface ProtectedRouteProps {
@@ -26,7 +27,8 @@ interface ProtectedRouteProps {
  *     KADIS / KEPALA DINAS         → 'Kadis'
  *     SUPER_ADMIN                  → 'Super Admin'
  */
-export const normalizeRole = (role: string): string => {
+export const normalizeRole = (role: string, username?: string): string => {
+  if (username === 'superadmin@geocitra.com') return 'Super Admin';
   const r = role.toUpperCase();
   if (r === 'PEMOHON') return 'Pemohon';
   if (r === 'ADMIN' || r === 'ADMIN SIPAS') return 'Admin SIPAS';
@@ -38,12 +40,64 @@ export const normalizeRole = (role: string): string => {
 };
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, logout } = useAuthStore();
+  const { isMaintenance, idleTimeout, fetchConfig } = useConfigStore();
   const location = useLocation();
 
   useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
+
+  // 1. Idle Timeout Auto-Logout Tracker
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let timeoutId: any;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        toast.warning('Sesi Anda telah berakhir karena inaktivitas.', { id: 'idle-timeout-toast' });
+        logout();
+      }, idleTimeout * 60 * 1000);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [isAuthenticated, idleTimeout, logout]);
+
+  // 2. Active Maintenance Kick Guard
+  useEffect(() => {
+    if (isMaintenance && isAuthenticated && user) {
+      const userRole = normalizeRole(user.role);
+      if (userRole !== 'Super Admin') {
+        logout();
+        toast.error('Sistem sedang dalam pemeliharaan berkala.', { id: 'maintenance-kick-toast' });
+      }
+    }
+  }, [isMaintenance, isAuthenticated, user, logout]);
+
+  useEffect(() => {
     if (!isAuthenticated) {
-      toast.error('Silakan login terlebih dahulu untuk mengakses halaman ini.');
+      const justLoggedOut = sessionStorage.getItem('justLoggedOut');
+      if (justLoggedOut === 'true') {
+        sessionStorage.removeItem('justLoggedOut');
+        toast.success('Logout berhasil! Sesi Anda telah ditutup.');
+      } else {
+        toast.error('Silakan login terlebih dahulu untuk mengakses halaman ini.');
+      }
     } else if (allowedRoles && user) {
       const normalizedUserRole = normalizeRole(user.role);
       const isAllowed = allowedRoles.some(
@@ -55,9 +109,19 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     }
   }, [isAuthenticated, allowedRoles, user]);
 
+  // Redirect to maintenance page if system is in maintenance mode and user is not Super Admin
+  if (isMaintenance) {
+    const isSuperAdmin = isAuthenticated && user && normalizeRole(user.role) === 'Super Admin';
+    if (!isSuperAdmin) {
+      return <Navigate to="/maintenance" replace />;
+    }
+  }
+
   if (!isAuthenticated) {
-    // Redirect to login page and keep track of where the user was trying to go
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Redirect to login page. If they just logged out, don't pass the redirect source (send to dashboard instead).
+    const justLoggedOut = sessionStorage.getItem('justLoggedOut');
+    const redirectState = justLoggedOut === 'true' ? undefined : { from: location };
+    return <Navigate to="/login" state={redirectState} replace />;
   }
 
   if (allowedRoles && user) {

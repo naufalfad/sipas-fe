@@ -5,16 +5,11 @@ import {
   TrendingUp,
   MapPin,
   Download,
-  Calendar,
-  CheckCircle2,
   FileSpreadsheet,
   AlertTriangle,
   Layers,
-  ArrowRight,
   ShieldCheck,
-  Building,
-  Activity,
-  FileText
+  Activity
 } from 'lucide-react';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import { Badge } from '@/components/ui/badge';

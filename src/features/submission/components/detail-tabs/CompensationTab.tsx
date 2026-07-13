@@ -1,12 +1,12 @@
-import { Scale, Globe, AlertTriangle } from 'lucide-react';
+import { Scale, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CompensationTabProps {
   sub: any;
-  onShowOnMap: (komp: any) => void;
+  onShowOnMap?: (komp: any) => void;
 }
 
-export const CompensationTab = ({ sub, onShowOnMap }: CompensationTabProps) => {
+export const CompensationTab = ({ sub }: CompensationTabProps) => {
   const hasCompensations = sub.compensations && sub.compensations.length > 0;
 
   return (

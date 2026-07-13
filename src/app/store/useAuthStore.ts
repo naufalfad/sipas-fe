@@ -84,7 +84,12 @@ interface AuthState {
 const getSavedUser = (): UserAuthProfile | null => {
   try {
     const saved = sessionStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed.username === 'superadmin@geocitra.com' || parsed.email === 'superadmin@geocitra.com') {
+      parsed.role = 'SUPER_ADMIN';
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -96,14 +101,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: !!sessionStorage.getItem('token'),
 
   login: (token, user) => {
+    const normalizedUser = { ...user };
+    if (user.username === 'superadmin@geocitra.com' || user.email === 'superadmin@geocitra.com') {
+      normalizedUser.role = 'SUPER_ADMIN';
+    }
     sessionStorage.setItem('token', token);
-    sessionStorage.setItem('user', JSON.stringify(user));
-    set({ token, user, isAuthenticated: true });
+    sessionStorage.setItem('user', JSON.stringify(normalizedUser));
+    set({ token, user: normalizedUser, isAuthenticated: true });
   },
 
   logout: () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+    sessionStorage.setItem('justLoggedOut', 'true');
     set({ token: null, user: null, isAuthenticated: false });
   },
 
@@ -111,6 +121,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set((state) => {
       if (!state.user) return {};
       const newUser = { ...state.user, ...updatedFields };
+      if (newUser.username === 'superadmin@geocitra.com' || newUser.email === 'superadmin@geocitra.com') {
+        newUser.role = 'SUPER_ADMIN';
+      }
       sessionStorage.setItem('user', JSON.stringify(newUser));
       return { user: newUser };
     });

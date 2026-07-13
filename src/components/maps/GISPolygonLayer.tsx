@@ -93,7 +93,7 @@ export default function GISPolygonLayer({ data }: GISPolygonLayerProps) {
             {activePolygon && centroid && (
                 <Popup
                     position={[centroid.lat, centroid.lng]}
-                    onClose={() => setActiveId(null)}
+                    eventHandlers={{ remove: () => setActiveId(null) }}
                 >
                     <div className="p-1 space-y-1.5 text-xs min-w-[160px]">
                         <h4 className="font-bold text-slate-800 text-sm leading-tight">

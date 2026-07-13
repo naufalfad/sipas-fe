@@ -1,6 +1,4 @@
 import { useEffect } from 'react';
-import { useUIStore } from '@/app/store/useUIStore';
-import { useGisUIStore } from '@/app/store/useGisUIStore';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import type { UserRole } from '@/app/store/useUIStore';
@@ -18,14 +16,16 @@ import ZoningHorizontalLegend from '../components/ZoningHorizontalLegend';
 
 export default function GISPage() {
   const { user } = useAuthStore();
-  const activeRole = user ? (normalizeRole(user.role) as UserRole) : 'Super Admin';
+  const activeRole = user ? (normalizeRole(user.role, user.username) as UserRole) : 'Super Admin';
 
 
   const isExecutive = activeRole === 'Kepala Bidang' || activeRole === 'Super Admin' || activeRole === 'Tim Teknis';
 
 
   useEffect(() => {
-    toast.info(`Kanvas Geospasial GEOSIPAS aktif sebagai: ${activeRole}`);
+    toast.info(`Kanvas Geospasial GEOSIPAS aktif sebagai: ${activeRole}`, {
+      id: 'gis-active-role-toast'
+    });
   }, [activeRole]);
 
   return (

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
+import DashboardBanner from '../components/DashboardBanner';
 
 export default function DashboardPage() {
   const { activeRole } = useUIStore();
@@ -23,7 +24,7 @@ export default function DashboardPage() {
   const disetujui = submissions.filter(s => s.status === 'Disetujui').length;
   const ditolak = submissions.filter(s => s.status === 'Ditolak').length;
 
-  const recentSubmissions = submissions.slice(0, 4);
+  const recentSubmissions = submissions.slice(0, 5);
 
   // Penyelarasan warna badge status sesuai dengan standardisasi palet organik baru (WCAG AA Compliant)
   const getStatusBadgeClass = (status: string) => {
@@ -60,6 +61,9 @@ export default function DashboardPage() {
           </Link>
         )}
       </div>
+
+      {/* Dynamic Slide Banner */}
+      <DashboardBanner />
 
       {/* ─── SEKSI 2: KARTU INDIKATOR UTAMA (STATS WIDGETS) ─── */}
       {/* Diubah menjadi container putih dengan outline dae4db tipis di atas latar sage */}

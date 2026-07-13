@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 export default function GisNavbar() {
     const navigate = useNavigate();
-    const { user } = useAuthStore();
+    const { user, logout } = useAuthStore();
     const activeRole = user ? (normalizeRole(user.role) as UserRole) : 'Super Admin';
     const userProfile = user ? {
         name: user.full_name,
@@ -25,6 +25,17 @@ export default function GisNavbar() {
         avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&h=100&fit=crop&crop=faces'
     };
     const [profileOpen, setProfileOpen] = useState(false);
+
+    useEffect(() => {
+        if (profileOpen) {
+            document.body.classList.add('header-dropdown-open');
+        } else {
+            document.body.classList.remove('header-dropdown-open');
+        }
+        return () => {
+            document.body.classList.remove('header-dropdown-open');
+        };
+    }, [profileOpen]);
 
     // Inisial Nama (Fase 4 - Security Audit Trail)
     const getInitials = (name: string) => {
@@ -125,7 +136,7 @@ export default function GisNavbar() {
                                 <button
                                     onClick={() => {
                                         setProfileOpen(false);
-                                        toast.error('Keluar sistem disimulasikan.');
+                                        logout();
                                     }}
                                     className="w-full flex items-center px-4 py-2.5 text-rose-600 hover:bg-rose-50 transition-colors text-left border-none bg-transparent font-bold cursor-pointer"
                                 >
