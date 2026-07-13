@@ -149,6 +149,7 @@ export default function AuditTrailViewer({ submissionId }: AuditTrailViewerProps
             'SUBMIT_UNIFIED_FORM': 'Pengajuan Dokumen',
             'Draft': 'Pengajuan Dokumen',
             'Menunggu Verifikasi': 'Pengajuan Dokumen',
+            'Pengajuan Dokumen': 'Pengajuan Dokumen',
 
             // 2. Kode Aksi Verifikasi Administrasi
             'VERIFY_ADMIN_APPROVED': 'Verifikasi Administrasi',

@@ -8,7 +8,7 @@ export const mockSubmissions: Submission[] = [
     developerName: 'PT Maju Jaya Sentosa',
     landArea: 25000,
     submissionDate: '2026-06-20',
-    status: 'Menunggu Verifikasi',
+    status: 'Pengajuan Dokumen',
     kdbPercent: 55.2,
     klbValue: 2.1,
     kdhPercent: 15.4,
@@ -22,7 +22,7 @@ export const mockSubmissions: Submission[] = [
     ],
     history: [
       { date: '2026-06-20 09:00', status: 'Draft', notes: 'Pengajuan dibuat oleh pemohon', actor: 'Ahmad Fauzi (Developer)' },
-      { date: '2026-06-20 10:30', status: 'Menunggu Verifikasi', notes: 'Berkas berhasil dikirim dan menunggu pemeriksaan berkas', actor: 'Ahmad Fauzi (Developer)' }
+      { date: '2026-06-20 10:30', status: 'Pengajuan Dokumen', notes: 'Berkas berhasil dikirim dan menunggu pemeriksaan berkas', actor: 'Ahmad Fauzi (Developer)' }
     ],
     location: {
       lat: -6.485,
@@ -161,7 +161,7 @@ export const mockSubmissions: Submission[] = [
     ],
     history: [
       { date: '2026-06-18 14:00', status: 'Draft', notes: 'Drafting data oleh developer', actor: 'PT Properti Indah Raya' },
-      { date: '2026-06-18 16:15', status: 'Menunggu Verifikasi', notes: 'Diajukan secara online', actor: 'PT Properti Indah Raya' },
+      { date: '2026-06-18 16:15', status: 'Pengajuan Dokumen', notes: 'Diajukan secara online', actor: 'PT Properti Indah Raya' },
       { date: '2026-06-19 09:00', status: 'Verifikasi Administrasi', notes: 'Pemeriksaan berkas administrasi (KTP, Sertifikat Tanah)', actor: 'Siti Rahma (Admin SIPAS)' }
     ],
     location: {
@@ -289,7 +289,7 @@ export const mockSubmissions: Submission[] = [
       { id: 'doc-3-2', name: 'SitePlan CAD Spasial Final.dwg', type: 'cad', url: '#', uploadedAt: '2026-06-15' },
     ],
     history: [
-      { date: '2026-06-15 11:00', status: 'Menunggu Verifikasi', notes: 'Pengajuan dikirim', actor: 'PT Graha Kencana' },
+      { date: '2026-06-15 11:00', status: 'Pengajuan Dokumen', notes: 'Pengajuan dikirim', actor: 'PT Graha Kencana' },
       { date: '2026-06-16 10:00', status: 'Verifikasi Administrasi', notes: 'Berkas lengkap secara administrasi', actor: 'Siti Rahma (Admin)' },
       { date: '2026-06-17 13:00', status: 'Verifikasi Teknis', notes: 'Pemeriksaan kesesuaian ruang, GSB, RTH, dan jalan oleh Tim Teknis', actor: 'Ir. Budi Santoso (Tim Teknis)' }
     ],
@@ -417,7 +417,7 @@ export const mockSubmissions: Submission[] = [
       { id: 'doc-4-2', name: 'Site Plan Disahkan.pdf', type: 'pdf', url: '#', uploadedAt: '2026-06-14' },
     ],
     history: [
-      { date: '2026-06-10 08:30', status: 'Menunggu Verifikasi', notes: 'Daftar pengajuan masuk', actor: 'PT Bangun Bumi' },
+      { date: '2026-06-10 08:30', status: 'Pengajuan Dokumen', notes: 'Daftar pengajuan masuk', actor: 'PT Bangun Bumi' },
       { date: '2026-06-11 11:00', status: 'Verifikasi Administrasi', notes: 'Administrasi OK', actor: 'Siti Rahma (Admin)' },
       { date: '2026-06-12 14:00', status: 'Verifikasi Teknis', notes: 'Teknis GIS dan CAD disetujui', actor: 'Ir. Budi Santoso (Tim Teknis)' },
       { date: '2026-06-13 10:00', status: 'Menunggu Persetujuan', notes: 'Rekomendasi persetujuan dikirim ke Kabid', actor: 'Ir. Budi Santoso' },
@@ -538,7 +538,7 @@ export const mockSubmissions: Submission[] = [
       { id: 'doc-5-1', name: 'Layout Gambar Rencana.dwg', type: 'cad', url: '#', uploadedAt: '2026-06-08' },
     ],
     history: [
-      { date: '2026-06-08 10:00', status: 'Menunggu Verifikasi', notes: 'Dikirim', actor: 'PT Jaya Real Estate' },
+      { date: '2026-06-08 10:00', status: 'Pengajuan Dokumen', notes: 'Dikirim', actor: 'PT Jaya Real Estate' },
       { date: '2026-06-09 13:00', status: 'Verifikasi Administrasi', notes: 'Administrasi lolos', actor: 'Siti Rahma' },
       { date: '2026-06-10 16:00', status: 'Verifikasi Teknis', notes: 'Ditolak karena letak rencana jalan menabrak area sempadan sungai yang dilindungi.', actor: 'Ir. Budi Santoso (Tim Teknis)' },
       { date: '2026-06-11 11:00', status: 'Ditolak', notes: 'Ditolak secara resmi oleh sistem dengan alasan teknis sempadan sungai.', actor: 'Ir. Budi Santoso (Tim Teknis)' }

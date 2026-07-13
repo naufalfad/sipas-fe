@@ -15,7 +15,7 @@ const PAGE_SIZE = 10;
 const STATUS_TABS = [
   'Semua',
   'Draft',
-  'Menunggu Verifikasi',
+  'Pengajuan Dokumen',
   'Verifikasi Administrasi',
   'Verifikasi Teknis',
   'Disetujui',

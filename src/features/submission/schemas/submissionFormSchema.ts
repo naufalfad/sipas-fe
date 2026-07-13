@@ -201,6 +201,10 @@ export const tpuSchema = z.object({
   noPks: z.string().optional(),
   nominalKompensasi: z.preprocess(numericPreprocess, z.number().min(0).optional()),
   alamat: z.string().optional(),
+  koordinat: z.string().refine(
+    val => !val || /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(val),
+    { message: 'Format koordinat harus berupa "latitude, longitude" (contoh: -6.485542, 106.824125)' }
+  ).optional(),
   buktiDokumenUrl: z.union([z.string(), z.any()]).optional(),
 }).optional();
 

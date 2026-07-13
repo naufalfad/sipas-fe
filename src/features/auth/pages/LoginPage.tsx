@@ -141,7 +141,7 @@ export default function LoginPage() {
                 {...register('username')}
                 placeholder="Masukkan username Anda"
                 disabled={isLoading}
-                className="w-full pl-9 pr-3 py-2.5 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] focus:ring-1 focus:ring-[#415D43] text-slate-800 disabled:opacity-50"
+                className="w-full pl-9 pr-3 py-2.5 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] focus:ring-1 focus:ring-[#415D43] text-slate-800 disabled:opacity-50 no-capitalize"
               />
             </div>
             {errors.username && (
@@ -167,7 +167,7 @@ export default function LoginPage() {
                 {...register('password')}
                 placeholder="••••••••"
                 disabled={isLoading}
-                className="w-full pl-9 pr-3 py-2.5 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] focus:ring-1 focus:ring-[#415D43] text-slate-800 disabled:opacity-50"
+                className="w-full pl-9 pr-3 py-2.5 bg-[#f4f7f4]/40 border border-[#DAE4DB] text-xs font-semibold focus:outline-none focus:border-[#415D43] focus:ring-1 focus:ring-[#415D43] text-slate-800 disabled:opacity-50 no-capitalize"
               />
             </div>
             {errors.password && (

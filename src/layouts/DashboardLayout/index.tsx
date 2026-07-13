@@ -15,7 +15,6 @@ import {
   Database,
   Users,
   ShieldAlert,
-  Bookmark,
   Menu,
   X,
   Bell,
@@ -185,7 +184,7 @@ export default function DashboardLayout() {
           const housingName = sub.housingName || 'Proyek';
           
           if (activeRole === 'Admin SIPAS') {
-            if (sub.status === 'Menunggu Verifikasi') {
+            if (sub.status === 'Pengajuan Dokumen') {
               notifs.push({
                 id: `notif-${idCounter++}`,
                 title: 'Pengajuan Baru',
@@ -243,7 +242,7 @@ export default function DashboardLayout() {
               });
             }
           } else if (activeRole === 'Super Admin') {
-            if (sub.status === 'Menunggu Verifikasi') {
+            if (sub.status === 'Pengajuan Dokumen') {
               notifs.push({
                 id: `notif-${idCounter++}`,
                 title: 'Pengajuan Baru',

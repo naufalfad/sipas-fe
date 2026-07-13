@@ -224,7 +224,7 @@ export default function SubmissionDetailPage() {
   const slaDaysRemaining = subData.remaining_sla_days ?? 0;
   const hasRevisionIssues = subData.kkprVerdict === 'Sesuai Bersyarat' || subData.status === 'Ditolak';
 
-  const showAdminPanel = isAdminActive && (subData.status === 'Menunggu Verifikasi' || subData.status === 'Verifikasi Administrasi');
+  const showAdminPanel = isAdminActive && (subData.status === 'Pengajuan Dokumen' || subData.status === 'Verifikasi Administrasi');
   const showKabidPanel = isKabidActive && subData.status === 'Menunggu Rekomendasi';
   const showKadisPanel = isKadisActive && subData.status === 'Menunggu Persetujuan';
 
@@ -239,7 +239,7 @@ export default function SubmissionDetailPage() {
     const checklistItemsPayload = approved ? [
       {
         aspekCode: 'legalDoc',
-        aspekLabel: 'Keabsahan Dokumen Hak Milik Lahan / Sertifikat BPN',
+        aspekLabel: ' Dokumen Hak Milik Lahan / Sertifikat BPN',
         statusKelayakan: 'Sesuai',
         catatanVerifikator: 'Dinyatakan valid dan sah secara administratif.',
         verifiedById: user?.id,
@@ -247,7 +247,7 @@ export default function SubmissionDetailPage() {
       },
       {
         aspekCode: subData.applicant?.type === 'BADAN_USAHA' ? 'nibDoc' : 'ktpDoc',
-        aspekLabel: subData.applicant?.type === 'BADAN_USAHA' ? 'Kesesuaian Nomor Induk Berusaha (NIB) Badan Usaha' : 'Kesesuaian Kartu Tanda Penduduk (KTP) Pemohon',
+        aspekLabel: subData.applicant?.type === 'BADAN_USAHA' ? 'Nomor Induk Berusaha (NIB) Badan Usaha' : 'Kartu Tanda Penduduk (KTP) Pemohon',
         statusKelayakan: 'Sesuai',
         catatanVerifikator: 'Dinyatakan cocok secara administratif.',
         verifiedById: user?.id,
@@ -255,7 +255,7 @@ export default function SubmissionDetailPage() {
       },
       {
         aspekCode: 'npwpDoc',
-        aspekLabel: 'Kesesuaian NPWP Wajib Pajak Pemohon',
+        aspekLabel: 'NPWP Wajib Pajak Pemohon',
         statusKelayakan: 'Sesuai',
         catatanVerifikator: 'Dinyatakan cocok secara administratif.',
         verifiedById: user?.id,
@@ -271,7 +271,7 @@ export default function SubmissionDetailPage() {
       },
       {
         aspekCode: 'technicalDoc',
-        aspekLabel: 'Kesesuaian Gambar Rencana Teknis CAD / PSU',
+        aspekLabel: 'Gambar Rencana Teknis CAD / PSU',
         statusKelayakan: 'Sesuai',
         catatanVerifikator: 'Gambar rencana teknis sesuai.',
         verifiedById: user?.id,
@@ -279,7 +279,7 @@ export default function SubmissionDetailPage() {
       },
       {
         aspekCode: 'supportDoc2',
-        aspekLabel: 'Kesesuaian Kajian Andalalin / Persetujuan Teknis Lingkungan',
+        aspekLabel: 'Kajian Andalalin / Persetujuan Teknis Lingkungan',
         statusKelayakan: 'Sesuai',
         catatanVerifikator: 'Dokumen andalalin/lingkungan sesuai.',
         verifiedById: user?.id,
@@ -287,7 +287,7 @@ export default function SubmissionDetailPage() {
       },
       {
         aspekCode: 'skaDoc',
-        aspekLabel: 'Keabsahan Sertifikat Keahlian (SKA) Arsitek',
+        aspekLabel: 'Sertifikat Keahlian (SKA) Arsitek',
         statusKelayakan: 'Sesuai',
         catatanVerifikator: 'SKA Arsitek terdaftar dan sah.',
         verifiedById: user?.id,
@@ -546,8 +546,8 @@ export default function SubmissionDetailPage() {
             <div className="bg-white border border-primary p-5 shadow-sm space-y-5 rounded-none text-left animate-in slide-in-from-bottom-2 duration-300">
               <div className="border-b border-border pb-3 flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Panel Tindakan: Verifikasi Administrasi</h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Lakukan validasi keabsahan dokumen persyaratan pemohon.</p>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Verifikasi Administrasi</h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Lakukan verifikasi dokumen persyaratan pemohon (Syarat Formal).</p>
                 </div>
                 <span className="px-2 py-0.5 bg-secondary text-primary font-bold text-[9px] uppercase border border-border">ADMINISTRATOR</span>
               </div>
@@ -562,8 +562,8 @@ export default function SubmissionDetailPage() {
                   />
                   <span className="text-xs font-semibold text-slate-700">
                     {subData.applicant?.type === 'BADAN_USAHA'
-                      ? "Kesesuaian Nomor Induk Berusaha (NIB) Badan Usaha"
-                      : "Kesesuaian Kartu Tanda Penduduk (KTP) Pemohon"
+                      ? "Nomor Induk Berusaha (NIB) Badan Usaha"
+                      : "Kartu Tanda Penduduk (KTP) Pemohon"
                     }
                   </span>
                 </label>
@@ -574,7 +574,7 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, sertifikat: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Keabsahan Dokumen Hak Milik Lahan / Sertifikat BPN</span>
+                  <span className="text-xs font-semibold text-slate-700">Dokumen Hak Milik Lahan / Sertifikat BPN</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -583,7 +583,7 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian NPWP Wajib Pajak Pemohon</span>
+                  <span className="text-xs font-semibold text-slate-700">NPWP Wajib Pajak Pemohon</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -601,7 +601,7 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, technical: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian Gambar Rencana Teknis CAD / PSU</span>
+                  <span className="text-xs font-semibold text-slate-700">Gambar Rencana Teknis CAD / PSU</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -610,7 +610,7 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, support2: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Kesesuaian Kajian Andalalin / Persetujuan Teknis Lingkungan</span>
+                  <span className="text-xs font-semibold text-slate-700">Kajian Andalalin / Persetujuan Teknis Lingkungan</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -619,7 +619,7 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, ska: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Keabsahan Sertifikat Keahlian (SKA) Arsitek</span>
+                  <span className="text-xs font-semibold text-slate-700">Sertifikat Keahlian (SKA) Arsitek</span>
                 </label>
                 <label className="flex items-start space-x-2.5 cursor-pointer select-none">
                   <input
@@ -628,7 +628,7 @@ export default function SubmissionDetailPage() {
                     onChange={(e) => setAdminChecks(prev => ({ ...prev, cad: e.target.checked }))}
                     className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Validitas Peta Koordinat CAD (.dwg/.dxf)</span>
+                  <span className="text-xs font-semibold text-slate-700">File Peta Koordinat CAD (.dwg/.dxf)</span>
                 </label>
               </div>
 
@@ -696,29 +696,50 @@ export default function SubmissionDetailPage() {
               )}
             </div>
 
-            {/* Riwayat Alur Proses (Timeline) */}
+            {/* Riwayat Alur Proses (Timeline - Perfectly Aligned & High Contrast) */}
             <div className="space-y-4">
               <h4 className="font-bold text-xs text-slate-400 uppercase tracking-wide">Riwayat Proses Pelacakan</h4>
-              <div className="max-h-[480px] overflow-y-auto pr-2 pl-4 relative">
-                {/* Vertical timeline line inside the scrollable container */}
-                <div className="absolute left-[23px] top-2 bottom-2 w-0.5 bg-slate-200/80" />
+              <div className="max-h-[480px] overflow-y-auto pr-2 relative text-left">
+
+                {/* Sumbu Garis Vertikal (Tepat berada di koordinat left-4 / 16px) */}
+                <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-200/80" />
 
                 <div className="space-y-6 pb-2">
                   {subData.history.map((hist, i) => {
                     const isApproved = hist.status === 'Disetujui';
                     const isRejected = hist.status === 'Ditolak';
 
+                    // Resolusi warna lingkaran solid untuk kontras tinggi (WCAG AA Compliant)
+                    const getCircleBgClass = (status: string) => {
+                      switch (status) {
+                        case 'Disetujui':
+                          return 'bg-emerald-500 border-white text-white';
+                        case 'Ditolak':
+                          return 'bg-rose-500 border-white text-white';
+                        case 'Verifikasi Teknis':
+                          return 'bg-indigo-500 border-white text-white';
+                        case 'Verifikasi Administrasi':
+                          return 'bg-blue-500 border-white text-white';
+                        default:
+                          return 'bg-amber-500 border-white text-white';
+                      }
+                    };
+
                     return (
-                      <div key={i} className="relative pl-8">
-                        {/* Circle Indicator centered perfectly on the line */}
+                      // Padding-left 10 (40px) memberikan ruang yang lega dari sumbu garis 16px
+                      <div key={i} className="relative pl-10 pb-1">
+
+                        {/* Lingkaran Penanda (Tepat di sumbu left-4 / 16px dengan pergeseran jangkar -translate-x-1/2) */}
                         <div className={cn(
-                          "absolute left-[23px] top-0.5 rounded-full p-1 border-[3px] border-white text-white z-10 -translate-x-1/2 shadow-sm",
-                          isApproved ? "bg-emerald-600" : isRejected ? "bg-rose-600" : "bg-amber-50"
+                          "absolute left-4 top-0.5 rounded-full p-1.5 border-[3px] z-10 -translate-x-1/2 shadow-sm flex items-center justify-center",
+                          getCircleBgClass(hist.status)
                         )}>
-                          {isApproved ? <CheckCircle2 className="h-2.5 w-2.5 text-white" /> :
-                            isRejected ? <XCircle className="h-2.5 w-2.5 text-white" /> : <Clock className="h-2.5 w-2.5 text-white" />}
+                          {isApproved && <CheckCircle2 className="h-3 w-3" />}
+                          {isRejected && <XCircle className="h-3 w-3" />}
+                          {!isApproved && !isRejected && <Clock className="h-3 w-3" />}
                         </div>
 
+                        {/* Konten Log Riwayat */}
                         <div className="space-y-1">
                           <h5 className="font-bold text-slate-800 text-xs leading-none">
                             {hist.status}
@@ -729,11 +750,12 @@ export default function SubmissionDetailPage() {
                             <span className="font-bold text-slate-500">{hist.actor}</span>
                           </div>
                           {hist.notes && (
-                            <p className="text-xs text-slate-500 mt-2 leading-relaxed bg-slate-50 p-2.5 border border-slate-100/80 rounded-sm">
+                            <p className="text-xs text-slate-500 mt-2 leading-relaxed bg-slate-50 p-2.5 border border-slate-100/80 rounded-none text-justify">
                               {hist.notes}
                             </p>
                           )}
                         </div>
+
                       </div>
                     );
                   })}

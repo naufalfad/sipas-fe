@@ -18,7 +18,7 @@ export default function VerificationPage() {
     submissions.filter((s) =>
       [
         'Draft',
-        'Menunggu Verifikasi',
+        'Pengajuan Dokumen',
         'Verifikasi Administrasi',
         'Verifikasi Teknis',
         'Menunggu Rekomendasi',

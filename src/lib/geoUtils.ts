@@ -155,7 +155,7 @@ export function resolveStatusColor(status: Submission['status']): string {
         case 'Ditolak': return '#ef4444'; // red-500
         case 'Verifikasi Teknis': return '#6366f1'; // indigo-500
         case 'Verifikasi Administrasi': return '#3b82f6'; // blue-500
-        case 'Menunggu Verifikasi': return '#f59e0b'; // amber-500
+        case 'Pengajuan Dokumen': return '#f59e0b'; // amber-500
         case 'Menunggu Persetujuan': return '#8b5cf6'; // violet-500
         case 'Proses TTE': return '#db2777'; // pink-600
         default: return '#64748b'; // slate-500

@@ -11,7 +11,7 @@
 
 export type SubmissionStatus =
   | 'Draft'
-  | 'Menunggu Verifikasi'
+  | 'Pengajuan Dokumen'
   | 'Verifikasi Administrasi'
   | 'Verifikasi Teknis'
   | 'Menunggu Rekomendasi'   // Tambahan (Fase 3: Tahap Peninjauan & Veto Kabid)
@@ -336,6 +336,7 @@ export interface Submission {
     noPks?: string;
     nominalKompensasi?: number;
     alamat?: string;
+    koordinat?: string;
     buktiDokumenUrl?: string;   // URL bukti dokumen PKS/setoran retribusi TPU
     statusVerifikasi?: 'PENDING' | 'APPROVED' | 'REJECTED';
     catatanVerifikasi?: string;
