@@ -333,15 +333,11 @@ export default function DashboardLayout() {
         {/* Identitas Branding */}
         <div className="h-16 flex items-center justify-between px-5 border-b border-border bg-white shrink-0">
           <Link to="/" className="flex items-center space-x-2.5 mx-auto lg:mx-0">
-            <div className="p-1 text-primary flex items-center justify-center shrink-0">
-              {appLogo ? (
-                <img src={appLogo} alt="Logo" className="h-7 w-7 object-contain" />
-              ) : (
-                <Layers className="h-5 w-5 stroke-[2.5]" />
-              )}
+            <div className="p-1.5 text-primary">
+              <Layers className="h-5 w-5 stroke-[2.5]" />
             </div>
             <span className={`text-base font-bold tracking-tight text-primary transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-              {appName || 'GEOSIPAS'}
+              GEOSIPAS
             </span>
           </Link>
           {sidebarOpen && (

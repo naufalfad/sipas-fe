@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useConfigStore } from '@/app/store/useConfigStore';
 import { toast } from 'sonner';
-import { API_BASE_URL } from '@/config';
 import {
   Settings,
   Clock,
@@ -13,9 +12,7 @@ import {
   Sliders,
   Sparkles,
   Eye,
-  Upload,
-  MapPin,
-  Download
+  Upload
 } from 'lucide-react';
 
 export default function ConfigPage() {
@@ -41,7 +38,7 @@ export default function ConfigPage() {
     updateMapConfig
   } = useConfigStore();
 
-  const [activeTab, setActiveTab] = useState<'sesi' | 'banner' | 'pemeliharaan' | 'branding' | 'wilayah'>('sesi');
+  const [activeTab, setActiveTab] = useState<'sesi' | 'banner' | 'pemeliharaan' | 'branding'>('sesi');
 
   // ── Sesi States ──
   const [sessDur, setSessDur] = useState(sessionDuration);
@@ -62,7 +59,6 @@ export default function ConfigPage() {
   const [maintMsg, setMaintMsg] = useState(maintenanceMessage);
 
   // ── Branding States ──
-  const [appNm, setAppNm] = useState(appName || 'GEOSIPAS');
   const [logoImg, setLogoImg] = useState<string | null>(appLogo || null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,98 +67,7 @@ export default function ConfigPage() {
   const [cLng, setCLng] = useState(mapCenterLng || 106.8560);
   const [cZoom, setCZoom] = useState(mapZoom || 11);
 
-  // ── Wilayah States ──
-  const [regions, setRegions] = useState<any[]>([]);
-  const [loadingRegions, setLoadingRegions] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const regionFileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchRegions = async () => {
-    setLoadingRegions(true);
-    try {
-      const token = sessionStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/config/regions`, {
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setRegions(data);
-      }
-    } catch (err) {
-      console.warn('Failed to fetch regions', err);
-    } finally {
-      setLoadingRegions(false);
-    }
-  };
-
-  React.useEffect(() => {
-    if (activeTab === 'wilayah') {
-      fetchRegions();
-    }
-  }, [activeTab]);
-
-  const handleDownloadTemplate = () => {
-    window.open(`${API_BASE_URL}/api/v1/auth/config/regions/template`, '_blank');
-  };
-
-  const handleUploadRegions = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const token = sessionStorage.getItem('token');
-    const formData = new FormData();
-    formData.append('file', file);
-
-    setUploading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/config/regions/upload`, {
-        method: 'POST',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: formData
-      });
-      const resData = await response.json();
-      if (response.ok && resData.status === 'SUCCESS') {
-        toast.success(resData.message || 'Wilayah referensi berhasil diunggah!');
-        fetchRegions();
-      } else {
-        toast.error(resData.message || 'Gagal mengunggah wilayah referensi.');
-      }
-    } catch (err) {
-      toast.error('Koneksi gagal atau terjadi kesalahan saat mengunggah berkas.');
-    } finally {
-      setUploading(false);
-      if (regionFileInputRef.current) regionFileInputRef.current.value = '';
-    }
-  };
-
-  const handleClearRegions = async () => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus seluruh data referensi wilayah dari sistem? Tindakan ini tidak dapat dibatalkan.')) {
-      return;
-    }
-
-    try {
-      const token = sessionStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/config/regions/clear`, {
-        method: 'DELETE',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
-      });
-      const resData = await response.json();
-      if (response.ok && resData.status === 'SUCCESS') {
-        toast.success(resData.message);
-        setRegions([]);
-      } else {
-        toast.error(resData.message || 'Gagal membersihkan wilayah referensi.');
-      }
-    } catch (err) {
-      toast.error('Terjadi kesalahan saat membersihkan wilayah referensi.');
-    }
-  };
 
   // ── Fetch & Sync Hooks ──
   React.useEffect(() => {
@@ -175,7 +80,6 @@ export default function ConfigPage() {
     setRotSec(rotationInterval);
     setMaintActive(isMaintenance);
     setMaintMsg(maintenanceMessage);
-    setAppNm(appName || 'GEOSIPAS');
     setLogoImg(appLogo || null);
     setCLat(mapCenterLat || -6.4816);
     setCLng(mapCenterLng || 106.8560);
@@ -200,9 +104,9 @@ export default function ConfigPage() {
   const handleSaveBranding = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateBrandingConfig(appNm, logoImg);
+      await updateBrandingConfig("GEOSIPAS", logoImg);
       await updateMapConfig(Number(cLat), Number(cLng), Number(cZoom));
-      toast.success('Pengaturan identitas aplikasi dan parameter peta GIS berhasil diperbarui!');
+      toast.success('Pengaturan logo aplikasi dan parameter peta GIS berhasil diperbarui!');
     } catch (err) {
       toast.error('Gagal memperbarui pengaturan.');
     }
@@ -290,8 +194,7 @@ export default function ConfigPage() {
           { id: 'sesi', label: 'Konfigurasi Sesi', icon: Clock },
           { id: 'banner', label: 'Slide Banner & Slideshow', icon: Image },
           { id: 'pemeliharaan', label: 'Mode Pemeliharaan', icon: AlertOctagon },
-          { id: 'branding', label: 'Branding & Titik Peta', icon: Sliders },
-          { id: 'wilayah', label: 'Referensi Wilayah', icon: MapPin }
+          { id: 'branding', label: 'Branding & Titik Peta', icon: Sliders }
         ].map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
@@ -688,23 +591,7 @@ export default function ConfigPage() {
           <form onSubmit={handleSaveBranding} className="space-y-6">
             {/* Bagian 1: Branding */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">1. Kustomisasi Branding & Logo</h4>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Nama Aplikasi / System Title *
-                </label>
-                <input
-                  type="text"
-                  value={appNm}
-                  onChange={(e) => setAppNm(e.target.value)}
-                  required
-                  className="w-full border border-slate-200 px-3.5 py-2 text-xs focus:outline-none focus:border-primary font-medium"
-                  placeholder="Contoh: GEOSIPAS"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Akan ditampilkan pada bilah samping (sidebar) aplikasi utama dan juga sebagai kop pada ekspor cetak PDF.
-                </p>
-              </div>
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">1. Kustomisasi Logo Aplikasi</h4>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
@@ -814,123 +701,6 @@ export default function ConfigPage() {
         </div>
       )}
 
-      {/* ─── TAB CONTENT: REFERENSI WILAYAH ─── */}
-      {activeTab === 'wilayah' && (
-        <div className="bg-white border border-border p-6 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] rounded-none text-left max-w-3xl animate-in fade-in duration-300 space-y-6">
-          <div className="flex items-center justify-between border-b pb-3 mb-4">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <MapPin className="h-4.5 w-4.5 text-primary" />
-              Kelola Data Referensi Wilayah Dinas
-            </h3>
-            
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={handleDownloadTemplate}
-                className="border border-slate-200 hover:border-slate-400 bg-white hover:bg-slate-50 px-3.5 py-1.5 text-[11px] font-bold transition-all cursor-pointer flex items-center space-x-1.5 text-slate-700 outline-none"
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span>Unduh Template CSV</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleClearRegions}
-                disabled={regions.length === 0}
-                className={`px-3.5 py-1.5 text-[11px] font-bold transition-all cursor-pointer flex items-center space-x-1.5 border outline-none ${
-                  regions.length === 0
-                    ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
-                }`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Kosongkan Tabel Wilayah</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-1 space-y-4">
-              <div className="border border-border p-4 bg-slate-50/50 space-y-4">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Unggah File Referensi Baru</h4>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Unggah file berformat **CSV** yang sesuai dengan template. Seluruh wilayah lama akan dihapus dan diganti dengan berkas baru ini.
-                </p>
-
-                <div className="space-y-2 pt-2">
-                  <input
-                    type="file"
-                    ref={regionFileInputRef}
-                    onChange={handleUploadRegions}
-                    accept=".csv"
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => regionFileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="w-full bg-primary hover:bg-primary/95 text-white py-2 text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-2 shadow-sm outline-none"
-                  >
-                    <Upload className="h-4 w-4" />
-                    <span>{uploading ? 'Mengunggah...' : 'Pilih & Unggah CSV'}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="border border-border p-4 bg-slate-50/50 space-y-2">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Statistik Tabel</h4>
-                <div className="flex justify-between items-center text-xs pt-1">
-                  <span className="text-slate-500 font-medium">Total Baris Terdaftar:</span>
-                  <span className="font-bold text-primary">{regions.length} wilayah</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="md:col-span-2 space-y-3">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Pratampilan Data Wilayah (Maksimal 10 Baris Pertama)</h4>
-              
-              {loadingRegions ? (
-                <div className="border border-border h-48 flex items-center justify-center bg-slate-50/20">
-                  <span className="text-xs font-medium text-slate-400">Memuat pratampilan data...</span>
-                </div>
-              ) : regions.length === 0 ? (
-                <div className="border border-border border-dashed h-48 flex flex-col items-center justify-center bg-slate-50/20 text-slate-400 space-y-1">
-                  <MapPin className="h-8 w-8 stroke-[1.5]" />
-                  <span className="text-xs font-bold">Belum Ada Data Referensi</span>
-                  <span className="text-[10px]">Silakan unduh template dan unggah berkas wilayah.</span>
-                </div>
-              ) : (
-                <div className="border border-border overflow-hidden">
-                  <div className="overflow-x-auto max-h-64">
-                    <table className="w-full text-left text-xs font-medium border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100 border-b border-border text-slate-600 font-bold select-none text-[10px] uppercase">
-                          <th className="px-4 py-2 border-r border-border">Provinsi</th>
-                          <th className="px-4 py-2 border-r border-border">Kab/Kota</th>
-                          <th className="px-4 py-2 border-r border-border">Kecamatan</th>
-                          <th className="px-4 py-2 border-r border-border">Desa/Kelurahan</th>
-                          <th className="px-4 py-2">Kode Pos</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-slate-600 font-medium divide-y divide-border">
-                        {regions.slice(0, 10).map((r, idx) => (
-                          <tr key={r.id || idx} className="hover:bg-slate-50/50">
-                            <td className="px-4 py-2 border-r border-border">{r.province}</td>
-                            <td className="px-4 py-2 border-r border-border">{r.regency}</td>
-                            <td className="px-4 py-2 border-r border-border">{r.district}</td>
-                            <td className="px-4 py-2 border-r border-border">{r.village}</td>
-                            <td className="px-4 py-2">{r.postal_code || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

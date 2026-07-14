@@ -98,11 +98,11 @@ export default function SitePlanListPage() {
   };
 
   const startEntry = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const endEntry   = Math.min(page * PAGE_SIZE, totalCount);
+  const endEntry = Math.min(page * PAGE_SIZE, totalCount);
 
   return (
     <div className="space-y-6 font-sans">
-      
+
       {/* ─── HEADER HALAMAN ─── */}
       <div className="text-left select-none">
         <h1 className="text-2xl font-bold text-[#111D13] leading-none flex items-center gap-2">
@@ -117,7 +117,7 @@ export default function SitePlanListPage() {
       {/* ─── FILTERS ─── */}
       <div className="space-y-4 bg-white border border-border p-4">
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
-          
+
           {/* Search input */}
           <div className="relative flex-1 md:max-w-sm text-left">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#709775]" />
@@ -169,11 +169,10 @@ export default function SitePlanListPage() {
             <button
               key={tab}
               onClick={() => handleStatusChange(tab)}
-              className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all border-b-2 -mb-px rounded-none ${
-                selectedStatus === tab
+              className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all border-b-2 -mb-px rounded-none ${selectedStatus === tab
                   ? 'border-primary text-primary font-bold bg-[#e8f2ea]/40'
                   : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
-              }`}
+                }`}
             >
               {tab}
             </button>
@@ -235,7 +234,7 @@ export default function SitePlanListPage() {
                     <td className="px-4 py-3 text-center">
                       <Link
                         to={`/siteplan/detail/${sub.id}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary text-white text-[10px] font-bold rounded-none hover:bg-primary/95 transition-all shadow-[2px_2px_0px_0px_rgba(65,93,67,0.1)] border border-primary animate-pulse"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary text-white text-[10px] font-bold rounded-none hover:bg-primary/95 transition-all shadow-[2px_2px_0px_0px_rgba(65,93,67,0.1)] border border-primary"
                       >
                         <Map className="h-3 w-3" />
                         Detail Spasial
