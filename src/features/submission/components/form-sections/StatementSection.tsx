@@ -148,7 +148,7 @@ export const StatementSection = () => {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Nominal Retribusi (Rp) - Opsional</label>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-1">Nilai Kompensasi Lahan (Rp) - Opsional</label>
                     <FormattedInput
                       name={`compensations.${index}.nominalAmount`}
                       placeholder="Contoh: 50.000.000"

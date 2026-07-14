@@ -127,6 +127,9 @@ export default function SubmissionCreatePage() {
           ipalCapacity: existingSub.technical?.ipalCapacity || undefined,
           greenBufferArea: existingSub.technical?.greenBufferArea || undefined,
           tpsB3Provision: existingSub.technical?.tpsB3Provision || undefined,
+          applicantBuildingArea: existingSub.technical?.applicantBuildingArea || undefined,
+          applicantGsb: existingSub.technical?.applicantGsb || undefined,
+          applicantRthArea: existingSub.technical?.applicantRthArea || undefined,
         },
         consultant: {
           consultantName: existingSub.consultant?.consultantName || '',
@@ -137,14 +140,14 @@ export default function SubmissionCreatePage() {
           agreed: existingSub.statement?.agreed || false,
         },
         document: {
-          legalDoc: existingSub.documents?.find(d => d.type === 'legalDoc')?.url || undefined,
-          technicalDoc: existingSub.documents?.find(d => d.type === 'technicalDoc')?.url || undefined,
-          supportDoc: existingSub.documents?.find(d => d.type === 'supportDoc')?.url || undefined,
-          supportDoc2: existingSub.documents?.find(d => d.type === 'supportDoc2')?.url || undefined,
-          skaDoc: existingSub.documents?.find(d => d.type === 'skaDoc')?.url || undefined,
-          cadDoc: existingSub.documents?.find(d => d.type === 'cadDoc')?.url || undefined,
-          ktpDoc: existingSub.documents?.find(d => d.type === 'ktpDoc')?.url || undefined,
-          nibDoc: existingSub.documents?.find(d => d.type === 'nibDoc')?.url || undefined,
+          legalDoc: existingSub.documents?.find(d => d.key === 'legalDoc')?.url || undefined,
+          technicalDoc: existingSub.documents?.find(d => d.key === 'technicalDoc')?.url || undefined,
+          supportDoc: existingSub.documents?.find(d => d.key === 'supportDoc')?.url || undefined,
+          supportDoc2: existingSub.documents?.find(d => d.key === 'supportDoc2')?.url || undefined,
+          skaDoc: existingSub.documents?.find(d => d.key === 'skaDoc')?.url || undefined,
+          cadDoc: existingSub.documents?.find(d => d.key === 'cadDoc')?.url || undefined,
+          ktpDoc: existingSub.documents?.find(d => d.key === 'ktpDoc')?.url || undefined,
+          nibDoc: existingSub.documents?.find(d => d.key === 'nibDoc')?.url || undefined,
         },
         photo: {
           photoNorth: existingSub.photos?.photoNorth || undefined,
@@ -187,9 +190,9 @@ export default function SubmissionCreatePage() {
       }
       return SubmissionService.create(data, false);
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
-      navigate('/pengajuan/daftar');
+      navigate(`/pengajuan/penerimaan/${res.id}`);
     }
   });
 
@@ -324,47 +327,50 @@ export default function SubmissionCreatePage() {
                   </fieldset>
                 </div>
 
-                {/* Tombol Navigasi Kaki Formulir (Ramping, Siku Kaku, Hunter Green) */}
+                {/* Tombol Navigasi Kaki Formulir (Symmetrical, Clean Typography, Siku Kaku) */}
                 <div className="pt-6 border-t border-border flex justify-between items-center select-none">
+
+                  {/* Tombol Sebelumnya */}
                   <button
                     type="button"
                     onClick={prevStep}
                     disabled={currentStep === 1}
-                    className="inline-flex items-center px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all rounded-none outline-none border-none cursor-pointer"
+                    className="inline-flex items-center px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all rounded-none outline-none border-none bg-transparent cursor-pointer"
                   >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Sebelumnya
+                    <ChevronLeft className="h-4 w-4 mr-1.5" />
+                    SEBELUMNYA
                   </button>
 
-                  {/* Tombol Simpan Draf (Hanya muncul jika form tidak dikunci) */}
+                  {/* Tombol Simpan Draf (Borderless, Clean Text Style) */}
                   {!isLocked && (
                     <button
                       type="button"
                       onClick={handleSaveDraft}
                       disabled={draftMutation.isPending || mutation.isPending}
-                      className="inline-flex items-center justify-center px-4.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-slate-800 border border-border rounded-none transition-colors cursor-pointer outline-none"
+                      className="inline-flex items-center justify-center px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all rounded-none outline-none border-none bg-transparent cursor-pointer"
                     >
                       {draftMutation.isPending ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                          <span>Menyimpan...</span>
+                          <span>MENYIMPAN...</span>
                         </>
                       ) : (
                         <>
                           <Save className="h-3.5 w-3.5 mr-1.5" />
-                          <span>{id ? 'Perbarui Draf' : 'Simpan Draf'}</span>
+                          <span>{id ? 'PERBARUI DRAF' : 'SIMPAN DRAF'}</span>
                         </>
                       )}
                     </button>
                   )}
 
+                  {/* Tombol Selanjutnya / Kirim (No Shadow, Perfect Filled State) */}
                   {currentStep < steps.length ? (
                     <button
                       type="button"
                       onClick={nextStep}
-                      className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 text-white font-bold rounded-none transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer outline-none"
+                      className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 text-white font-bold uppercase tracking-wider rounded-none transition-all gap-2 text-xs border border-primary cursor-pointer outline-none"
                     >
-                      Selanjutnya
+                      <span>SELANJUTNYA</span>
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </button>
                   ) : (
@@ -372,17 +378,17 @@ export default function SubmissionCreatePage() {
                       <button
                         type="submit"
                         disabled={mutation.isPending}
-                        className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-none transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer outline-none"
+                        className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:opacity-50 text-white font-bold uppercase tracking-wider rounded-none transition-all gap-2 text-xs border border-primary cursor-pointer outline-none"
                       >
                         {mutation.isPending ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin text-white" />
-                            <span>Mengirimkan...</span>
+                            <span>MENGIRIMKAN...</span>
                           </>
                         ) : (
                           <>
                             <Save className="h-4 w-4" />
-                            <span>Simpan Pengajuan Final</span>
+                            <span>SIMPAN PENGAJUAN FINAL</span>
                           </>
                         )}
                       </button>

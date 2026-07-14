@@ -267,4 +267,9 @@ ol[data-sonner-toaster] {
 /* Ketika dropdown di header terbuka, dorong Toaster ke bawah agar tidak menghalangi menu */
 body.header-dropdown-open ol[data-sonner-toaster] {
   top: 220px !important;
+}
+
+/* Penyeragaman visual inputan text menjadi Title Case saat diketik */
+input[type="text"]:not([name*="email"]):not([name*="password"]):not([name*="username"]):not(.no-capitalize), textarea {
+  text-transform: capitalize;
 }

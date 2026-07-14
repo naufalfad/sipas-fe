@@ -26,7 +26,7 @@ export default function SubmissionListPanel() {
     // Unik status list untuk filter dropdown (Sesuai database SIPAS) [sipas-fe.txt]
     const statusOptions = [
         { value: "ALL", label: "Semua Berkas" },
-        { value: "Menunggu Verifikasi", label: "Menunggu Verifikasi" },
+        { value: "Pengajuan Dokumen", label: "Pengajuan Dokumen" },
         { value: "Verifikasi Administrasi", label: "Verifikasi Admin" },
         { value: "Verifikasi Teknis", label: "Verifikasi Teknis" },
         { value: "Disetujui", label: "Disetujui" },
@@ -84,7 +84,7 @@ export default function SubmissionListPanel() {
         const styles: Record<string, string> = {
             "Disetujui": "text-emerald-700 bg-emerald-50/50 border-emerald-100",
             "Ditolak": "text-rose-700 bg-rose-50/50 border-rose-100 animate-pulse",
-            "Menunggu Verifikasi": "text-blue-700 bg-blue-50/50 border-blue-100",
+            "Pengajuan Dokumen": "text-blue-700 bg-blue-50/50 border-blue-100",
             "Verifikasi Administrasi": "text-amber-700 bg-amber-50/50 border-amber-100",
             "Verifikasi Teknis": "text-indigo-700 bg-indigo-50/50 border-indigo-100"
         };

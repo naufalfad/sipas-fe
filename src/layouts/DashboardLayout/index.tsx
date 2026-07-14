@@ -16,7 +16,6 @@ import {
   Database,
   Users,
   ShieldAlert,
-  Bookmark,
   Menu,
   X,
   Bell,
@@ -182,16 +181,16 @@ export default function DashboardLayout() {
       try {
         const submissions = await SubmissionService.getAllList();
         if (!active) return;
-        
+
         const notifs: any[] = [];
         let idCounter = 1;
-        
+
         submissions.forEach((sub) => {
           const subNo = sub.submissionNo || sub.id;
           const housingName = sub.housingName || 'Proyek';
-          
+
           if (activeRole === 'Admin SIPAS') {
-            if (sub.status === 'Menunggu Verifikasi') {
+            if (sub.status === 'Pengajuan Dokumen') {
               notifs.push({
                 id: `notif-${idCounter++}`,
                 title: 'Pengajuan Baru',
@@ -249,7 +248,7 @@ export default function DashboardLayout() {
               });
             }
           } else if (activeRole === 'Super Admin') {
-            if (sub.status === 'Menunggu Verifikasi') {
+            if (sub.status === 'Pengajuan Dokumen') {
               notifs.push({
                 id: `notif-${idCounter++}`,
                 title: 'Pengajuan Baru',
@@ -279,7 +278,7 @@ export default function DashboardLayout() {
             time: '-'
           });
         }
-        
+
         setNotifications(notifs);
       } catch (err) {
         console.warn('Gagal memuat notifikasi dinamis:', err);

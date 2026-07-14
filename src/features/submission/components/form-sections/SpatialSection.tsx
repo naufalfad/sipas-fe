@@ -8,8 +8,32 @@ import { ContextualUploadBox } from './ContextualUploadBox';
 import { cn } from '@/lib/utils';
 import { inputClass } from './styles';
 
+const ZONING_OPTIONS = {
+  PERUMAHAN: [
+    { value: 'Kawasan Hunian Kepadatan Sangat Tinggi', label: 'Kawasan Hunian Kepadatan Sangat Tinggi (R-1)' },
+    { value: 'Kawasan Hunian Kepadatan Tinggi', label: 'Kawasan Hunian Kepadatan Tinggi (R-2)' },
+    { value: 'Kawasan Hunian Kepadatan Sedang', label: 'Kawasan Hunian Kepadatan Sedang (R-3)' },
+    { value: 'Kawasan Hunian Kepadatan Rendah', label: 'Kawasan Hunian Kepadatan Rendah (R-4)' },
+    { value: 'Kawasan Hunian Kepadatan Sangat Rendah', label: 'Kawasan Hunian Kepadatan Sangat Rendah (R-5)' }
+  ],
+  NON_PERUMAHAN: [
+    { value: 'Kawasan Perdagangan dan Jasa', label: 'Kawasan Perdagangan dan Jasa (K)' },
+    { value: 'Kawasan Perkantoran', label: 'Kawasan Perkantoran (KT)' },
+    { value: 'Kawasan Pariwisata', label: 'Kawasan Pariwisata (W)' }
+  ],
+  FASUM: [
+    { value: 'Kawasan Fasilitas Pelayanan Umum', label: 'Kawasan Fasilitas Pelayanan Umum (SPU)' },
+    { value: 'Kawasan Ruang Terbuka Hijau', label: 'Kawasan Ruang Terbuka Hijau (RTH)' }
+  ],
+  INDUSTRI: [
+    { value: 'Kawasan Peruntukan Industri', label: 'Kawasan Peruntukan Industri (KPI)' },
+    { value: 'Kawasan Pergudangan', label: 'Kawasan Pergudangan (G)' }
+  ]
+};
+
 export const SpatialSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
+  const category = watch('submission.category') || 'PERUMAHAN';
   const landArea = watch('location.landArea') || 0;
   const greenAreaVal = watch('spatial.greenArea');
   const [greenAreaPercent, setGreenAreaPercent] = useState<string>('');
@@ -58,7 +82,17 @@ export const SpatialSection = () => {
 
         <div>
           <LabelWithInfo label="Kriteria Peruntukan Lahan (Zonasi Perda)" helpText="Kriteria rencana peruntukan zonasi perumahan atau komersial sesuai Perda Rencana Tata Ruang Wilayah (RTRW)." />
-          <input {...register('spatial.landUse')} type="text" className={inputClass} placeholder="Contoh: Kawasan Hunian Kepadatan Sedang" />
+          <select 
+            {...register('spatial.landUse')} 
+            className={cn(inputClass, "h-[38px] cursor-pointer")}
+          >
+            <option value="">-- Pilih Zonasi Peruntukan Lahan --</option>
+            {ZONING_OPTIONS[category as keyof typeof ZONING_OPTIONS]?.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           {errors.spatial?.landUse && <p className="text-xs text-rose-500 mt-1">{errors.spatial.landUse.message}</p>}
         </div>
 
@@ -101,7 +135,7 @@ export const SpatialSection = () => {
           <ContextualUploadBox
             label="Unggah Dokumen SK KKPR / IPPT Awal"
             fieldKey="document.supportDoc"
-            helpText="Unggah dokumen keputusan KKPR atau izin prinsip yang didapatkan dari BKPRD/DPMPTSP."
+            helpText="Unggah dokumen keputusan KKPR atau izin prinsip yang didapatkan dari BKPRD/DPMPTSP dalam format PDF."
           />
         </div>
       </div>

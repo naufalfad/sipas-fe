@@ -19,7 +19,7 @@ export default function DashboardPage() {
   // Kalkulasi statistik data
   const total = submissions.length;
   const diproses = submissions.filter(s =>
-    ['Menunggu Verifikasi', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Menunggu Persetujuan'].includes(s.status)
+    ['Pengajuan Dokumen', 'Verifikasi Administrasi', 'Verifikasi Teknis', 'Menunggu Persetujuan'].includes(s.status)
   ).length;
   const disetujui = submissions.filter(s => s.status === 'Disetujui').length;
   const ditolak = submissions.filter(s => s.status === 'Ditolak').length;

@@ -108,111 +108,154 @@ export const TechnicalSection = () => {
 
         {/* 4-Column Raw Inputs Grid with Vertical Justification for Consistent Alignment */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="flex flex-col justify-between h-full">
-            <LabelWithInfo label="Luas Lantai Dasar (m²)" helpText="Total luasan tapak lantai dasar bangunan rencana untuk kalkulasi KDB." />
+          <div className="flex flex-col justify-between h-full text-left">
+            <LabelWithInfo
+              label="Luas Lantai Dasar"
+              subLabel="(m²)"
+              helpText="Total luasan tapak lantai dasar bangunan rencana untuk kalkulasi KDB."
+            />
             <FormattedInput name="technical.applicantBuildingArea" placeholder="Contoh: 6000" />
             {errors.technical?.applicantBuildingArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantBuildingArea.message}</p>}
           </div>
 
-          <div className="flex flex-col justify-between h-full">
-            <LabelWithInfo label="Total Luas Lantai (m²)" helpText="Akumulasi luas seluruh lantai bangunan (Lantai 1 + Lantai 2 + dst) untuk kalkulasi KLB." />
+          <div className="flex flex-col justify-between h-full text-left">
+            <LabelWithInfo
+              label="Total Luas Lantai"
+              subLabel="(m²)"
+              helpText="Akumulasi luas seluruh lantai bangunan (Lantai 1 + Lantai 2 + dst) untuk kalkulasi KLB."
+            />
             <FormattedInput name="technical.totalFloorArea" placeholder="Contoh: 12000" />
             {errors.technical?.totalFloorArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.totalFloorArea.message}</p>}
           </div>
 
-          <div className="flex flex-col justify-between h-full">
-            <LabelWithInfo label="Luas Hijau Resapan (RTH - m²)" helpText="Total luasan pekarangan hijau alami (tanpa semen/perkerasan) untuk kalkulasi KDH." />
+          <div className="flex flex-col justify-between h-full text-left">
+            <LabelWithInfo
+              label="Luas Hijau Resapan"
+              subLabel="(RTH - m²)"
+              helpText="Total luasan pekarangan hijau alami (tanpa semen/perkerasan) untuk kalkulasi KDH."
+            />
             <FormattedInput name="technical.applicantRthArea" placeholder="Contoh: 1500" />
             {errors.technical?.applicantRthArea && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantRthArea.message}</p>}
           </div>
 
-          <div className="flex flex-col justify-between h-full">
-            <LabelWithInfo label="Garis Sempadan (GSB - m)" helpText="Batas penarikan mundur minimal dinding bangunan terluar dari rencana as jalan." />
+          <div className="flex flex-col justify-between h-full text-left">
+            <LabelWithInfo
+              label="Garis Sempadan"
+              subLabel="(GSB - m)"
+              helpText="Batas penarikan mundur minimal dinding bangunan terluar dari rencana as jalan."
+            />
             <FormattedInput name="technical.applicantGsb" placeholder="Contoh: 5" unit="meter" />
             {errors.technical?.applicantGsb && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantGsb.message}</p>}
           </div>
         </div>
 
-        {/* STREAMING_CHUNK:Rendering real-time calculated ratios comparison scorecard */}
+        {/* Uji Mandiri Scorecard Grid */}
         <div className="pt-3.5 border-t border-primary/10 space-y-2.5">
           <div className="text-[9px] font-black text-primary uppercase tracking-widest leading-none mb-1">
             Uji Mandiri Parameter Kepatuhan Perda (Standard Acuan Kab. Bogor)
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs font-semibold text-slate-700">
-            {/* Reference Land Area */}
-            <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Luas Lahan Acuan</span>
-              <span className="font-bold font-mono text-slate-800 text-[11px]">{landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : '-'}</span>
+
+            {/* Kartu 1: Luas Lahan Acuan */}
+            <div className="p-3 bg-white border border-slate-200 flex flex-col justify-between min-h-[75px] text-left">
+              <div>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Luas Lahan Acuan</span>
+                <span className="text-[8px] font-bold text-slate-400 block mt-0.5">(Total Bidang BPN)</span>
+              </div>
+              <span className="font-bold font-mono text-slate-800 text-[11px] mt-2 block">
+                {landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : '-'}
+              </span>
             </div>
 
-            {/* KDB Proposed */}
-            <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">KDB Usulan (Maks 60%)</span>
-              {kdbVal !== undefined ? (
-                <span className={cn(
-                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
-                  kdbVal <= 60.0
-                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
-                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
-                )}>
-                  {kdbVal.toFixed(1)}% {kdbVal <= 60.0 ? "✓ Lolos" : "⚠ Melanggar"}
-                </span>
-              ) : (
-                <span className="text-slate-400 font-medium text-[11px]">-</span>
-              )}
+            {/* Kartu 2: KDB Proposed */}
+            <div className="p-3 bg-white border border-slate-200 flex flex-col justify-between min-h-[75px] text-left">
+              <div>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">KDB Usulan</span>
+                <span className="text-[8px] font-bold text-slate-400 block mt-0.5">(Maks 60%)</span>
+              </div>
+              <div className="mt-2">
+                {kdbVal !== undefined ? (
+                  <span className={cn(
+                    "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                    kdbVal <= 60.0
+                      ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                      : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                  )}>
+                    {kdbVal.toFixed(1)}% {kdbVal <= 60.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-medium text-[11px]">-</span>
+                )}
+              </div>
             </div>
 
-            {/* KLB Proposed */}
-            <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">KLB Usulan (Maks 3.5)</span>
-              {klbVal !== undefined ? (
-                <span className={cn(
-                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
-                  klbVal <= 3.5
-                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
-                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
-                )}>
-                  {klbVal.toFixed(2)}x {klbVal <= 3.5 ? "✓ Lolos" : "⚠ Melanggar"}
-                </span>
-              ) : (
-                <span className="text-slate-400 font-medium text-[11px]">-</span>
-              )}
+            {/* Kartu 3: KLB Proposed */}
+            <div className="p-3 bg-white border border-slate-200 flex flex-col justify-between min-h-[75px] text-left">
+              <div>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">KLB Usulan</span>
+                <span className="text-[8px] font-bold text-slate-400 block mt-0.5">(Maks 3.5)</span>
+              </div>
+              <div className="mt-2">
+                {klbVal !== undefined ? (
+                  <span className={cn(
+                    "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                    klbVal <= 3.5
+                      ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                      : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                  )}>
+                    {klbVal.toFixed(2)}x {klbVal <= 3.5 ? "✓ Lolos" : "⚠ Melanggar"}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-medium text-[11px]">-</span>
+                )}
+              </div>
             </div>
 
-            {/* KDH Proposed */}
-            <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">KDH Usulan (Min 10%)</span>
-              {kdhVal !== undefined ? (
-                <span className={cn(
-                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
-                  kdhVal >= 10.0
-                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
-                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
-                )}>
-                  {kdhVal.toFixed(1)}% {kdhVal >= 10.0 ? "✓ Lolos" : "⚠ Melanggar"}
-                </span>
-              ) : (
-                <span className="text-slate-400 font-medium text-[11px]">-</span>
-              )}
+            {/* Kartu 4: KDH Proposed */}
+            <div className="p-3 bg-white border border-slate-200 flex flex-col justify-between min-h-[75px] text-left">
+              <div>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">KDH Usulan</span>
+                <span className="text-[8px] font-bold text-slate-400 block mt-0.5">(Min 10%)</span>
+              </div>
+              <div className="mt-2">
+                {kdhVal !== undefined ? (
+                  <span className={cn(
+                    "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                    kdhVal >= 10.0
+                      ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                      : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                  )}>
+                    {kdhVal.toFixed(1)}% {kdhVal >= 10.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-medium text-[11px]">-</span>
+                )}
+              </div>
             </div>
 
-            {/* GSB Proposed */}
-            <div className="p-2.5 bg-white border border-slate-200">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block mb-1">Garis Sempadan (Min 5m)</span>
-              {applicantGsbVal !== undefined && applicantGsbVal > 0 ? (
-                <span className={cn(
-                  "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
-                  applicantGsbVal >= 5.0
-                    ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
-                    : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
-                )}>
-                  {applicantGsbVal} meter {applicantGsbVal >= 5.0 ? "✓ Lolos" : "⚠ Melanggar"}
-                </span>
-              ) : (
-                <span className="text-slate-400 font-medium text-[11px]">-</span>
-              )}
+            {/* Kartu 5: GSB Proposed */}
+            <div className="p-3 bg-white border border-slate-200 flex flex-col justify-between min-h-[75px] text-left">
+              <div>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Garis Sempadan</span>
+                <span className="text-[8px] font-bold text-slate-400 block mt-0.5">(Min 5m)</span>
+              </div>
+              <div className="mt-2">
+                {applicantGsbVal !== undefined && applicantGsbVal > 0 ? (
+                  <span className={cn(
+                    "font-bold font-mono text-[10px] px-1.5 py-0.5 border leading-none inline-block",
+                    applicantGsbVal >= 5.0
+                      ? "bg-[#e8f2ea] text-primary border-[#A1CCA5]"
+                      : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                  )}>
+                    {applicantGsbVal} meter {applicantGsbVal >= 5.0 ? "✓ Lolos" : "⚠ Melanggar"}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-medium text-[11px]">-</span>
+                )}
+              </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -237,9 +280,9 @@ export const TechnicalSection = () => {
           {/* ─── MODUL PENYEDIAAN TEMPAT PEMAKAMAN UMUM (TPU) TERSTRUKTUR ─── */}
           <div className="md:col-span-2 border border-[#DAE4DB] bg-[#f4f7f4]/20 p-5 space-y-4">
             <div>
-              <LabelWithInfo 
-                label="Metode Pemenuhan Kewajiban TPU" 
-                helpText="Pilih metode pemenuhan kewajiban Tempat Pemakaman Umum (TPU) sesuai kesepakatan tata ruang dan perda setempat." 
+              <LabelWithInfo
+                label="Metode Pemenuhan Kewajiban TPU"
+                helpText="Pilih metode pemenuhan kewajiban Tempat Pemakaman Umum (TPU) sesuai kesepakatan tata ruang dan perda setempat."
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
                 {[
@@ -256,8 +299,8 @@ export const TechnicalSection = () => {
                       onClick={() => setValue('tpu.method', m.id as any)}
                       className={cn(
                         "border p-3 cursor-pointer transition-all duration-200 select-none flex flex-col justify-between min-h-[90px]",
-                        isSelected 
-                          ? "border-primary bg-[#e8f2ea]/40 ring-1 ring-primary shadow-sm" 
+                        isSelected
+                          ? "border-primary bg-[#e8f2ea]/40 ring-1 ring-primary shadow-sm"
                           : "border-border hover:border-slate-400 bg-white"
                       )}
                     >
@@ -269,7 +312,7 @@ export const TechnicalSection = () => {
                         <input
                           type="radio"
                           checked={isSelected}
-                          onChange={() => {}} // handled by parent onClick
+                          onChange={() => { }} // handled by parent onClick
                           className="h-3 w-3 text-primary border-slate-300 focus:ring-primary cursor-pointer"
                         />
                       </div>
@@ -284,27 +327,27 @@ export const TechnicalSection = () => {
               {tpuMethod === 'MANDIRI' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex flex-col justify-between h-full">
-                    <LabelWithInfo 
-                      label="Luas Lahan Makam Rencana (m²)" 
-                      helpText={`Penyediaan area makam fisik mandiri (wajib minimal 2% dari total luas lahan perumahan: ${(landArea * 0.02).toLocaleString('id-ID')} m²).`} 
+                    <LabelWithInfo
+                      label="Luas Lahan Makam Rencana (m²)"
+                      helpText={`Penyediaan area makam fisik mandiri (wajib minimal 2% dari total luas lahan perumahan: ${(landArea * 0.02).toLocaleString('id-ID')} m²).`}
                     />
-                    <FormattedInput 
-                      name="tpu.area" 
-                      placeholder="Penyediaan 2% dari luas total" 
-                      unit="m²" 
+                    <FormattedInput
+                      name="tpu.area"
+                      placeholder="Penyediaan 2% dari luas total"
+                      unit="m²"
                       onChangeCustom={(val) => {
                         setValue('tpu.area', val);
                         setValue('technical.cemeteryArea', val); // Sinkronkan ke kolom legacy
                         handleCemeteryLuasChangeVal(val);
-                      }} 
+                      }}
                     />
                     {errors.tpu?.area && <p className="text-xs text-rose-500 mt-1">{errors.tpu.area.message}</p>}
                   </div>
 
                   <div className="flex flex-col justify-between h-full">
-                    <LabelWithInfo 
-                      label="Persentase Terhadap Luas Perumahan (%)" 
-                      helpText={`Dihitung otomatis. Target minimal 2%. Luas Lahan Aktif: ${landArea.toLocaleString('id-ID')} m².`} 
+                    <LabelWithInfo
+                      label="Persentase Terhadap Luas Perumahan (%)"
+                      helpText={`Dihitung otomatis. Target minimal 2%. Luas Lahan Aktif: ${landArea.toLocaleString('id-ID')} m².`}
                     />
                     <div className="relative">
                       <input
@@ -336,6 +379,11 @@ export const TechnicalSection = () => {
                     <LabelWithInfo label="Alamat / Lokasi TPU" helpText="Kecamatan dan kelurahan lokasi TPU Pemda." />
                     <input type="text" {...register('tpu.alamat')} className={inputClass} placeholder="Contoh: Kec. Cibinong, Kel. Pondok Rajeg" />
                   </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <LabelWithInfo label="Koordinat TPU (Google Format: lat,long)" helpText="Titik koordinat lokasi fisik TPU, e.g. -6.485542, 106.824125" />
+                    <input type="text" {...register('tpu.koordinat')} className={cn(inputClass, "no-capitalize")} placeholder="Contoh: -6.485542, 106.824125" />
+                    {errors.tpu?.koordinat && <p className="text-xs text-rose-500 mt-1">{errors.tpu.koordinat.message}</p>}
+                  </div>
                   <div className="col-span-1 md:col-span-2 mt-2 text-left">
                     <ContextualUploadBox
                       label="Unggah Surat Rekomendasi / Bukti Izin Penggunaan TPU Pemda"
@@ -366,6 +414,11 @@ export const TechnicalSection = () => {
                       <input type="text" {...register('tpu.alamat')} className={inputClass} placeholder="Contoh: Kampung Sukasari RT 02/RW 03, Jonggol" />
                     </div>
                   </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <LabelWithInfo label="Koordinat TPU (Google Format: lat,long)" helpText="Titik koordinat lokasi fisik TPU, e.g. -6.485542, 106.824125" />
+                    <input type="text" {...register('tpu.koordinat')} className={cn(inputClass, "no-capitalize")} placeholder="Contoh: -6.485542, 106.824125" />
+                    {errors.tpu?.koordinat && <p className="text-xs text-rose-500 mt-1">{errors.tpu.koordinat.message}</p>}
+                  </div>
                   <div className="col-span-1 md:col-span-2 mt-2 text-left">
                     <ContextualUploadBox
                       label="Unggah Dokumen Perjanjian Kerja Sama (PKS) TPU"
@@ -380,10 +433,10 @@ export const TechnicalSection = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex flex-col justify-between h-full">
                     <LabelWithInfo label="Nominal Uang Kompensasi (Rp)" helpText="Jumlah uang retribusi kompensasi TPU yang disetor ke Kas Daerah." />
-                    <FormattedInput 
-                      name="tpu.nominalKompensasi" 
-                      placeholder="Contoh: 150.000.000" 
-                      prefix="Rp " 
+                    <FormattedInput
+                      name="tpu.nominalKompensasi"
+                      placeholder="Contoh: 150.000.000"
+                      prefix="Rp "
                     />
                   </div>
                   <div className="flex flex-col justify-between h-full">

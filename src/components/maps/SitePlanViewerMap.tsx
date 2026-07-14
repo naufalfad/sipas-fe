@@ -164,7 +164,7 @@ export default function SitePlanViewerMap({
     };
 
     return (
-        <div className={cn("relative overflow-hidden rounded-none", className)} style={{ width: '100%', height: '100%' }}>
+        <div className={cn("relative overflow-hidden rounded-none", className)} style={{ width: '100%' }}>
 
             {/* 1. SAGE GREEN LOADING SPINNER OVERLAY */}
             {isLoading && (

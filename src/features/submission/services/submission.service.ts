@@ -12,7 +12,7 @@ import type { Submission, SubmissionStatus, EvaluationChecklistItem } from '../t
 import type { FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 import { API_BASE_URL as API_BASE_URL_CONFIG } from '@/config';
 
-const API_BASE_URL = `${API_BASE_URL_CONFIG}/api/v1/submissions`;
+export const API_BASE_URL = `${API_BASE_URL_CONFIG}/api/v1/submissions`;
 
 const getAuthHeaders = (extraHeaders?: Record<string, string>) => {
   const token = sessionStorage.getItem('token');
