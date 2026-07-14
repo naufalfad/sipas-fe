@@ -127,6 +127,9 @@ export default function SubmissionCreatePage() {
           ipalCapacity: existingSub.technical?.ipalCapacity || undefined,
           greenBufferArea: existingSub.technical?.greenBufferArea || undefined,
           tpsB3Provision: existingSub.technical?.tpsB3Provision || undefined,
+          applicantBuildingArea: existingSub.technical?.applicantBuildingArea || undefined,
+          applicantGsb: existingSub.technical?.applicantGsb || undefined,
+          applicantRthArea: existingSub.technical?.applicantRthArea || undefined,
         },
         consultant: {
           consultantName: existingSub.consultant?.consultantName || '',
@@ -137,14 +140,14 @@ export default function SubmissionCreatePage() {
           agreed: existingSub.statement?.agreed || false,
         },
         document: {
-          legalDoc: existingSub.documents?.find(d => d.type === 'legalDoc')?.url || undefined,
-          technicalDoc: existingSub.documents?.find(d => d.type === 'technicalDoc')?.url || undefined,
-          supportDoc: existingSub.documents?.find(d => d.type === 'supportDoc')?.url || undefined,
-          supportDoc2: existingSub.documents?.find(d => d.type === 'supportDoc2')?.url || undefined,
-          skaDoc: existingSub.documents?.find(d => d.type === 'skaDoc')?.url || undefined,
-          cadDoc: existingSub.documents?.find(d => d.type === 'cadDoc')?.url || undefined,
-          ktpDoc: existingSub.documents?.find(d => d.type === 'ktpDoc')?.url || undefined,
-          nibDoc: existingSub.documents?.find(d => d.type === 'nibDoc')?.url || undefined,
+          legalDoc: existingSub.documents?.find(d => d.key === 'legalDoc')?.url || undefined,
+          technicalDoc: existingSub.documents?.find(d => d.key === 'technicalDoc')?.url || undefined,
+          supportDoc: existingSub.documents?.find(d => d.key === 'supportDoc')?.url || undefined,
+          supportDoc2: existingSub.documents?.find(d => d.key === 'supportDoc2')?.url || undefined,
+          skaDoc: existingSub.documents?.find(d => d.key === 'skaDoc')?.url || undefined,
+          cadDoc: existingSub.documents?.find(d => d.key === 'cadDoc')?.url || undefined,
+          ktpDoc: existingSub.documents?.find(d => d.key === 'ktpDoc')?.url || undefined,
+          nibDoc: existingSub.documents?.find(d => d.key === 'nibDoc')?.url || undefined,
         },
         photo: {
           photoNorth: existingSub.photos?.photoNorth || undefined,
@@ -187,9 +190,9 @@ export default function SubmissionCreatePage() {
       }
       return SubmissionService.create(data, false);
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
-      navigate('/pengajuan/daftar');
+      navigate(`/pengajuan/penerimaan/${res.id}`);
     }
   });
 

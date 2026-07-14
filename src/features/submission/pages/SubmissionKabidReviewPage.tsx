@@ -118,11 +118,11 @@ export default function SubmissionKabidReviewPage() {
 
     const handleVetoOverride = () => {
         if (!notes.trim()) {
-            toast.warning('Justifikasi hukum veto override wajib diisi sebagai dasar legalitas diskresi.');
+            toast.warning('Justifikasi dan alasan diskresi wajib diisi sebagai dasar legalitas penyesuaian.');
             return;
         }
         if (!signature) {
-            toast.warning('Paraf pimpinan wajib dibubuhkan untuk mengesahkan veto.');
+            toast.warning('Paraf pimpinan wajib dibubuhkan untuk mengesahkan penyesuaian keputusan.');
             return;
         }
 
@@ -233,23 +233,23 @@ export default function SubmissionKabidReviewPage() {
 
                         {/* Title Section */}
                         <div className="border-b border-slate-200 pb-3">
-                            <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest block mb-0.5">Kabid Decision Engine</span>
-                            <h3 className="text-sm font-bold text-slate-900 uppercase">Matriks Keputusan Birokrasi</h3>
+                            <span className="text-[8px] font-black text-[#709775] uppercase tracking-widest block mb-0.5">Kabid Otoritas &amp; Diskresi</span>
+                            <h3 className="text-sm font-bold text-slate-900 uppercase">Otorisasi &amp; Penyesuaian Rekomendasi</h3>
                         </div>
 
                         {/* SOP Info Alert */}
                         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 flex items-start gap-2.5 text-xs">
                             <Info size={16} className="text-teal-700 shrink-0 mt-0.5" />
                             <p className="text-[10px] leading-relaxed text-justify">
-                                Sesuai Perbup Bogor No. 4 Tahun 2025, Kepala Bidang memegang hak otorisasi peninjauan teknis. Anda dapat langsung mengesahkan Telaah Staf untuk men-generate draf Surat Keputusan (SK) bagi Kepala Dinas, atau mengaktifkan hak khusus **Veto/Override** [SOP-KABID-VETO].
+                                Sesuai Perbup Bogor No. 4 Tahun 2025, Kepala Bidang memegang hak otorisasi peninjauan teknis. Anda dapat langsung mengesahkan Telaah Staf untuk men-generate draf Surat Keputusan (SK) bagi Kepala Dinas, atau menggunakan wewenang **Diskresi Penyesuaian Rekomendasi** jika diperlukan.
                             </p>
                         </div>
 
                         {/* Hak Veto Toggle Switch */}
                         <div className="flex justify-between items-center py-2 border-y border-slate-100 bg-slate-50/50 px-3">
                             <div className="text-left">
-                                <span className="text-xs font-bold text-slate-800 block">Aktifkan Hak Veto Khusus</span>
-                                <span className="text-[9px] text-slate-400 block mt-0.5">Veto rekomendasi Tim Teknis dan ubah keputusan</span>
+                                <span className="text-xs font-bold text-slate-800 block">Gunakan Wewenang Diskresi</span>
+                                <span className="text-[9px] text-slate-400 block mt-0.5">Sesuaikan rekomendasi Tim Teknis berdasarkan pertimbangan khusus</span>
                             </div>
                             <button
                                 type="button"
@@ -273,7 +273,7 @@ export default function SubmissionKabidReviewPage() {
                         {isVetoModeActive ? (
                             <div className="space-y-4 animate-in fade-in duration-300">
                                 <div className="space-y-1.5">
-                                    <label className={labelClass}>Ubah Rekomendasi KKPR Akhir</label>
+                                    <label className={labelClass}>Penyesuaian Keputusan Akhir</label>
                                     <select
                                         value={vetoVerdict}
                                         onChange={(e) => setVetoVerdict(e.target.value)}
@@ -285,12 +285,12 @@ export default function SubmissionKabidReviewPage() {
                                 </div>
 
                                 <div className="space-y-1.5 text-left">
-                                    <label className={labelClass}>Justifikasi Hukum &amp; Alasan Veto</label>
+                                    <label className={labelClass}>Justifikasi &amp; Alasan Diskresi</label>
                                     <textarea
                                         rows={3}
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        placeholder="Tuliskan justifikasi hukum formal mengapa rekomendasi Tim Teknis dikesampingkan..."
+                                        placeholder="Tuliskan pertimbangan atau alasan khusus mengapa rekomendasi disesuaikan..."
                                         className={inputClass}
                                         required
                                     />
@@ -300,7 +300,7 @@ export default function SubmissionKabidReviewPage() {
                                     value={signature}
                                     onChange={setSignature}
                                     onClear={() => setSignature('')}
-                                    placeholder="Goreskan paraf override pimpinan"
+                                    placeholder="Goreskan paraf otorisasi pimpinan"
                                 />
 
                                 <button
@@ -309,7 +309,7 @@ export default function SubmissionKabidReviewPage() {
                                     onClick={handleVetoOverride}
                                     className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-widest rounded-none border-none transition-colors cursor-pointer disabled:opacity-50 shadow-md"
                                 >
-                                    Eksploitasi &amp; Terapkan Veto Kabid
+                                    Terapkan Penyesuaian Kabid
                                 </button>
                             </div>
                         ) : (

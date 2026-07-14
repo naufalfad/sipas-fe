@@ -25,9 +25,9 @@ const STATUS_TABS = [
 const CATEGORY_OPTIONS = [
   { value: '', label: 'Semua Kategori' },
   { value: 'PERUMAHAN', label: 'Perumahan' },
-  { value: 'KOMERSIAL', label: 'Komersial' },
+  { value: 'NON_PERUMAHAN', label: 'Komersial' },
   { value: 'INDUSTRI', label: 'Industri' },
-  { value: 'FASILITAS_UMUM', label: 'Fasilitas Umum' },
+  { value: 'FASUM', label: 'Fasilitas Umum' },
 ];
 
 /** Simple debounce hook */
@@ -229,6 +229,7 @@ export default function SubmissionListPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-border text-slate-600 text-xs font-semibold uppercase tracking-wider">
+                  <th className="px-6 py-4 font-bold text-center w-12">No</th>
                   <th className="px-6 py-4 font-bold">No. Berkas</th>
                   <th className="px-6 py-4 font-bold">Informasi Perumahan / Pengaju</th>
                   <th className="px-6 py-4 font-bold">Luas Lahan</th>
@@ -238,8 +239,11 @@ export default function SubmissionListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {submissions.map((sub) => (
+                {submissions.map((sub, index) => (
                   <tr key={sub.id} className="hover:bg-slate-50/40 transition-colors">
+                    <td className="px-6 py-4 text-center text-slate-500 font-medium w-12">
+                      {(page - 1) * PAGE_SIZE + index + 1}
+                    </td>
                     <td className="px-6 py-4">
                       <span className="font-mono font-bold text-[#111D13]">{sub.submissionNo}</span>
                     </td>

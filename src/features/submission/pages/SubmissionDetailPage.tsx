@@ -801,12 +801,20 @@ export default function SubmissionDetailPage() {
         {/* ─── TAHAP 5: REFACTORED KABID CTA PANEL ─── */}
         {showKabidPanel && (
           <div className="bg-white border border-[#415D43] p-5 shadow-sm text-left space-y-4 rounded-none animate-in fade-in duration-300">
-            <div className="border-b border-slate-200 pb-3 flex justify-between items-center select-none">
+            <div className="border-b border-slate-150 pb-3 flex justify-between items-center select-none">
               <div>
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Otoritas Kepala Bidang</h3>
-                <p className="text-[9px] text-slate-400 mt-0.5">Peninjauan Teknis &amp; Kompilasi Diktum SK</p>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Verifikasi Kepala Bidang
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                  Peninjauan Teknis &amp; Kompilasi Diktum SK
+                </p>
               </div>
-              <span className="px-2 py-0.5 bg-slate-900 text-white font-bold text-[8.5px] uppercase rounded-none">KABID VETO GATE</span>
+
+              {/* Badge Solid, Sharp (Tanpa Rounded & Tanpa Outline) */}
+              <span className="px-3 py-1 bg-slate-800 text-white font-bold text-[8.5px] uppercase tracking-wider rounded-none">
+                VERIFIKASI KABID
+              </span>
             </div>
 
             <div className="p-3.5 bg-[#e8f2ea]/40 border border-[#A1CCA5]/60 flex items-start gap-2.5 text-xs text-slate-600">

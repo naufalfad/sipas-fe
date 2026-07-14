@@ -11,6 +11,7 @@ import SubmissionVerificationPage from '@/features/submission/pages/SubmissionVe
 import SubmissionPreviewTelaahPage from '@/features/submission/pages/SubmissionPreviewTelaahPage'; // Halaman (Fase 2)
 import SubmissionKabidReviewPage from '@/features/submission/pages/SubmissionKabidReviewPage';       // BARU TAHAP 2 (Kabid)
 import SubmissionKadisSignPage from '@/features/submission/pages/SubmissionKadisSignPage';         // BARU TAHAP 2 (Kadis)
+import SubmissionReceiptPage from '@/features/submission/pages/SubmissionReceiptPage';
 import SitePlanListPage from '@/features/siteplan/pages/SitePlanListPage';
 import SitePlanDetailPage from '@/features/siteplan/pages/SitePlanDetailPage';
 import VerificationPage from '@/features/verification/pages/VerificationPage';
@@ -84,6 +85,14 @@ export const router = createBrowserRouter([
           {
             path: 'daftar',
             element: <SubmissionListPage />,
+          },
+          {
+            path: 'penerimaan/:id',
+            element: (
+              <ProtectedRoute allowedRoles={['Pemohon', 'Super Admin']}>
+                <SubmissionReceiptPage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'tambah',

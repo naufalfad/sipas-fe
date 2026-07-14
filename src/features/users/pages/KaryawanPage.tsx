@@ -250,7 +250,7 @@ export default function KaryawanPage() {
           className="inline-flex items-center justify-center px-4 py-2.5 bg-primary hover:bg-primary/90 text-white font-semibold rounded-none transition-all gap-2 text-xs shadow-[4px_4px_0px_0px_rgba(65,93,67,0.15)] border border-primary cursor-pointer"
         >
           <Plus className="h-4 w-4" />
-          <span>Tambah Karyawan Baru</span>
+          <span>Tambah Pengguna</span>
         </button>
       </div>
 
