@@ -25,7 +25,8 @@ import {
   AlertCircle,
   CheckCircle,
   Briefcase,
-  Settings
+  Settings,
+  MessageSquare
 } from 'lucide-react';
 
 interface MenuItem {
@@ -403,6 +404,25 @@ export default function DashboardLayout() {
             );
           })}
         </nav>
+
+        {/* Usulan & Kebutuhan Menu Item */}
+        <div className={`border-t border-border/60 py-2.5 ${sidebarOpen ? 'px-3.5' : 'px-2'}`}>
+          <Link
+            to="/usulan"
+            title={!sidebarOpen ? "Usulan & Kebutuhan" : undefined}
+            className={`flex items-center rounded-none text-xs font-semibold transition-all group ${
+              sidebarOpen ? 'px-4 py-2.5' : 'px-0 py-2.5 justify-center'
+            } ${location.pathname === '/usulan'
+              ? 'bg-secondary text-primary border-l-2 border-primary font-bold'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <MessageSquare className={`h-4 w-4 shrink-0 ${sidebarOpen ? 'mr-3' : ''} ${
+              location.pathname === '/usulan' ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600 transition-colors'
+            }`} />
+            {sidebarOpen && <span>Usulan & Kebutuhan</span>}
+          </Link>
+        </div>
 
         {/* Profil Sesi Pengguna di Kaki Sidebar */}
         <div className="p-4 border-t border-border bg-slate-50/50 text-slate-500 text-xs shrink-0 select-none">

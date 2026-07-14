@@ -193,7 +193,7 @@ export default function ConfigPage() {
           { id: 'sesi', label: 'Konfigurasi Sesi', icon: Clock },
           { id: 'banner', label: 'Slide Banner & Slideshow', icon: Image },
           { id: 'pemeliharaan', label: 'Mode Pemeliharaan', icon: AlertOctagon },
-          { id: 'branding', label: 'Branding & Titik Peta', icon: Sliders }
+          { id: 'branding', label: 'Referensi Logo & Titik Peta', icon: Sliders }
         ].map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
@@ -201,11 +201,10 @@ export default function ConfigPage() {
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id as any)}
-              className={`flex items-center space-x-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer outline-none border-transparent ${
-                isActive
-                  ? 'border-primary text-primary bg-[#e8f2ea]/20'
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-              }`}
+              className={`flex items-center space-x-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer outline-none border-transparent ${isActive
+                ? 'border-primary text-primary bg-[#e8f2ea]/20'
+                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                }`}
             >
               <Icon className="h-4 w-4" />
               <span>{t.label}</span>
@@ -273,7 +272,7 @@ export default function ConfigPage() {
       {/* ─── TAB CONTENT: BANNER SLIDESHOW ─── */}
       {activeTab === 'banner' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
-          
+
           {/* Kolom Kiri: Form Add Banner */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white border border-border p-6 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] rounded-none">
@@ -355,11 +354,10 @@ export default function ConfigPage() {
                             key={f}
                             type="button"
                             onClick={() => setCropFocal(f as any)}
-                            className={`px-3 py-1 text-[10px] font-bold uppercase border cursor-pointer ${
-                              cropFocal === f
-                                ? 'bg-primary text-white border-primary'
-                                : 'bg-slate-50 text-slate-500 border-slate-200'
-                            }`}
+                            className={`px-3 py-1 text-[10px] font-bold uppercase border cursor-pointer ${cropFocal === f
+                              ? 'bg-primary text-white border-primary'
+                              : 'bg-slate-50 text-slate-500 border-slate-200'
+                              }`}
                           >
                             {f === 'top' ? 'Atas' : f === 'center' ? 'Tengah' : 'Bawah'}
                           </button>
@@ -376,7 +374,7 @@ export default function ConfigPage() {
                       <Eye className="h-3.5 w-3.5 text-[#415D43]" />
                       Pratinjau Simulator Banner Dashboard (Live Preview)
                     </label>
-                    
+
                     {/* Simulated Banner Container */}
                     <div className="relative w-full h-44 overflow-hidden border bg-[#111D13] text-white">
                       {/* Background Image */}
@@ -389,7 +387,7 @@ export default function ConfigPage() {
                           opacity: newOpacity / 100
                         }}
                       />
-                      
+
                       {/* Gradient overlay */}
                       <div className="absolute inset-0 bg-gradient-to-r from-[#111D13]/90 via-[#111D13]/70 to-transparent" />
 
@@ -485,7 +483,7 @@ export default function ConfigPage() {
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pb-2 border-b">
                 Slide Aktif ({slideBanners.length})
               </h4>
-              
+
               <div className="space-y-3 max-h-80 overflow-y-auto divide-y">
                 {slideBanners.map((slide) => (
                   <div key={slide.id} className="pt-3 first:pt-0 flex space-x-3 items-start justify-between">
@@ -566,11 +564,10 @@ export default function ConfigPage() {
             <div className="flex justify-end pt-4 border-t">
               <button
                 type="submit"
-                className={`px-5 py-2.5 text-white text-xs font-semibold rounded-none shadow-[2px_2px_0px_rgba(0,0,0,0.15)] transition-all cursor-pointer border ${
-                  maintActive
-                    ? 'bg-rose-600 hover:bg-rose-700 border-rose-700'
-                    : 'bg-primary hover:bg-primary/95 border-primary'
-                }`}
+                className={`px-5 py-2.5 text-white text-xs font-semibold rounded-none shadow-[2px_2px_0px_rgba(0,0,0,0.15)] transition-all cursor-pointer border ${maintActive
+                  ? 'bg-rose-600 hover:bg-rose-700 border-rose-700'
+                  : 'bg-primary hover:bg-primary/95 border-primary'
+                  }`}
               >
                 {maintActive ? 'Aktifkan Mode Pemeliharaan' : 'Simpan Konfigurasi Pemeliharaan'}
               </button>
@@ -584,17 +581,17 @@ export default function ConfigPage() {
         <div className="bg-white border border-border p-6 shadow-[1px_1px_3px_rgba(0,0,0,0.015)] rounded-none text-left max-w-2xl animate-in fade-in duration-300 space-y-6">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b pb-3">
             <Sliders className="h-4.5 w-4.5 text-primary" />
-            Pengaturan Identitas & Titik Tengah Peta GIS
+            Pengaturan Referensi Logo & Titik Tengah Peta GIS
           </h3>
 
           <form onSubmit={handleSaveBranding} className="space-y-6">
             {/* Bagian 1: Branding */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">1. Kustomisasi Logo Aplikasi</h4>
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">1. Referensi Logo Pada Dokumen Cetak</h4>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Logo Kustom Aplikasi (.png, .jpg, .svg)
+                  Referensi Logo Dokumen Cetak (.png, .jpg, .svg)
                 </label>
                 <div className="flex items-center space-x-4">
                   <div className="h-20 w-20 border border-slate-200 bg-slate-50 flex items-center justify-center p-2 overflow-hidden relative group shrink-0">

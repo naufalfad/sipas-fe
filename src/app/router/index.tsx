@@ -32,6 +32,7 @@ import MaintenancePage from '@/features/auth/pages/MaintenancePage';
 import KaryawanPage from '@/features/users/pages/KaryawanPage';
 import ConfigPage from '@/features/users/pages/ConfigPage';
 import ActivityLogPage from '@/features/users/pages/ActivityLogPage';
+import FeedbackPage from '@/features/users/pages/FeedbackPage';
 
 /**
  * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
@@ -193,6 +194,10 @@ export const router = createBrowserRouter([
       {
         path: 'profil',
         element: <ProfilePage />,
+      },
+      {
+        path: 'usulan',
+        element: <FeedbackPage />,
       },
       {
         path: 'laporan',
