@@ -26,8 +26,6 @@ import { useSipasMapData, type ProcessedSubmission } from '../hooks/useSipasMapD
 import ConflictMarkers from './markers/ConflictMarkers';
 
 // ─── Konstanta ─────────────────────────────────────────────────────────────────
-const BOGOR_LAT = -6.4816;
-const BOGOR_LNG = 106.8560;
 const INITIAL_ZOOM = 11;
 
 // ─── Basemap URL Factory ───────────────────────────────────────────────────────

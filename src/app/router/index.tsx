@@ -31,6 +31,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import MaintenancePage from '@/features/auth/pages/MaintenancePage';
 import KaryawanPage from '@/features/users/pages/KaryawanPage';
 import ConfigPage from '@/features/users/pages/ConfigPage';
+import ActivityLogPage from '@/features/users/pages/ActivityLogPage';
 
 /**
  * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
@@ -243,6 +244,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={['Super Admin']}>
                 <ConfigPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'log-aktivitas',
+            element: (
+              <ProtectedRoute allowedRoles={['Super Admin']}>
+                <ActivityLogPage />
               </ProtectedRoute>
             ),
           },

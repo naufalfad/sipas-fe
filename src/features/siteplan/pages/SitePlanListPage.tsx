@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import {
-  Layers, Search, Eye, Map, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X
+  Layers, Search, Map, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';

@@ -137,6 +137,12 @@ const menuItems: MenuItem[] = [
         icon: Settings,
         roles: ['Super Admin'],
       },
+      {
+        title: 'Log Aktivitas',
+        path: '/master/log-aktivitas',
+        icon: ClipboardList,
+        roles: ['Super Admin'],
+      },
     ],
   },
 ];
@@ -144,7 +150,7 @@ const menuItems: MenuItem[] = [
 export default function DashboardLayout() {
   const { sidebarOpen, activeRole: uiActiveRole, userProfile: uiUserProfile, toggleSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
-  const { appName, appLogo, fetchConfig } = useConfigStore();
+  const { fetchConfig } = useConfigStore();
 
   React.useEffect(() => {
     fetchConfig();

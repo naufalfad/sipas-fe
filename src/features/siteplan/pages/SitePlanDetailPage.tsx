@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, Map, ShieldAlert, CheckCircle2, AlertTriangle, Layers, Info, MapPin, Building, Calendar, HelpCircle
+  ArrowLeft, Map, ShieldAlert, CheckCircle2, AlertTriangle, Layers, Info, Building, Play
 } from 'lucide-react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -50,11 +50,9 @@ export default function SitePlanDetailPage() {
 
   // ─── QUERY CAD/SHP GEOJSON SITE PLAN ───
   const [cadGeoJson, setCadGeoJson] = useState<any>(null);
-  const [isCadLoading, setIsCadLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    setIsCadLoading(true);
     const token = sessionStorage.getItem('token');
     fetch(`${API_BASE_URL}/api/v1/submissions/${id}/geojson`, {
       headers: {
@@ -69,62 +67,60 @@ export default function SitePlanDetailPage() {
       .then(data => {
         setCadGeoJson(data);
       })
-      .catch(err => console.error(err))
-      .finally(() => setIsCadLoading(false));
+      .catch(err => console.error(err));
   }, [id]);
 
   // ─── DYNAMIC OVERLAY DOCK LOADERS ───
   useEffect(() => {
     if (showSungai && !sungaiData) {
-      import('@/assets/geojson/bogor/SUNGAI_LN_25K.json')
-        .then(m => setSungaiData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/SUNGAI_LN_25K.json')
+        .then(res => res.json())
+        .then(data => setSungaiData(data)).catch(console.error);
     }
   }, [showSungai, sungaiData]);
 
   useEffect(() => {
     if (showRelka && !relkaData) {
-      import('@/assets/geojson/kab bogor/RELKA_LN_25K.json')
-        .then(m => setRelkaData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/RELKA_LN_25K.json')
+        .then(res => res.json())
+        .then(data => setRelkaData(data)).catch(console.error);
     }
   }, [showRelka, relkaData]);
 
   useEffect(() => {
     if (showSawah && !sawahData) {
-      import('@/assets/geojson/bogor/AGRISAWAH_AR_25K.json')
-        .then(m => setSawahData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/AGRISAWAH_AR_25K.json')
+        .then(res => res.json())
+        .then(data => setSawahData(data)).catch(console.error);
     }
   }, [showSawah, sawahData]);
 
   useEffect(() => {
     if (showPemukiman && !pemukimanData) {
-      import('@/assets/geojson/bogor/PEMUKIMAN_AR_25K.json')
-        .then(m => setPemukimanData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/PEMUKIMAN_AR_25K.json')
+        .then(res => res.json())
+        .then(data => setPemukimanData(data)).catch(console.error);
     }
   }, [showPemukiman, pemukimanData]);
 
   // ─── TURF.JS SPATIAL AUDIT TRIGGER ───
   const { validateRiverBuffer, isProcessing: isAuditing } = useSpatialValidator();
 
-  useEffect(() => {
+  const handleRunAudit = async () => {
     if (!submission?.location?.polygon || submission.location.polygon.length < 3) return;
-    
-    const runAudit = async () => {
-      const result = await validateRiverBuffer(
-        submission.location.polygon || [],
-        submission.submissionDetails?.category || 'PERUMAHAN'
-      );
-      setSpatialResult(result);
-    };
-
-    runAudit();
-  }, [submission, validateRiverBuffer]);
+    const result = await validateRiverBuffer(
+      submission.location.polygon || [],
+      submission.submissionDetails?.category || 'PERUMAHAN'
+    );
+    setSpatialResult(result);
+  };
 
   // Normalize outer polygon coordinates for leaflet display
   const leafletOuterCoords = useMemo(() => {
     if (!submission?.location?.polygon) return [];
     return submission.location.polygon.map(([a, b]) => {
       const isLatFirst = a < 20 && b > 90;
-      return isLatFirst ? [a, b] : [b, a] as [number, number];
+      return (isLatFirst ? [a, b] : [b, a]) as [number, number];
     });
   }, [submission]);
 
@@ -356,7 +352,30 @@ export default function SitePlanDetailPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-400 py-6 text-center">Menghitung matriks persilangan spasial...</p>
+              <div className="py-8 text-center space-y-4">
+                <div className="bg-slate-50 border border-slate-100 p-4 max-w-sm mx-auto rounded-none text-left">
+                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                    Analisis tumpang tindih tata ruang (buffer sempadan rel kereta, sungai, sawah lindung LSD, perkebunan) belum dijalankan untuk koordinat permohonan ini.
+                  </p>
+                </div>
+                <button
+                  onClick={handleRunAudit}
+                  disabled={isAuditing || !submission?.location?.polygon}
+                  className="inline-flex items-center space-x-2 bg-primary hover:bg-[#344E38] text-white font-bold text-xs py-2 px-4 shadow-sm transition-colors cursor-pointer outline-none rounded-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAuditing ? (
+                    <>
+                      <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span>Menganalisis Spasial...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-3 w-3 fill-current shrink-0" />
+                      <span>Jalankan Audit Spasial (Turf.js)</span>
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
 
@@ -455,13 +474,13 @@ export default function SitePlanDetailPage() {
                       type: 'Feature',
                       geometry: {
                         type: 'Polygon',
-                        coordinates: [submission.location.polygon.map(([a, b]) => {
+                        coordinates: [(submission?.location?.polygon || []).map(([a, b]) => {
                           const isLatFirst = a < 20 && b > 90;
                           return isLatFirst ? [b, a] : [a, b]; // GeoJSON format is [lng, lat]
                         })]
                       },
                       properties: {}
-                    }}
+                    } as any}
                     style={{
                       color: '#ef4444',
                       weight: 2.5,

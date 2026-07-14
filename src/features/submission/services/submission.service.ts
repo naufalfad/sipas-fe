@@ -264,5 +264,24 @@ export const SubmissionService = {
       throw new Error(errText || `Gagal memuat statistik laporan (HTTP ${response.status})`);
     }
     return await response.json();
+  },
+
+  /**
+   * Mengambil log aktivitas sistem (Audit Trail) dengan pagination dan filter pencarian.
+   */
+  getAuditLogs: async (page: number, limit: number, search: string): Promise<any> => {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search ? { search } : {})
+    });
+    const response = await fetch(`${API_BASE_URL_CONFIG}/api/v1/auth/audit-logs?${queryParams}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat log aktivitas (HTTP ${response.status})`);
+    }
+    return await response.json();
   }
 };
