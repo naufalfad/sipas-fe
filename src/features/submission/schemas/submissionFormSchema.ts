@@ -1,4 +1,14 @@
-/* STREAMING_CHUNK:Configuring imports and base schema properties */
+/**
+ * ============================================================================
+ * SIPAS DOMAIN SCHEMAS — Submission Form Schema [submissionFormSchema.ts] (REVISED v5.1)
+ * ============================================================================
+ * Peran: Skema penegakan validasi formulir terpadu (10-tahap) menggunakan Zod.
+ *        Menjamin tipe data dan kelengkapan berkas legalitas aman sebelum
+ *        dikirimkan ke lapisan REST API backend, serta mematikan alur
+ *        revisi non-draf tanpa rujukan SK yang valid secara kondisional.
+ * ============================================================================
+ */
+
 import * as z from 'zod';
 
 // ─── PURE FABRICATION: HELPER PREPROSES DATA NUMERIK ────────────────────────
@@ -7,7 +17,7 @@ const numericPreprocess = (val: unknown) => {
   return Number(val);
 };
 
-/* STREAMING_CHUNK:Defining applicant and submission schemas */
+// ─── TAHAP 1: DATA PEMOHON (APPLICANT) ──────────────────────────────────────
 export const applicantSchema = z.object({
   type: z.enum(['PERORANGAN', 'BADAN_USAHA']),
   name: z.string().min(3, 'Nama wajib diisi'),
@@ -20,13 +30,14 @@ export const applicantSchema = z.object({
   address: z.string().min(10, 'Alamat lengkap wajib diisi'),
 });
 
+// ─── TAHAP 2: DATA PENGAJUAN (SUBMISSION DETAILS) ───────────────────────────
 export const submissionDataSchema = z.object({
   submissionType: z.enum(['BARU', 'REVISI', 'PERPANJANGAN']),
   activityName: z.string().min(5, 'Nama kegiatan/pembangunan wajib diisi'),
   category: z.enum(['PERUMAHAN', 'NON_PERUMAHAN', 'FASUM', 'INDUSTRI']),
 });
 
-/* STREAMING_CHUNK:Defining location and coordinate transformation schemas */
+// ─── TAHAP 3: DATA LOKASI ADMINISTRATIF & TANAH (LOCATION) ──────────────────
 export const locationSchema = z.object({
   locationName: z.string().min(3, 'Nama lokasi wajib diisi'),
   village: z.string().min(3, 'Desa/Kelurahan wajib diisi'),
@@ -43,11 +54,12 @@ export const locationSchema = z.object({
   certificateOwner: z.string().min(3, 'Nama pemilik sertifikat wajib diisi'),
 });
 
+// ─── TAHAP 4: DATA KOORDINAT BATAS LUAR (OUTER BOUNDARY GEOM) ───────────────
 export const coordinateSchema = z.object({
   polygon: z.any().optional(), // Menyimpan koordinat poligon georeferenced bumi nyata
   coordinatesText: z.string().optional(), // Menyimpan penulisan manual teks GeoJSON koordinat
 
-  // ─── PARAMETER TRANSFORMASI CAD HELMERT 2D (SINKRONISASI SPASIAL) [Jakarta 5] ───
+  // Parameter Kalibrasi Helmert 2D terhitung
   cadFileName: z.string().optional(),       // Nama file CAD (.dwg / .dxf) asal
   cadParamA: z.number().optional(),         // Nilai parameter A = s * cos(theta)
   cadParamB: z.number().optional(),         // Nilai parameter B = s * sin(theta)
@@ -57,7 +69,7 @@ export const coordinateSchema = z.object({
   cadRotation: z.number().optional(),       // Sudut rotasi spasial (theta) dalam satuan radian
 });
 
-/* STREAMING_CHUNK:Defining spatial and technical specification schemas */
+// ─── TAHAP 5: DATA INFORMASI TATA RUANG (SPATIAL INFO) ──────────────────────
 export const spatialSchema = z.object({
   kkprNumber: z.string().min(3, 'Nomor KKPR wajib diisi'),
   landUse: z.string().min(3, 'Peruntukan lahan wajib diisi'),
@@ -67,8 +79,9 @@ export const spatialSchema = z.object({
   ),
 });
 
+// ─── TAHAP 6: PARAMETER TEKNIS BERSYARAT (TECHNICAL DETAILS) ───────────────
 export const technicalSchema = z.object({
-  // --- KATEGORI 1: PERUMAHAN ---
+  // A. Kategori Perumahan
   lotCount: z.preprocess(
     numericPreprocess,
     z.number().positive('Jumlah kaveling harus berupa angka positif').optional()
@@ -83,7 +96,7 @@ export const technicalSchema = z.object({
   waterSystem: z.string().optional(),      // Sistem Penyediaan Air Bersih
   waterSource: z.string().optional(),      // Sumber Air Bersih
 
-  // --- KATEGORI 2: NON_PERUMAHAN ---
+  // B. Kategori Non-Perumahan (Gedung/Komersial)
   buildingBlocks: z.preprocess(
     numericPreprocess,
     z.number().positive('Jumlah blok harus positif').optional()
@@ -113,7 +126,7 @@ export const technicalSchema = z.object({
     z.number().positive('Total luas lantai harus positif').optional()
   ),
 
-  // --- KATEGORI 3: FASUM ---
+  // C. Kategori Fasilitas Umum (Fasum)
   facilityType: z.string().optional(),     // Jenis Layanan (Kesehatan, Pendidikan, dll)
   capacity: z.preprocess(
     numericPreprocess,
@@ -123,7 +136,7 @@ export const technicalSchema = z.object({
   specialParking: z.string().optional(),   // Sarana Parkir Khusus (Ambulans/Bus)
   fireProtection: z.string().optional(),   // Sistem Proteksi Kebakaran
 
-  // --- KATEGORI 4: INDUSTRI ---
+  // D. Kategori Industri
   warehouseCount: z.preprocess(
     numericPreprocess,
     z.number().positive('Jumlah unit gudang harus positif').optional()
@@ -145,7 +158,7 @@ export const technicalSchema = z.object({
   roadPlan: z.string().optional(),
   drainagePlan: z.string().optional(),
 
-  // ─── REVISI: METRIK USULAN PEMOHON (PROPOSED METRICS) ───
+  // Metrik Proposed Pengembang (Proposed)
   applicantBuildingArea: z.preprocess(
     numericPreprocess,
     z.number().positive("Luas bangunan wajib diisi")
@@ -160,14 +173,14 @@ export const technicalSchema = z.object({
   )
 });
 
-/* STREAMING_CHUNK:Defining consultant, document, photo, and statement schemas */
+// ─── TAHAP 7: DATA KONSULTAN PERENCANA (CONSULTANT) ─────────────────────────
 export const consultantSchema = z.object({
   consultantName: z.string().min(3, 'Nama konsultan wajib diisi'),
   companyName: z.string().min(3, 'Nama perusahaan wajib diisi'),
   picName: z.string().min(3, 'Nama penanggung jawab wajib diisi'),
 });
 
-// ─── REVISI: DUKUNGAN TERHADAP FILE OBJECT MAUPUN STRING URL (INSTANT UPLOAD) ───
+// ─── TAHAP 8 & 9: BERKAS DOKUMEN & FOTO LAMPIRAN (DOCUMENT & PHOTO) ──────────
 export const documentSchema = z.object({
   legalDoc: z.union([z.string().min(1, 'Dokumen wajib dilampirkan'), z.any()]).optional(),
   technicalDoc: z.union([z.string().min(1, 'Dokumen wajib dilampirkan'), z.any()]).optional(),
@@ -187,12 +200,14 @@ export const photoSchema = z.object({
   photoAccess: z.union([z.string(), z.any()]).optional(),
 });
 
+// ─── TAHAP 10: PERNYATAAN KOMITMEN HUKUM (STATEMENT) ────────────────────────
 export const statementSchema = z.object({
   agreed: z.boolean().refine(val => val === true, {
     message: 'Anda harus mencentang pernyataan ini untuk melanjutkan'
   })
 });
 
+// ─── TPU & KOMPENSASI MANDIRI (SELF-DECLARATION DETAILS) ─────────────────────
 export const tpuSchema = z.object({
   method: z.enum(['MANDIRI', 'EKSISTING', 'KERJASAMA', 'KOMPENSASI_UANG', 'INTEGRASI_WARGA']).optional(),
   area: z.preprocess(numericPreprocess, z.number().min(0).optional()),
@@ -217,9 +232,23 @@ export const compensationItemSchema = z.object({
   documentUrl: z.union([z.string(), z.any()]).optional(),
 });
 
-/* STREAMING_CHUNK:Consolidating unified submission schema and type declarations */
+// ─── UPDATE FASE 5 (REVISI): SKEMA VALIDASI METADATA SK FISIK LAMA ───────────
+export const legacyMetadataSchema = z.object({
+  replaced_sk_number: z.string().min(3, 'Nomor SK lama wajib diisi'),
+  replaced_sk_date: z.string().min(10, 'Tanggal SK lama wajib diisi'),
+  replaced_sk_doc_url: z.string().min(1, 'Scan PDF SK lama wajib diunggah')
+});
+
+// ─── KONTRAK UTAMA FORM INTEGRASI UNIFIED FORM (SOT) ──────────────────────────
 export const fullSubmissionSchema = z.object({
   id_permohonan: z.string().optional(),
+  is_draft: z.boolean().optional(),
+
+  // ─── UPDATE FASE 5 (REVISI): SILSILAH RUJUKAN SK LAMA SECARA KONDISIONAL ───
+  baseline_source: z.enum(['DIGITAL', 'LEGACY']).optional(),
+  parent_id_permohonan: z.string().optional(),
+  legacy_metadata: legacyMetadataSchema.optional(),
+
   applicant: applicantSchema,
   submission: submissionDataSchema,
   location: locationSchema,
@@ -232,6 +261,23 @@ export const fullSubmissionSchema = z.object({
   statement: statementSchema,
   tpu: tpuSchema,
   compensations: z.array(compensationItemSchema).optional(),
+}).refine((data) => {
+  // PENEGAKAN HUKUM: Jika bukan draf (IS_DRAFT == FALSE) dan tipenya REVISI
+  const isRevision = data.submission?.submissionType === 'REVISI';
+  if (isRevision && !data.is_draft) {
+    if (!data.baseline_source) return false;
+
+    if (data.baseline_source === 'DIGITAL' && !data.parent_id_permohonan) {
+      return false;
+    }
+    if (data.baseline_source === 'LEGACY' && !data.legacy_metadata) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Proses revisi dibatalkan. Bukti dan data rujukan SK lama mutlak diperlukan.",
+  path: ["baseline_source"]
 });
 
 export type FullSubmissionFormValues = z.infer<typeof fullSubmissionSchema>;
