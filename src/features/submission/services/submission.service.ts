@@ -284,43 +284,5 @@ export const SubmissionService = {
       throw new Error(errText || `Gagal memuat log aktivitas (HTTP ${response.status})`);
     }
     return await response.json();
-  },
-
-  /**
-   * Mengirimkan usulan pengembangan/kebutuhan dari user ke aplikasi.
-   */
-  submitFeedback: async (feedback: { category: string; title: string; description: string }): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL_CONFIG}/api/v1/auth/feedback`, {
-      method: 'POST',
-      headers: {
-        ...getAuthHeaders(),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(feedback)
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(errText || `Gagal menyimpan usulan pengembangan (HTTP ${response.status})`);
-    }
-    return await response.json();
-  },
-
-  /**
-   * Mengambil daftar usulan pengembangan dengan pagination dan filter pencarian (Hanya Super Admin / Admin).
-   */
-  getFeedbacks: async (page: number, limit: number, search: string): Promise<any> => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...(search ? { search } : {})
-    });
-    const response = await fetch(`${API_BASE_URL_CONFIG}/api/v1/auth/feedbacks?${queryParams}`, {
-      headers: getAuthHeaders()
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(errText || `Gagal memuat usulan pengembangan (HTTP ${response.status})`);
-    }
-    return await response.json();
   }
 };
