@@ -103,6 +103,8 @@ export default function SubmissionListPage({ myVerificationsOnly = false }: Subm
         return 'bg-accent/35 text-[#415D43] border border-accent/70';
       case 'Ditolak':
         return 'bg-rose-50 text-rose-700 border border-rose-100';
+      case 'Tidak Berlaku':
+        return 'bg-slate-100 text-slate-500 border border-slate-200';
       default:
         return 'bg-amber-50 text-amber-800 border border-amber-100';
     }

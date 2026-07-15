@@ -46,6 +46,8 @@ export default function VerificationPage() {
         return 'bg-[#e8f2ea] text-[#415D43] border border-[#A1CCA5]/60'; // Celadon theme
       case 'Verifikasi Administrasi':
         return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
+      case 'Tidak Berlaku':
+        return 'bg-slate-100 text-slate-500 border border-slate-200';
       default:
         return 'bg-slate-50 text-slate-600 border border-slate-200'; // Neutral theme
     }

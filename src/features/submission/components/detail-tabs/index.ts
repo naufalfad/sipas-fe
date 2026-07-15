@@ -4,3 +4,4 @@ export { LocationTab } from './LocationTab';
 export { TechnicalTab } from './TechnicalTab';
 export { CompensationTab } from './CompensationTab';
 export { PhotosTab } from './PhotosTab';
+export { SilsilahTab } from './SilsilahTab';

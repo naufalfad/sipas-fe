@@ -29,12 +29,9 @@ import { cn } from '@/lib/utils';
 import AuditTrailViewer from '@/features/approval/components/AuditTrailViewer';
 import {
   SummaryTab, ApplicantTab, LocationTab,
-  TechnicalTab, CompensationTab, PhotosTab
+  TechnicalTab, CompensationTab, PhotosTab, SilsilahTab
 } from '../components/detail-tabs';
 
-// ─── STYLING CONSTANTS (PROTECTED VARIATIONS) ──────────────────────────────────
-const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
-const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
 
 const getStatusBadgeClassLocal = (status: string) => {
   switch (status) {
@@ -42,6 +39,8 @@ const getStatusBadgeClassLocal = (status: string) => {
       return 'bg-accent/35 text-[#415D43] border border-accent/70'; // Celadon theme
     case 'Ditolak':
       return 'bg-rose-50 text-rose-700 border border-rose-100'; // Rose theme
+    case 'Tidak Berlaku':
+      return 'bg-slate-100 text-slate-500 border border-slate-200'; // Gray theme
     default:
       return 'bg-amber-50 text-amber-800 border border-amber-100'; // Amber theme
   }
@@ -82,23 +81,10 @@ export default function SubmissionDetailPage() {
   const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
   const flyTo = useGisUIStore((s) => s.flyTo);
 
-  // Core Form States
-  const [notes, setNotes] = useState('');
 
   // State untuk Tab Aktif
-  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'audit'>('ringkasan');
+  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'silsilah' | 'audit'>('ringkasan');
 
-  // Checklist states (Admin SIPAS)
-  const [adminChecks, setAdminChecks] = useState({
-    ktp: false,
-    sertifikat: false,
-    npwp: false,
-    kkpr: false,
-    technical: false,
-    support2: false,
-    ska: false,
-    cad: false
-  });
 
   // State dictionary kelayakan teknis
   const [checklistStates, setChecklistStates] = useState<Record<string, {
@@ -523,7 +509,7 @@ export default function SubmissionDetailPage() {
 
           {/* Tab Navigation Menu */}
           <div className="flex border-b border-border overflow-x-auto select-none bg-slate-50 p-1 gap-1">
-            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', 'audit'] as const).map((tab) => {
+            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit'] as const).map((tab) => {
               const isActive = activeTab === tab;
               const labels: Record<string, string> = {
                 ringkasan: 'Ringkasan',
@@ -532,13 +518,14 @@ export default function SubmissionDetailPage() {
                 teknis: 'Data Teknis',
                 kompensasi: 'Kompensasi Lahan',
                 foto: 'Foto Lapangan',
+                silsilah: 'Pemeriksaan Silsilah',
                 audit: 'Audit Trail'
               };
               return (
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => setActiveTab(tab as any)}
                   className={cn(
                     "px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-none cursor-pointer outline-none border-none whitespace-nowrap",
                     isActive
@@ -567,6 +554,7 @@ export default function SubmissionDetailPage() {
               <CompensationTab sub={subData} onShowOnMap={handleShowCompensationOnMap} />
             )}
             {activeTab === 'foto' && <PhotosTab sub={subData} />}
+            {activeTab === 'silsilah' && <SilsilahTab sub={subData} />}
             {activeTab === 'audit' && (
               <AuditTrailViewer submissionId={subData.id} />
             )}
@@ -845,6 +833,34 @@ export default function SubmissionDetailPage() {
 
       {/* FULL-WIDTH PANELS: DECOUPLED DELEGATED CTA BUTTONS (TTE / KABID / KADIS) */}
       <div className="space-y-6">
+        {/* ADMIN PANEL */}
+        {showAdminPanel && (
+          <div className="bg-white border border-primary p-5 shadow-sm text-left space-y-4 rounded-none animate-in fade-in duration-300">
+            <div className="border-b border-slate-200 pb-3 flex justify-between items-center select-none">
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Otoritas Admin SIPAS</h3>
+                <p className="text-[9px] text-slate-400 mt-0.5 font-medium">Verifikasi Persyaratan Administrasi & Kelengkapan Formal</p>
+              </div>
+              <span className="px-2.5 py-1 bg-slate-800 text-white font-bold text-[8.5px] uppercase tracking-wider rounded-none">ADMINISTRATOR</span>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 flex items-start gap-2.5 text-xs text-slate-600">
+              <Info size={16} className="text-slate-500 shrink-0 mt-0.5" />
+              <p className="text-[10px] leading-relaxed text-justify">
+                Berkas permohonan baru saja masuk atau sedang dalam antrean. Anda diwajibkan memeriksa kesesuaian dan kelengkapan dokumen persyaratan formal pemohon (seperti KTP, NIB, NPWP, Sertifikat BPN) sebelum meloloskannya ke tahap pemeriksaan tim teknis.
+              </p>
+            </div>
+
+            <Link
+              to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
+              className="w-full py-2.5 bg-primary hover:opacity-90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>Mulai Verifikasi Administrasi</span>
+            </Link>
+          </div>
+        )}
+
         {/* TIM TEKNIS PANEL */}
         {showTeknisPanel && (
           <div className="bg-white border border-[#415D43] p-5 shadow-sm text-left space-y-4 rounded-none animate-in fade-in duration-300">

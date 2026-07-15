@@ -8,6 +8,7 @@ import SubmissionListPage from '@/features/submission/pages/SubmissionListPage';
 import SubmissionCreatePage from '@/features/submission/pages/SubmissionCreatePage';
 import SubmissionDetailPage from '@/features/submission/pages/SubmissionDetailPage';
 import SubmissionVerificationPage from '@/features/submission/pages/SubmissionVerificationPage';
+import SubmissionAdminVerificationPage from '@/features/submission/pages/SubmissionAdminVerificationPage';
 import SubmissionPreviewTelaahPage from '@/features/submission/pages/SubmissionPreviewTelaahPage'; // Halaman (Fase 2)
 import SubmissionKabidReviewPage from '@/features/submission/pages/SubmissionKabidReviewPage';       // BARU TAHAP 2 (Kabid)
 import SubmissionKadisSignPage from '@/features/submission/pages/SubmissionKadisSignPage';         // BARU TAHAP 2 (Kadis)
@@ -122,6 +123,14 @@ export const router = createBrowserRouter([
           {
             path: 'detail/:id',
             element: <SubmissionDetailPage />,
+          },
+          {
+            path: 'verifikasi-administrasi/:id',
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <SubmissionAdminVerificationPage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'verifikasi/:id',

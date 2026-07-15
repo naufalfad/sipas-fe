@@ -14,8 +14,8 @@ import {
 } from '../components/FormSections';
 
 const steps = [
-  { id: 1, title: 'Data Pemohon' },
-  { id: 2, title: 'Data Pengajuan' },
+  { id: 1, title: 'Data Pengajuan' },
+  { id: 2, title: 'Data Pemohon' },
   { id: 3, title: 'Data Lokasi' },
   { id: 4, title: 'Data Koordinat' },
   { id: 5, title: 'Info Tata Ruang' },
@@ -204,8 +204,8 @@ export default function SubmissionCreatePage() {
   const nextStep = async () => {
     let fieldsToValidate: any = [];
     switch (currentStep) {
-      case 1: fieldsToValidate = 'applicant'; break;
-      case 2: fieldsToValidate = 'submission'; break;
+      case 1: fieldsToValidate = 'submission'; break;
+      case 2: fieldsToValidate = 'applicant'; break;
       case 3: fieldsToValidate = 'location'; break;
       case 4: fieldsToValidate = 'coordinate'; break;
       case 5: fieldsToValidate = 'spatial'; break;
@@ -314,8 +314,8 @@ export default function SubmissionCreatePage() {
                 {/* Form Sections Viewport */}
                 <div className="flex-1 mb-8">
                   <fieldset disabled={isLocked} className="border-none p-0 m-0 min-w-0 flex-1">
-                    {currentStep === 1 && <ApplicantSection />}
-                    {currentStep === 2 && <SubmissionSection />}
+                    {currentStep === 1 && <SubmissionSection />}
+                    {currentStep === 2 && <ApplicantSection />}
                     {currentStep === 3 && <LocationSection />}
                     {currentStep === 4 && <CoordinateSection />}
                     {currentStep === 5 && <SpatialSection />}
