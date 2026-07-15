@@ -593,7 +593,7 @@ export default function SubmissionDetailPage() {
                   onClick={() => unclaimMutation.mutate()}
                   className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
                 >
-                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "Lepas Kunci (Batal)"}
                 </button>
                 <Link
                   to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
@@ -664,7 +664,7 @@ export default function SubmissionDetailPage() {
                   onClick={() => unclaimMutation.mutate()}
                   className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
                 >
-                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "Lepas Kunci (Batal)"}
                 </button>
                 <Link
                   to={`/pengajuan/verifikasi/${subData.id}`}
