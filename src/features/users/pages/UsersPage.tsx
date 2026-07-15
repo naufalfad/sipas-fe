@@ -29,7 +29,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('Semua');
   const [statusFilter, setStatusFilter] = useState('Semua');
-  
+
   // Modal states
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
@@ -68,7 +68,7 @@ export default function UsersPage() {
     fetchUsers();
   }, []);
 
-  // 1. TOGGLE STATUS
+  // 1. TOGGLE STATUS (REVISED: Dynamic Error Extraction & Protected Parsing)
   const handleToggleStatus = async (user: UserItem) => {
     const nextStatus = user.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
     const actionText = nextStatus === 'Aktif' ? 'mengaktifkan' : 'menonaktifkan';
@@ -87,16 +87,19 @@ export default function UsersPage() {
         body: JSON.stringify({ status: nextStatus })
       });
 
-      if (!response.ok) throw new Error('Gagal mengubah status akun.');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Gagal mengubah status akun.');
+      }
 
       toast.success(`Akun ${user.name} berhasil diubah menjadi ${nextStatus}.`, { id: toastId });
       fetchUsers();
     } catch (err: any) {
-      toast.error('Gagal memperbarui status keaktifan.', { id: toastId });
+      toast.error(err.message || 'Gagal memperbarui status keaktifan.', { id: toastId });
     }
   };
 
-  // 2. RESET PASSWORD
+  // 2. RESET PASSWORD (REVISED: Protected Parsing)
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser || !newPassword) return;
@@ -122,7 +125,7 @@ export default function UsersPage() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || 'Gagal mereset password.');
       }
 
@@ -137,11 +140,11 @@ export default function UsersPage() {
   // Filter logic
   const filteredUsers = usersList.filter((u) => {
     const q = search.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       u.name.toLowerCase().includes(q) ||
       u.username.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q);
-      
+
     const matchesRole = roleFilter === 'Semua' || normalizeRole(u.role) === roleFilter;
     const matchesStatus = statusFilter === 'Semua' || u.status === statusFilter;
 

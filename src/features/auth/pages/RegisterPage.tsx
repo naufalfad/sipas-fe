@@ -1,4 +1,3 @@
-// --- FILE: src/features/auth/pages/RegisterPage.tsx ---
 import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
@@ -65,7 +64,7 @@ export default function RegisterPage() {
     };
   }, [step, timer]);
 
-  // Langkah 1: Kirim data pendaftaran dan minta OTP ke WhatsApp
+  // Langkah 1: Kirim data pendaftaran dan minta OTP ke WhatsApp (REVISED: Protected Parsing)
   const handleInitiateRegister = async (data: RegisterSchemaType) => {
     setIsLoading(true);
     const toastId = toast.loading('Mengirimkan kode verifikasi OTP ke WhatsApp Anda...');
@@ -80,7 +79,7 @@ export default function RegisterPage() {
         })
       });
 
-      const resData = await response.json();
+      const resData = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(resData.detail || 'Gagal mengirimkan OTP. Cek nomor HP Anda.');
@@ -97,7 +96,7 @@ export default function RegisterPage() {
     }
   };
 
-  // Langkah 2: Verifikasi OTP yang dimasukkan pengguna
+  // Langkah 2: Verifikasi OTP yang dimasukkan pengguna (REVISED: Protected Parsing)
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otpCode.length !== 6) {
@@ -118,7 +117,7 @@ export default function RegisterPage() {
         })
       });
 
-      const resData = await response.json();
+      const resData = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(resData.detail || 'Verifikasi gagal. Periksa kembali kode OTP Anda.');

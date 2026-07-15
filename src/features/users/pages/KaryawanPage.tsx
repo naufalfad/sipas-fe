@@ -30,7 +30,7 @@ export default function KaryawanPage() {
   const [employeesList, setEmployeesList] = useState<EmployeeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  
+
   // Modal states
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -57,7 +57,7 @@ export default function KaryawanPage() {
       });
       if (!response.ok) throw new Error('Gagal memuat data dari server.');
       const data = await response.json();
-      
+
       // Filter out PEMOHON, only keep official employees
       const filtered = data
         .filter((u: any) => u.role !== 'PEMOHON')
@@ -95,7 +95,7 @@ export default function KaryawanPage() {
     setRole('TIM_TEKNIS');
   };
 
-  // 1. ADD EMPLOYEE
+  // 1. ADD EMPLOYEE (REVISED: Bearer Token Integration & Protected Parsing)
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !email || !name || !password) {
@@ -105,9 +105,13 @@ export default function KaryawanPage() {
 
     const toastId = toast.loading('Mendaftarkan karyawan baru...');
     try {
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Suntik token Admin untuk role guard
+        },
         body: JSON.stringify({
           username,
           email,
@@ -121,7 +125,7 @@ export default function KaryawanPage() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || 'Gagal mendaftarkan karyawan.');
       }
 
@@ -147,7 +151,7 @@ export default function KaryawanPage() {
     setIsEditOpen(true);
   };
 
-  // 3. EDIT EMPLOYEE SUBMIT
+  // 3. EDIT EMPLOYEE SUBMIT (REVISED: Protected Parsing)
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEmp) return;
@@ -173,7 +177,7 @@ export default function KaryawanPage() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || 'Gagal memperbarui data.');
       }
 
@@ -186,7 +190,7 @@ export default function KaryawanPage() {
     }
   };
 
-  // 4. TOGGLE STATUS
+  // 4. TOGGLE STATUS (REVISED: Dynamic Error Extraction & Protected Parsing)
   const handleToggleStatus = async (emp: EmployeeItem) => {
     const nextStatus = emp.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
     const actionText = nextStatus === 'Aktif' ? 'mengaktifkan' : 'menonaktifkan';
@@ -205,7 +209,10 @@ export default function KaryawanPage() {
         body: JSON.stringify({ status: nextStatus })
       });
 
-      if (!response.ok) throw new Error('Gagal memperbarui status akun.');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Gagal mengubah status keaktifan pegawai.');
+      }
 
       toast.success(`Akun berhasil diubah menjadi ${nextStatus}.`, { id: toastId });
       fetchEmployees();
@@ -352,7 +359,7 @@ export default function KaryawanPage() {
               <UserPlus className="h-4.5 w-4.5 text-primary" />
               Daftarkan Karyawan Dinas Baru
             </h3>
-            
+
             <form onSubmit={handleAddSubmit} className="space-y-4 mt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">

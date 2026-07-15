@@ -696,6 +696,7 @@ import SubmissionListPage from '@/features/submission/pages/SubmissionListPage';
 import SubmissionCreatePage from '@/features/submission/pages/SubmissionCreatePage';
 import SubmissionDetailPage from '@/features/submission/pages/SubmissionDetailPage';
 import SubmissionVerificationPage from '@/features/submission/pages/SubmissionVerificationPage';
+import SubmissionAdminVerificationPage from '@/features/submission/pages/SubmissionAdminVerificationPage';
 import SubmissionPreviewTelaahPage from '@/features/submission/pages/SubmissionPreviewTelaahPage';
 import SubmissionKabidReviewPage from '@/features/submission/pages/SubmissionKabidReviewPage';
 import SubmissionKadisSignPage from '@/features/submission/pages/SubmissionKadisSignPage';
@@ -788,6 +789,14 @@ export const router = createBrowserRouter([
           {
             path: 'detail/:id',
             element: <SubmissionDetailPage />,
+          },
+          {
+            path: 'verifikasi-administrasi/:id',
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Super Admin']}>
+                <SubmissionAdminVerificationPage />
+              </ProtectedRoute>
+            ),
           },
           {
             path: 'verifikasi/:id',
@@ -10794,6 +10803,7 @@ export { LocationTab } from './LocationTab';
 export { TechnicalTab } from './TechnicalTab';
 export { CompensationTab } from './CompensationTab';
 export { PhotosTab } from './PhotosTab';
+export { SilsilahTab } from './SilsilahTab';
 
 --- FILE: src\features\submission\components\detail-tabs\LocationTab.tsx ---
 import { useMemo, useState, useEffect } from 'react';
@@ -11096,10 +11106,420 @@ export const PhotosTab = ({ sub }: PhotosTabProps) => {
   );
 };
 
+--- FILE: src\features\submission\components\detail-tabs\SilsilahTab.tsx ---
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import {
+  AlertTriangle, Layers, Loader2, CheckCircle2,
+  FileText, Link2, GitCommit, FileCheck, UploadCloud
+} from 'lucide-react';
+import { SubmissionService } from '../../services/submission.service';
+import { uploadFileToBackend } from '../../utils/upload';
+
+const resolveDocUrl = (url?: string | null) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `http://localhost:8000${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+const inputClass = "w-full px-3.5 py-2.5 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
+const labelClass = "block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide";
+
+interface SilsilahTabProps {
+  sub: any;
+}
+
+export const SilsilahTab = ({ sub }: SilsilahTabProps) => {
+  const queryClient = useQueryClient();
+  const [baselineSource, setBaselineSource] = useState<'DIGITAL' | 'LEGACY'>('DIGITAL');
+  const [selectedParentId, setSelectedParentId] = useState<string>('');
+
+  const [legacySkNumber, setLegacySkNumber] = useState<string>('');
+  const [legacySkDate, setLegacySkDate] = useState<string>('');
+  const [legacySkDocUrl, setLegacySkDocUrl] = useState<string>('');
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const { data: overlaps = [], isLoading: isLoadingOverlaps } = useQuery({
+    queryKey: ['spatial-overlaps', sub.id],
+    queryFn: () => SubmissionService.getSpatialOverlaps(sub.id),
+    enabled: !!sub.id,
+  });
+
+  const { data: approvedSubs = [], isLoading: isLoadingApproved } = useQuery({
+    queryKey: ['submissions-approved-only'],
+    queryFn: () => SubmissionService.getAllList(),
+    enabled: baselineSource === 'DIGITAL',
+  });
+
+  const listApproved = Array.isArray(approvedSubs)
+    ? approvedSubs.filter((s: any) => s.status === 'Disetujui' && s.id !== sub.id)
+    : [];
+
+  const linkParentMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      return SubmissionService.linkParent(sub.id, payload);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['submission', sub.id], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ['submissions'] })
+      ]);
+      toast.success('Silsilah permohonan berhasil dikaitkan!');
+
+      setSelectedParentId('');
+      setLegacySkNumber('');
+      setLegacySkDate('');
+      setLegacySkDocUrl('');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Gagal menautkan silsilah permohonan');
+    }
+  });
+
+  const handleLinkParentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (baselineSource === 'DIGITAL') {
+      if (!selectedParentId) {
+        toast.error('Harap pilih SK lama terdaftar digital.');
+        return;
+      }
+      linkParentMutation.mutate({
+        baseline_source: 'DIGITAL',
+        parent_id_permohonan: selectedParentId
+      });
+    } else {
+      if (!legacySkNumber || !legacySkDate || !legacySkDocUrl) {
+        toast.error('Harap lengkapi semua bidang metadata SK fisik.');
+        return;
+      }
+      linkParentMutation.mutate({
+        baseline_source: 'LEGACY',
+        replaced_sk_number: legacySkNumber,
+        replaced_sk_date: legacySkDate,
+        replaced_sk_doc_url: legacySkDocUrl
+      });
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      toast.error('Berkas terlalu besar! Batas maksimal ukuran berkas adalah 10MB.');
+      return;
+    }
+
+    try {
+      setUploadingDoc(true);
+      const res = await uploadFileToBackend(file);
+      const finalUrl = `${res.file_url}?name=${encodeURIComponent(file.name)}`;
+      setLegacySkDocUrl(finalUrl);
+      toast.success(`Sukses mengunggah SK fisik: ${file.name}`);
+    } catch (err) {
+      toast.error('Gagal mengunggah berkas SK fisik ke server.');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-300 text-left">
+
+      {}
+      <div className="space-y-4">
+        <div className="border-b border-border pb-2 flex items-center gap-2 select-none">
+          <Layers className="h-4.5 w-4.5 text-primary" />
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Analisis Tumpang Tindih Spasial (PostGIS Detector)</h3>
+        </div>
+
+        {isLoadingOverlaps ? (
+          <div className="flex items-center gap-2 p-4 bg-slate-50 border border-slate-200 text-slate-400 text-xs font-semibold">
+            <Loader2 className="h-4.5 w-4.5 animate-spin text-primary" />
+            <span>MENGHITUNG IRISAN POLIGON DI DATABASE POSTGIS...</span>
+          </div>
+        ) : overlaps.length === 0 ? (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-none flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            <span>Clean Land. Tidak terdeteksi tumpang tindih spasial (overlap &lt; 5%) dengan bidang tanah ber-SK aktif lainnya.</span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2.5 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs leading-normal">
+              <AlertTriangle className="h-4.5 w-4.5 text-rose-500 shrink-0 mt-0.5 animate-pulse" />
+              <div>
+                <span className="font-bold uppercase tracking-wider block text-[10px] mb-0.5">Potensi Klaim Ganda Terdeteksi</span>
+                <p className="text-[10px] leading-relaxed text-slate-500">
+                  Poligon batas luar berkas ini bertumpukan secara spasial dengan lokasi SK terbit di bawah ini. Admin disarankan menautkan berkas baru ini sebagai **Revisi** jika memang menggantikan site plan lama.
+                </p>
+              </div>
+            </div>
+
+            <div className="border border-border overflow-hidden">
+              <table className="w-full text-xs font-sans">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-border text-[10px] font-bold text-slate-500 uppercase tracking-wider text-left select-none">
+                    <th className="p-3">No. Permohonan / SK</th>
+                    <th className="p-3">Nama Perumahan</th>
+                    <th className="p-3">Persentase Overlap</th>
+                    <th className="p-3">Status Berkas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-white">
+                  {overlaps.map((item: any) => (
+                    <tr key={item.id_permohonan} className="hover:bg-slate-50/50">
+                      <td className="p-3 font-mono font-bold text-slate-700">{item.submission_no}</td>
+                      <td className="p-3 font-semibold text-slate-800">{item.housing_name}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-100 font-bold rounded-none text-[10px]">
+                          {item.overlap_percent.toFixed(2)}% Overlap
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 bg-accent/30 text-[#415D43] border border-accent/60 font-bold rounded-none text-[10px]">
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {}
+      <div className="space-y-4">
+        <div className="border-b border-border pb-2 flex items-center gap-2 select-none">
+          <GitCommit className="h-4.5 w-4.5 text-primary" />
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Status Silsilah Hubungan Berkas</h3>
+        </div>
+
+        {sub.parent_id_permohonan ? (
+          <div className="p-4 bg-teal-50/50 border border-teal-200 rounded-none space-y-3 font-sans text-xs">
+            <div className="flex items-center gap-2 text-teal-900 font-bold">
+              <FileCheck className="h-5 w-5 text-teal-600" />
+              <span>TERKONEKSI DENGAN BERKAS DIGITAL INTERNAL</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1.5 border-t border-teal-200/50">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">ID Berkas Induk</span>
+                <Link to={`/pengajuan/detail/${sub.parent_id_permohonan}`} className="text-teal-700 font-bold hover:underline">
+                  {sub.parent_id_permohonan}
+                </Link>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Nomor SK Direvisi</span>
+                <span className="font-bold text-slate-700">{sub.replaced_sk_number || '-'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Tanggal Penerbitan SK</span>
+                <span className="font-bold text-slate-700">{sub.replaced_sk_date || '-'}</span>
+              </div>
+            </div>
+          </div>
+        ) : sub.replaced_sk_number ? (
+          <div className="p-4 bg-amber-50/40 border border-amber-200 rounded-none space-y-3 font-sans text-xs">
+            <div className="flex items-center gap-2 text-amber-900 font-bold">
+              <FileCheck className="h-5 w-5 text-amber-600" />
+              <span>TERKONEKSI DENGAN SK FISIK LEGACY (OFFLINE)</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1.5 border-t border-amber-200/50">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Nomor SK Fisik Lama</span>
+                <span className="font-bold text-slate-700">{sub.replaced_sk_number}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Tanggal Terbit</span>
+                <span className="font-bold text-slate-700">{sub.replaced_sk_date}</span>
+              </div>
+              <div className="md:col-span-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Scan Salinan Dokumen SK</span>
+                {sub.replaced_sk_doc_url ? (
+                  <a href={resolveDocUrl(sub.replaced_sk_doc_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-700 font-bold hover:underline">
+                    <FileText className="h-4.5 w-4.5" /> Buka PDF Scan SK Fisik
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic">Dokumen belum diunggah</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold rounded-none">
+            Belum Dikaitkan. Berkas ini saat ini terdaftar sebagai **Site Plan Baru** dan belum ditautkan dengan Surat Keputusan (SK) lama mana pun.
+          </div>
+        )}
+      </div>
+
+      {}
+      <div className="space-y-4">
+        <div className="border-b border-border pb-2 flex items-center gap-2 select-none">
+          <Link2 className="h-4.5 w-4.5 text-primary" />
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Tautkan Silsilah Rujukan Manual</h3>
+        </div>
+
+        <form onSubmit={handleLinkParentSubmit} className="bg-white border border-border p-5 md:p-6 space-y-5 rounded-none">
+          <div>
+            <span className={labelClass}>Sumber Rujukan Dokumen Lama</span>
+            <div className="flex items-center space-x-6 mt-2 select-none">
+              <label className="flex items-center space-x-2.5 cursor-pointer">
+                <input
+                  type="radio"
+                  value="DIGITAL"
+                  checked={baselineSource === 'DIGITAL'}
+                  onChange={() => setBaselineSource('DIGITAL')}
+                  className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-700">Opsi A: SK Terdaftar Digital</span>
+              </label>
+              <label className="flex items-center space-x-2.5 cursor-pointer">
+                <input
+                  type="radio"
+                  value="LEGACY"
+                  checked={baselineSource === 'LEGACY'}
+                  onChange={() => setBaselineSource('LEGACY')}
+                  className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-700">Opsi B: SK Fisik / Offline (Scan PDF)</span>
+              </label>
+            </div>
+          </div>
+
+          {}
+          {baselineSource === 'DIGITAL' && (
+            <div className="space-y-1.5 animate-in fade-in duration-300">
+              <label className={labelClass}>Pilih SK Lama Terbitan Digital</label>
+              {isLoadingApproved ? (
+                <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 text-slate-400 text-xs">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                  <span className="font-bold uppercase tracking-wider">Menghubungkan basis data digital...</span>
+                </div>
+              ) : listApproved.length === 0 ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold uppercase tracking-wider rounded-none">
+                  Tidak ada berkas ber-SK disetujui lainnya di database untuk ditautkan.
+                </div>
+              ) : (
+                <select
+                  value={selectedParentId}
+                  onChange={(e) => setSelectedParentId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">-- Pilih Surat Keputusan (SK) Induk --</option>
+                  {listApproved.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.skNumber || s.submissionNo} - {s.housingName} ({s.developerName})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {}
+          {baselineSource === 'LEGACY' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-300">
+              <div className="space-y-1.5">
+                <label className={labelClass}>Nomor SK Fisik Lama</label>
+                <input
+                  type="text"
+                  value={legacySkNumber}
+                  onChange={(e) => setLegacySkNumber(e.target.value)}
+                  placeholder="Contoh: 600/120/415.19/2020"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className={labelClass}>Tanggal Penerbitan SK Fisik</label>
+                <input
+                  type="date"
+                  value={legacySkDate}
+                  onChange={(e) => setLegacySkDate(e.target.value)}
+                  className={inputClass}
+                  style={{ colorScheme: 'light' }}
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-1.5">
+                <label className={labelClass}>Unggah Scan Dokumen SK Lama (PDF)</label>
+
+                {uploadingDoc ? (
+                  <div className="border border-dashed border-slate-300 p-6 text-center text-xs flex flex-col items-center justify-center space-y-2">
+                    <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                    <span className="font-bold text-primary">Mengunggah file ke disk...</span>
+                  </div>
+                ) : legacySkDocUrl ? (
+                  <div className="border border-slate-200 p-4 bg-slate-50 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-teal-600" />
+                      <span className="text-xs font-mono truncate max-w-[280px]" title={legacySkDocUrl}>
+                        {legacySkDocUrl.split('/').pop()?.split('?')[0]}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLegacySkDocUrl('')}
+                      className="text-xs font-bold text-rose-600 hover:text-rose-700 transition-colors border-none bg-transparent cursor-pointer"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-slate-300 hover:bg-slate-50/50 p-6 text-center cursor-pointer relative flex flex-col items-center justify-center min-h-[100px] select-none">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                    />
+                    <UploadCloud className="h-6 w-6 text-slate-400 mb-1" />
+                    <p className="text-xs font-bold text-slate-700">Pilih berkas PDF Surat Keputusan</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Maks. ukuran file 10MB</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="pt-2 flex justify-end">
+            <button
+              type="submit"
+              disabled={linkParentMutation.isPending}
+              className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white font-bold uppercase tracking-wider text-xs rounded-none transition-all gap-2 cursor-pointer outline-none"
+            >
+              {linkParentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>Tautkan Silsilah SK</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  );
+};
+
 --- FILE: src\features\submission\components\detail-tabs\SummaryTab.tsx ---
 
 import { File, MapPin, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { useState } from 'react';
+
+const resolveDocUrl = (url?: string | null) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `http://localhost:8000${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const getDocCategoryLabel = (key?: string) => {
   if (key === 'ktpDoc') return 'Scan KTP Pemohon / Penanggung Jawab';
@@ -11202,7 +11622,7 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Salinan SK Lama</span>
                 {sub.replaced_sk_doc_url ? (
                   <a
-                    href={sub.replaced_sk_doc_url}
+                    href={resolveDocUrl(sub.replaced_sk_doc_url)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline mt-1 leading-none decoration-none"
@@ -13465,6 +13885,7 @@ import { useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { LabelWithInfo } from './LabelWithInfo';
 import { ContextualUploadBox } from './ContextualUploadBox';
@@ -13476,6 +13897,7 @@ export const SubmissionSection = () => {
 
   const submissionType = watch('submission.submissionType');
   const baselineSource = watch('baseline_source');
+  const parentId = watch('parent_id_permohonan');
 
   useEffect(() => {
     if (submissionType !== 'REVISI') {
@@ -13484,6 +13906,47 @@ export const SubmissionSection = () => {
       setValue('legacy_metadata', undefined);
     }
   }, [submissionType, setValue]);
+
+  useEffect(() => {
+    if (submissionType === 'REVISI' && baselineSource === 'DIGITAL' && parentId) {
+      const fetchAndFill = async () => {
+        try {
+          const parentData = await SubmissionService.getById(parentId);
+          if (parentData) {
+
+            if (parentData.applicant) {
+              setValue('applicant.type', parentData.applicant.type || 'PERORANGAN');
+              setValue('applicant.name', parentData.applicant.name || '');
+              setValue('applicant.nik', parentData.applicant.nik || undefined);
+              setValue('applicant.nib', parentData.applicant.nib || undefined);
+              setValue('applicant.npwp', parentData.applicant.npwp || '');
+              setValue('applicant.directorName', parentData.applicant.directorName || undefined);
+              setValue('applicant.phone', parentData.applicant.phone || '');
+              setValue('applicant.email', parentData.applicant.email || '');
+              setValue('applicant.address', parentData.applicant.address || '');
+            }
+
+            if (parentData.locationDetails) {
+              setValue('location.locationName', parentData.locationDetails.locationName || '');
+              setValue('location.village', parentData.locationDetails.village || '');
+              setValue('location.district', parentData.locationDetails.district || '');
+              setValue('location.city', parentData.locationDetails.city || 'Kabupaten Bogor');
+              setValue('location.province', parentData.locationDetails.province || 'Jawa Barat');
+              setValue('location.fullAddress', parentData.locationDetails.fullAddress || '');
+              setValue('location.landArea', parentData.locationDetails.landArea || 0);
+              setValue('location.ownershipStatus', parentData.locationDetails.ownershipStatus || 'SHM');
+              setValue('location.certificateNumber', parentData.locationDetails.certificateNumber || '');
+              setValue('location.certificateOwner', parentData.locationDetails.certificateOwner || '');
+            }
+            toast.success('Data pemohon dan lokasi otomatis terisi dari SK Digital Induk!');
+          }
+        } catch (err) {
+          console.error('Gagal mengambil data SK induk untuk auto-fill:', err);
+        }
+      };
+      fetchAndFill();
+    }
+  }, [parentId, submissionType, baselineSource, setValue]);
 
   const { data: submissions = [], isLoading: isLoadingApproved } = useQuery({
     queryKey: ['submissions-approved-only'],
@@ -13498,7 +13961,7 @@ export const SubmissionSection = () => {
       <div className="border-b border-border pb-3">
         <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          2. Data Pengajuan
+          1. Data Pengajuan
         </h3>
         <p className="text-[10px] text-slate-400 mt-1">Klasifikasi administrasi jenis dokumen site plan yang diajukan ke dinas.</p>
       </div>
@@ -14976,6 +15439,606 @@ export const VERIFICATION_ASPECTS: AspectDefinition[] = [
   }
 ]
 
+--- FILE: src\features\submission\pages\SubmissionAdminVerificationPage.tsx ---
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import { SubmissionService, API_BASE_URL } from '@/features/submission/services/submission.service';
+import type { SubmissionStatus } from '../types';
+import {
+  ArrowLeft, CheckCircle2, XCircle, Loader2,
+  ShieldCheck, FileText, Info, ExternalLink, AlertTriangle
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
+const labelClass = "block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide";
+
+export default function SubmissionAdminVerificationPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+
+  const [notes, setNotes] = useState('');
+  const [pendingParentId, setPendingParentId] = useState<string | null>(null);
+  const [adminChecks, setAdminChecks] = useState({
+    ktp: false,
+    sertifikat: false,
+    npwp: false,
+    kkpr: false,
+    technical: false,
+    support2: false,
+    ska: false,
+    cad: false
+  });
+
+  const { data: sub, isLoading } = useQuery({
+    queryKey: ['submission', id],
+    queryFn: () => SubmissionService.getById(id || ''),
+    enabled: !!id,
+  });
+
+  const { data: overlaps = [], isLoading: isLoadingOverlaps } = useQuery({
+    queryKey: ['spatial-overlaps', id],
+    queryFn: () => SubmissionService.getSpatialOverlaps(id || ''),
+    enabled: !!id,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async ({
+      status,
+      notes,
+      checklist_items
+    }: {
+      status: SubmissionStatus;
+      notes: string;
+      checklist_items?: any[];
+    }) => {
+
+      if (status === 'Sesuai' && pendingParentId) {
+        await SubmissionService.linkParent(id || '', {
+          baseline_source: 'DIGITAL',
+          parent_id_permohonan: pendingParentId,
+          notes: 'Ditautkan secara dinamis saat Admin menyetujui kelayakan administrasi.'
+        });
+      }
+
+      const actorInfo = `${user?.full_name || 'Verifikator'} (${user?.role || 'Admin SIPAS'})`;
+      return SubmissionService.updateStatus(
+        id || '',
+        status,
+        actorInfo,
+        notes,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        checklist_items
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ['submissions'] })
+      ]);
+      toast.success('Hasil verifikasi administrasi berhasil direkam!');
+      navigate(`/pengajuan/detail/${id}`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Gagal menyimpan verifikasi: ${error.message}`);
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex flex-col justify-center items-center space-y-4 font-sans">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <p className="text-xs text-slate-500">Memuat berkas administrasi...</p>
+      </div>
+    );
+  }
+
+  if (!sub) {
+    return (
+      <div className="flex flex-col justify-center items-center py-16 text-center max-w-md mx-auto select-none bg-white border border-border p-8 font-sans">
+        <XCircle className="h-10 w-10 text-rose-500 mx-auto mb-3" />
+        <h3 className="text-sm font-bold text-slate-800">Berkas Tidak Ditemukan</h3>
+        <p className="text-xs text-slate-400 mt-2 mb-6">
+          Nomor registrasi berkas pengajuan tidak terdaftar di sistem.
+        </p>
+        <button onClick={() => navigate('/pengajuan/daftar')} className="px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-none cursor-pointer border-none outline-none">
+          Kembali ke Daftar
+        </button>
+      </div>
+    );
+  }
+
+  const allChecked = Object.values(adminChecks).every(Boolean);
+
+  const handleAdminVerifySubmit = (approved: boolean) => {
+    const targetStatus = approved ? 'Verifikasi Teknis' : 'Ditolak';
+    const defaultNotes = approved
+      ? 'Berkas LENGKAP secara administratif. Diteruskan ke Tim Teknis.'
+      : 'Berkas DITOLAK / butuh REVISI administratif.';
+
+    const checklistItemsPayload = approved ? [
+      {
+        aspekCode: 'legalDoc',
+        aspekLabel: 'Dokumen Hak Milik Lahan / Sertifikat BPN',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'Dinyatakan valid dan sah secara administratif.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      },
+      {
+        aspekCode: sub.applicant?.type === 'BADAN_USAHA' ? 'nibDoc' : 'ktpDoc',
+        aspekLabel: sub.applicant?.type === 'BADAN_USAHA' ? 'Nomor Induk Berusaha (NIB) Badan Usaha' : 'Kartu Tanda Penduduk (KTP) Pemohon',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'Dinyatakan cocok secara administratif.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      },
+      {
+        aspekCode: 'npwpDoc',
+        aspekLabel: 'NPWP Wajib Pajak Pemohon',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'Dinyatakan cocok secara administratif.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      },
+      {
+        aspekCode: 'supportDoc',
+        aspekLabel: 'Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Terlampir',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'Dokumen KKPR terlampir.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      },
+      {
+        aspekCode: 'technicalDoc',
+        aspekLabel: 'Gambar Rencana Teknis CAD / PSU',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'Gambar rencana teknis sesuai.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      },
+      {
+        aspekCode: 'supportDoc2',
+        aspekLabel: 'Kajian Andalalin / Persetujuan Teknis Lingkungan',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'Dokumen andalalin/lingkungan sesuai.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      },
+      {
+        aspekCode: 'skaDoc',
+        aspekLabel: 'Sertifikat Keahlian (SKA) Arsitek',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'SKA Arsitek terdaftar dan sah.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      },
+      {
+        aspekCode: 'cadDoc',
+        aspekLabel: 'Validitas Peta Koordinat CAD (.dwg/.dxf)',
+        statusKelayakan: 'Sesuai',
+        catatanVerifikator: 'Berkas peta CAD koordinat valid.',
+        verifiedById: user?.id,
+        verifiedAt: new Date().toISOString()
+      }
+    ] : [];
+
+    mutation.mutate({
+      status: targetStatus,
+      notes: notes.trim() || defaultNotes,
+      checklist_items: checklistItemsPayload
+    });
+  };
+
+  const getDocUrl = (key: string) => {
+    const doc = sub.documents?.find((d: any) => d.key === key);
+    if (!doc?.url) return null;
+    if (doc.url.startsWith('http://') || doc.url.startsWith('https://')) {
+      return doc.url;
+    }
+    return `http://localhost:8000${doc.url.startsWith('/') ? '' : '/'}${doc.url}`;
+  };
+
+  const getDocName = (key: string) => {
+    const doc = sub.documents?.find((d: any) => d.key === key);
+    return doc?.name || null;
+  };
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto font-sans text-left">
+
+      {}
+      <div className="flex items-center gap-4 select-none">
+        <Link
+          to={`/pengajuan/detail/${id}`}
+          className="p-2 bg-white hover:bg-slate-50 border border-border text-slate-500 hover:text-slate-800 transition-colors rounded-none"
+        >
+          <ArrowLeft className="h-4 w-5" />
+        </Link>
+        <div className="text-left flex-1">
+          <h1 className="text-xl font-bold text-[#111D13] leading-none uppercase">
+            Workspace Verifikasi Administrasi
+          </h1>
+          <p className="text-xs text-slate-500 mt-2">
+            Pemeriksaan validitas berkas persyaratan formal untuk registrasi {sub.submissionNo} ({sub.housingName}).
+          </p>
+        </div>
+        <span className="px-3 py-1.5 bg-slate-800 text-white font-bold text-[9px] uppercase tracking-wider rounded-none">
+          Peran: Administrator
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        {}
+        <div className="lg:col-span-6 space-y-6">
+          <div className="bg-white border border-border p-5 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <FileText className="h-4.5 w-4.5 text-primary" />
+              Unggahan Berkas Persyaratan Pemohon
+            </h3>
+
+            <p className="text-[10px] text-slate-400 leading-normal">
+              Silakan klik tombol tautan eksternal untuk mengunduh dan meninjau kebenaran dokumen di tab browser baru sebelum mencentang kelayakan formal.
+            </p>
+
+            <div className="border border-slate-100 divide-y divide-slate-100">
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">Sertifikat Tanah / Hak Milik BPN</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{getDocName('legalDoc') || 'sertifikat_lahan.pdf'}</span>
+                </div>
+                {getDocUrl('legalDoc') ? (
+                  <a href={getDocUrl('legalDoc')!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-bold">
+                    <span>Tinjau</span> <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Belum diunggah</span>
+                )}
+              </div>
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">
+                    {sub.applicant?.type === 'BADAN_USAHA' ? 'Nomor Induk Berusaha (NIB) Perusahaan' : 'KTP Pemohon'}
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    {sub.applicant?.type === 'BADAN_USAHA' ? (getDocName('nibDoc') || 'nib_perusahaan.pdf') : (getDocName('ktpDoc') || 'ktp_identitas.pdf')}
+                  </span>
+                </div>
+                {getDocUrl(sub.applicant?.type === 'BADAN_USAHA' ? 'nibDoc' : 'ktpDoc') ? (
+                  <a href={getDocUrl(sub.applicant?.type === 'BADAN_USAHA' ? 'nibDoc' : 'ktpDoc')!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-bold">
+                    <span>Tinjau</span> <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Belum diunggah</span>
+                )}
+              </div>
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">NPWP Wajib Pajak</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{sub.applicant?.npwp || '-'}</span>
+                </div>
+                <span className="text-slate-400 italic text-[10px]">Terverifikasi via API</span>
+              </div>
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">SK KKPR Terlampir</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{getDocName('supportDoc') || 'sk_kkpr.pdf'}</span>
+                </div>
+                {getDocUrl('supportDoc') ? (
+                  <a href={getDocUrl('supportDoc')!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-bold">
+                    <span>Tinjau</span> <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Belum diunggah</span>
+                )}
+              </div>
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">Gambar Rencana Teknis CAD / PSU</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{getDocName('technicalDoc') || 'rencana_teknis.pdf'}</span>
+                </div>
+                {getDocUrl('technicalDoc') ? (
+                  <a href={getDocUrl('technicalDoc')!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-bold">
+                    <span>Tinjau</span> <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Belum diunggah</span>
+                )}
+              </div>
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">Kajian Andalalin / Persetujuan Teknis Lingkungan</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{getDocName('supportDoc2') || 'andalalin_izin.pdf'}</span>
+                </div>
+                {getDocUrl('supportDoc2') ? (
+                  <a href={getDocUrl('supportDoc2')!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-bold">
+                    <span>Tinjau</span> <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Belum diunggah</span>
+                )}
+              </div>
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">Sertifikat Keahlian (SKA) Arsitek</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{getDocName('skaDoc') || 'ska_arsitek.pdf'}</span>
+                </div>
+                {getDocUrl('skaDoc') ? (
+                  <a href={getDocUrl('skaDoc')!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-bold">
+                    <span>Tinjau</span> <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Belum diunggah</span>
+                )}
+              </div>
+
+              {}
+              <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-800 block">Berkas Peta Koordinat CAD (.dwg/.dxf)</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{getDocName('cadDoc') || 'peta_siteplan.dxf'}</span>
+                </div>
+                {getDocUrl('cadDoc') ? (
+                  <a href={getDocUrl('cadDoc')!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-bold">
+                    <span>Tinjau</span> <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Belum diunggah</span>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {}
+        <div className="lg:col-span-6 space-y-6">
+          <div className="bg-white border border-primary p-6 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-3 flex justify-between items-center select-none">
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Form Lembar Kerja Administrasi</h3>
+                <p className="text-[9px] text-slate-400 mt-0.5">Penetapan Validitas Persyaratan Formal</p>
+              </div>
+              <ShieldCheck className="h-6 w-6 text-primary" />
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 text-[10px] text-slate-500 leading-relaxed text-justify">
+              Sebagai Administrator, Anda wajib mencentang kedelapan aspek persyaratan formal di bawah ini setelah memverifikasi keaslian dan kesesuaian berkas lampiran fisik pemohon.
+            </div>
+
+            {}
+            {sub.submissionDetails?.submissionType === 'BARU' && overlaps.length > 0 && (
+              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs leading-normal space-y-3 animate-in fade-in duration-300">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5 animate-pulse" />
+                  <div>
+                    <span className="font-bold uppercase tracking-wider block text-[10px] mb-0.5">Temuan Konflik Spasial (PostGIS)</span>
+                    <p className="text-[10px] leading-relaxed text-slate-500">
+                      Sistem mendeteksi koordinat bidang tanah permohonan baru ini bertumpang tindih dengan koordinat SK aktif yang sudah terbit di database:
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border border-rose-200/50 bg-white overflow-hidden">
+                  <table className="w-full text-[10px] font-sans">
+                    <tbody className="divide-y divide-rose-100 bg-white text-slate-700">
+                      {overlaps.map((item: any) => (
+                        <tr key={item.id_permohonan}>
+                          <td className="p-2 font-mono font-bold text-[9px] text-slate-600">{item.sk_number || item.submission_no}</td>
+                          <td className="p-2 font-semibold">{item.housing_name}</td>
+                          <td className="p-2 text-right font-bold text-rose-600">{item.overlap_percentage}% Overlap</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {!pendingParentId ? (
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-slate-500 italic">
+                      Apakah Anda ingin mengaitkan pengusulan baru ini sebagai **Revisi** untuk menggantikan SK lama tersebut saat menyetujui verifikasi ini?
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstOverlap = overlaps[0];
+                        setPendingParentId(firstOverlap.id_permohonan);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold uppercase tracking-wider text-[9px] border-none rounded-none cursor-pointer transition-colors"
+                    >
+                      <ShieldCheck className="h-3 w-3" />
+                      Tandai Rencana Tautan (Revisi)
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 space-y-2.5">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-teal-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-[10px] uppercase tracking-wider block text-teal-900">Rencana Tautan Silsilah Disiapkan</span>
+                        <p className="text-[9px] leading-relaxed text-teal-700 mt-0.5">
+                          Tautan silsilah akan disimpan ke database dan kategori permohonan akan otomatis diubah menjadi <strong>REVISI</strong> jika Anda menyetujui hasil verifikasi lembar kerja ini.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPendingParentId(null)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-600 hover:bg-slate-700 text-white font-bold uppercase tracking-wider text-[8px] border-none rounded-none cursor-pointer transition-colors"
+                    >
+                      Batalkan Rencana Tautan
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {}
+            <div className="space-y-3.5">
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.ktp}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">
+                  {sub.applicant?.type === 'BADAN_USAHA'
+                    ? "Nomor Induk Berusaha (NIB) Badan Usaha valid di lembar persetujuan"
+                    : "Kartu Tanda Penduduk (KTP) Pemohon sesuai data kependudukan"
+                  }
+                </span>
+              </label>
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.sertifikat}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, sertifikat: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">Dokumen Sertifikat Tanah BPN sah & tidak bersengketa</span>
+              </label>
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.npwp}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">NPWP Wajib Pajak aktif dan terisi lengkap</span>
+              </label>
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.kkpr}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, kkpr: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) sesuai zonasi</span>
+              </label>
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.technical}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, technical: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">Gambar Rencana Teknis CAD / Masterplan PSU terlampir</span>
+              </label>
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.support2}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, support2: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">Kajian Andalalin / Persetujuan Teknis Lingkungan lengkap</span>
+              </label>
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.ska}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, ska: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">Sertifikat Keahlian (SKA) Arsitek aktif</span>
+              </label>
+
+              <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={adminChecks.cad}
+                  onChange={(e) => setAdminChecks(prev => ({ ...prev, cad: e.target.checked }))}
+                  className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-semibold text-slate-700">Berkas biner koordinat peta CAD (.dwg/.dxf) dapat dibuka</span>
+              </label>
+
+            </div>
+
+            {}
+            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+              <label className={labelClass}>Catatan Tambahan Verifikasi Administrasi</label>
+              <textarea
+                rows={3}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Berikan alasan spesifik jika berkas dikembalikan/ditolak, atau catatan administratif penting..."
+                className={inputClass}
+              />
+            </div>
+
+            {}
+            <div className="pt-2 flex items-center justify-end gap-3 select-none">
+              <button
+                type="button"
+                disabled={mutation.isPending}
+                onClick={() => handleAdminVerifySubmit(false)}
+                className="px-4 py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold uppercase tracking-wider transition-all rounded-none cursor-pointer bg-transparent"
+              >
+                Tolak Berkas
+              </button>
+              <button
+                type="button"
+                disabled={mutation.isPending || !allChecked}
+                onClick={() => handleAdminVerifySubmit(true)}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-primary hover:opacity-95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white text-xs font-bold uppercase tracking-wider transition-all rounded-none cursor-pointer"
+              >
+                {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Setujui & Teruskan ke Teknis
+              </button>
+            </div>
+
+            {!allChecked && (
+              <div className="flex items-start gap-2 text-[10px] text-amber-700 bg-amber-50 p-2.5 border border-amber-100">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                <span>Tombol persetujuan akan aktif setelah semua dokumen formal dicentang sebagai valid.</span>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 --- FILE: src\features\submission\pages\SubmissionCreatePage.tsx ---
 import { useState, useEffect } from 'react';
 import { useForm, FormProvider, type Resolver } from 'react-hook-form';
@@ -14993,8 +16056,8 @@ import {
 } from '../components/FormSections';
 
 const steps = [
-  { id: 1, title: 'Data Pemohon' },
-  { id: 2, title: 'Data Pengajuan' },
+  { id: 1, title: 'Data Pengajuan' },
+  { id: 2, title: 'Data Pemohon' },
   { id: 3, title: 'Data Lokasi' },
   { id: 4, title: 'Data Koordinat' },
   { id: 5, title: 'Info Tata Ruang' },
@@ -15179,8 +16242,8 @@ export default function SubmissionCreatePage() {
   const nextStep = async () => {
     let fieldsToValidate: any = [];
     switch (currentStep) {
-      case 1: fieldsToValidate = 'applicant'; break;
-      case 2: fieldsToValidate = 'submission'; break;
+      case 1: fieldsToValidate = 'submission'; break;
+      case 2: fieldsToValidate = 'applicant'; break;
       case 3: fieldsToValidate = 'location'; break;
       case 4: fieldsToValidate = 'coordinate'; break;
       case 5: fieldsToValidate = 'spatial'; break;
@@ -15289,8 +16352,8 @@ export default function SubmissionCreatePage() {
                 {}
                 <div className="flex-1 mb-8">
                   <fieldset disabled={isLocked} className="border-none p-0 m-0 min-w-0 flex-1">
-                    {currentStep === 1 && <ApplicantSection />}
-                    {currentStep === 2 && <SubmissionSection />}
+                    {currentStep === 1 && <SubmissionSection />}
+                    {currentStep === 2 && <ApplicantSection />}
                     {currentStep === 3 && <LocationSection />}
                     {currentStep === 4 && <CoordinateSection />}
                     {currentStep === 5 && <SpatialSection />}
@@ -15403,11 +16466,8 @@ import { cn } from '@/lib/utils';
 import AuditTrailViewer from '@/features/approval/components/AuditTrailViewer';
 import {
   SummaryTab, ApplicantTab, LocationTab,
-  TechnicalTab, CompensationTab, PhotosTab
+  TechnicalTab, CompensationTab, PhotosTab, SilsilahTab
 } from '../components/detail-tabs';
-
-const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
-const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide";
 
 const getStatusBadgeClassLocal = (status: string) => {
   switch (status) {
@@ -15415,6 +16475,8 @@ const getStatusBadgeClassLocal = (status: string) => {
       return 'bg-accent/35 text-[#415D43] border border-accent/70';
     case 'Ditolak':
       return 'bg-rose-50 text-rose-700 border border-rose-100';
+    case 'Tidak Berlaku':
+      return 'bg-slate-100 text-slate-500 border border-slate-200';
     default:
       return 'bg-amber-50 text-amber-800 border border-amber-100';
   }
@@ -15454,20 +16516,7 @@ export default function SubmissionDetailPage() {
   const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
   const flyTo = useGisUIStore((s) => s.flyTo);
 
-  const [notes, setNotes] = useState('');
-
-  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'audit'>('ringkasan');
-
-  const [adminChecks, setAdminChecks] = useState({
-    ktp: false,
-    sertifikat: false,
-    npwp: false,
-    kkpr: false,
-    technical: false,
-    support2: false,
-    ska: false,
-    cad: false
-  });
+  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'silsilah' | 'audit'>('ringkasan');
 
   const [checklistStates, setChecklistStates] = useState<Record<string, {
     status: 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai';
@@ -15512,56 +16561,6 @@ export default function SubmissionDetailPage() {
     }
   }, [sub]);
 
-  const mutation = useMutation({
-    mutationFn: async ({
-      status,
-      notes,
-      checklist_items
-    }: {
-      status: SubmissionStatus;
-      notes: string;
-      checklist_items?: any[];
-    }) => {
-      return SubmissionService.updateStatus(
-        sub?.id || '',
-        status,
-        `${userProfile?.name || 'Verifikator'} (${user?.role || activeRole})`,
-        notes,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        checklist_items
-      );
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true }),
-        queryClient.invalidateQueries({ queryKey: ['submissions'] })
-      ]);
-      setNotes('');
-      setAdminChecks({
-        ktp: false,
-        sertifikat: false,
-        npwp: false,
-        kkpr: false,
-        technical: false,
-        support2: false,
-        ska: false,
-        cad: false
-      });
-      toast.success('Penyimpanan verifikasi administrasi berhasil diselesaikan!');
-    },
-    onError: (error: Error) => {
-      toast.error(`Gagal memproses transaksi: ${error.message}`);
-    }
-  });
-
   if (isLoading) {
     return (
       <div className="min-h-[50vh] flex flex-col justify-center items-center space-y-4">
@@ -15597,85 +16596,6 @@ export default function SubmissionDetailPage() {
   const showKadisPanel = isKadisActive && subData.status === 'Menunggu Persetujuan';
 
   const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && subData.status === 'Verifikasi Teknis';
-  const allAdminChecked = Object.values(adminChecks).every(Boolean);
-
-  const handleAdminAction = (approved: boolean) => {
-    const targetStatus = approved ? 'Verifikasi Teknis' : 'Ditolak';
-    const defaultNotes = approved ? 'Berkas LENGKAP secara administratif. Diteruskan ke Tim Teknis.' : 'Berkas DITOLAK / butuh REVISI administratif.';
-
-    const checklistItemsPayload = approved ? [
-      {
-        aspekCode: 'legalDoc',
-        aspekLabel: ' Dokumen Hak Milik Lahan / Sertifikat BPN',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Dinyatakan valid dan sah secara administratif.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      },
-      {
-        aspekCode: subData.applicant?.type === 'BADAN_USAHA' ? 'nibDoc' : 'ktpDoc',
-        aspekLabel: subData.applicant?.type === 'BADAN_USAHA' ? 'Nomor Induk Berusaha (NIB) Badan Usaha' : 'Kartu Tanda Penduduk (KTP) Pemohon',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Dinyatakan cocok secara administratif.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      },
-      {
-        aspekCode: 'npwpDoc',
-        aspekLabel: 'NPWP Wajib Pajak Pemohon',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Dinyatakan cocok secara administratif.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      },
-      {
-        aspekCode: 'supportDoc',
-        aspekLabel: 'Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Terlampir',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Dokumen KKPR terlampir.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      },
-      {
-        aspekCode: 'technicalDoc',
-        aspekLabel: 'Gambar Rencana Teknis CAD / PSU',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Gambar rencana teknis sesuai.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      },
-      {
-        aspekCode: 'supportDoc2',
-        aspekLabel: 'Kajian Andalalin / Persetujuan Teknis Lingkungan',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Dokumen andalalin/lingkungan sesuai.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      },
-      {
-        aspekCode: 'skaDoc',
-        aspekLabel: 'Sertifikat Keahlian (SKA) Arsitek',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'SKA Arsitek terdaftar dan sah.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      },
-      {
-        aspekCode: 'cadDoc',
-        aspekLabel: 'Validitas Peta Koordinat CAD (.dwg/.dxf)',
-        statusKelayakan: 'Sesuai',
-        catatanVerifikator: 'Berkas peta CAD koordinat valid.',
-        verifiedById: user?.id,
-        verifiedAt: new Date().toISOString()
-      }
-    ] : [];
-
-    mutation.mutate({
-      status: targetStatus,
-      notes: notes.trim() || defaultNotes,
-      checklist_items: checklistItemsPayload
-    });
-  };
 
   const renderTelaahStafSection = (data: Submission) => {
     const hasTechnicalResult = data.kkprVerdict || data.telaahStaf;
@@ -15858,7 +16778,7 @@ export default function SubmissionDetailPage() {
 
           {}
           <div className="flex border-b border-border overflow-x-auto select-none bg-slate-50 p-1 gap-1">
-            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', 'audit'] as const).map((tab) => {
+            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit'] as const).map((tab) => {
               const isActive = activeTab === tab;
               const labels: Record<string, string> = {
                 ringkasan: 'Ringkasan',
@@ -15867,13 +16787,14 @@ export default function SubmissionDetailPage() {
                 teknis: 'Data Teknis',
                 kompensasi: 'Kompensasi Lahan',
                 foto: 'Foto Lapangan',
+                silsilah: 'Pemeriksaan Silsilah',
                 audit: 'Audit Trail'
               };
               return (
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => setActiveTab(tab as any)}
                   className={cn(
                     "px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all rounded-none cursor-pointer outline-none border-none whitespace-nowrap",
                     isActive
@@ -15902,134 +16823,11 @@ export default function SubmissionDetailPage() {
               <CompensationTab sub={subData} onShowOnMap={handleShowCompensationOnMap} />
             )}
             {activeTab === 'foto' && <PhotosTab sub={subData} />}
+            {activeTab === 'silsilah' && <SilsilahTab sub={subData} />}
             {activeTab === 'audit' && (
               <AuditTrailViewer submissionId={subData.id} />
             )}
           </div>
-
-          {}
-          {showAdminPanel && (
-            <div className="bg-white border border-primary p-5 shadow-sm space-y-5 rounded-none text-left animate-in slide-in-from-bottom-2 duration-300">
-              <div className="border-b border-border pb-3 flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Verifikasi Administrasi</h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Lakukan verifikasi dokumen persyaratan pemohon (Syarat Formal).</p>
-                </div>
-                <span className="px-2 py-0.5 bg-secondary text-primary font-bold text-[9px] uppercase border border-border">ADMINISTRATOR</span>
-              </div>
-
-              <div className="space-y-2.5">
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.ktp}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">
-                    {subData.applicant?.type === 'BADAN_USAHA'
-                      ? "Nomor Induk Berusaha (NIB) Badan Usaha"
-                      : "Kartu Tanda Penduduk (KTP) Pemohon"
-                    }
-                  </span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.sertifikat}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, sertifikat: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Dokumen Hak Milik Lahan / Sertifikat BPN</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.npwp}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">NPWP Wajib Pajak Pemohon</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.kkpr}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, kkpr: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Terlampir</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.technical}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, technical: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Gambar Rencana Teknis CAD / PSU</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.support2}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, support2: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Kajian Andalalin / Persetujuan Teknis Lingkungan</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.ska}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, ska: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Sertifikat Keahlian (SKA) Arsitek</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.cad}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, cad: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">File Peta Koordinat CAD (.dwg/.dxf)</span>
-                </label>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className={labelClass}>Catatan Tambahan Administrasi</label>
-                <textarea
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Berikan catatan perbaikan draf kelayakan jika berkas dikembalikan ke pemohon..."
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  disabled={mutation.isPending}
-                  onClick={() => handleAdminAction(false)}
-                  className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all rounded-none cursor-pointer"
-                >
-                  Tolak Berkas
-                </button>
-                <button
-                  type="button"
-                  disabled={mutation.isPending || !allAdminChecked}
-                  onClick={() => handleAdminAction(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white text-xs font-bold transition-all rounded-none cursor-pointer"
-                >
-                  {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Setujui & Teruskan ke Teknis
-                </button>
-              </div>
-            </div>
-          )}
 
         </div>
 
@@ -16134,6 +16932,34 @@ export default function SubmissionDetailPage() {
 
       {}
       <div className="space-y-6">
+        {}
+        {showAdminPanel && (
+          <div className="bg-white border border-primary p-5 shadow-sm text-left space-y-4 rounded-none animate-in fade-in duration-300">
+            <div className="border-b border-slate-200 pb-3 flex justify-between items-center select-none">
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Otoritas Admin SIPAS</h3>
+                <p className="text-[9px] text-slate-400 mt-0.5 font-medium">Verifikasi Persyaratan Administrasi & Kelengkapan Formal</p>
+              </div>
+              <span className="px-2.5 py-1 bg-slate-800 text-white font-bold text-[8.5px] uppercase tracking-wider rounded-none">ADMINISTRATOR</span>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 flex items-start gap-2.5 text-xs text-slate-600">
+              <Info size={16} className="text-slate-500 shrink-0 mt-0.5" />
+              <p className="text-[10px] leading-relaxed text-justify">
+                Berkas permohonan baru saja masuk atau sedang dalam antrean. Anda diwajibkan memeriksa kesesuaian dan kelengkapan dokumen persyaratan formal pemohon (seperti KTP, NIB, NPWP, Sertifikat BPN) sebelum meloloskannya ke tahap pemeriksaan tim teknis.
+              </p>
+            </div>
+
+            <Link
+              to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
+              className="w-full py-2.5 bg-primary hover:opacity-90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>Mulai Verifikasi Administrasi</span>
+            </Link>
+          </div>
+        )}
+
         {}
         {showTeknisPanel && (
           <div className="bg-white border border-[#415D43] p-5 shadow-sm text-left space-y-4 rounded-none animate-in fade-in duration-300">
@@ -17083,6 +17909,8 @@ export default function SubmissionListPage() {
         return 'bg-accent/35 text-[#415D43] border border-accent/70';
       case 'Ditolak':
         return 'bg-rose-50 text-rose-700 border border-rose-100';
+      case 'Tidak Berlaku':
+        return 'bg-slate-100 text-slate-500 border border-slate-200';
       default:
         return 'bg-amber-50 text-amber-800 border border-amber-100';
     }
@@ -19228,6 +20056,30 @@ export const SubmissionService = {
       throw new Error(errText || `Gagal memuat statistik laporan (HTTP ${response.status})`);
     }
     return await response.json();
+  },
+
+  getSpatialOverlaps: async (id: string): Promise<any[]> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/spatial-overlaps`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat hasil tumpang tindih spasial (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  linkParent: async (id: string, payload: any): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/link-parent`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal menautkan silsilah berkas permohonan (HTTP ${response.status})`);
+    }
+    return await response.json();
   }
 };
 
@@ -19242,7 +20094,8 @@ export type SubmissionStatus =
   | 'Menunggu Persetujuan'
   | 'Proses TTE'
   | 'Disetujui'
-  | 'Ditolak';
+  | 'Ditolak'
+  | 'Tidak Berlaku';
 
 export type KKPRVerdict =
   | 'Sesuai'
@@ -22132,6 +22985,8 @@ export default function VerificationPage() {
         return 'bg-[#e8f2ea] text-[#415D43] border border-[#A1CCA5]/60';
       case 'Verifikasi Administrasi':
         return 'bg-amber-50 text-amber-800 border border-amber-100';
+      case 'Tidak Berlaku':
+        return 'bg-slate-100 text-slate-500 border border-slate-200';
       default:
         return 'bg-slate-50 text-slate-600 border border-slate-200';
     }
