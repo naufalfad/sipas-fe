@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { LabelWithInfo } from './LabelWithInfo';
 import { ContextualUploadBox } from './ContextualUploadBox';
@@ -24,6 +25,7 @@ export const SubmissionSection = () => {
 
   const submissionType = watch('submission.submissionType');
   const baselineSource = watch('baseline_source');
+  const parentId = watch('parent_id_permohonan');
 
   // --- AUTOMATIC CLEAN STATE TRANSITION (Anti-Pollution Guard) ---
   useEffect(() => {
@@ -33,6 +35,48 @@ export const SubmissionSection = () => {
       setValue('legacy_metadata', undefined);
     }
   }, [submissionType, setValue]);
+
+  // --- AUTO-FILL EFFECT FOR OPSI A (DIGITAL REVISION) ---
+  useEffect(() => {
+    if (submissionType === 'REVISI' && baselineSource === 'DIGITAL' && parentId) {
+      const fetchAndFill = async () => {
+        try {
+          const parentData = await SubmissionService.getById(parentId);
+          if (parentData) {
+            // Fill applicant details
+            if (parentData.applicant) {
+              setValue('applicant.type', parentData.applicant.type || 'PERORANGAN');
+              setValue('applicant.name', parentData.applicant.name || '');
+              setValue('applicant.nik', parentData.applicant.nik || undefined);
+              setValue('applicant.nib', parentData.applicant.nib || undefined);
+              setValue('applicant.npwp', parentData.applicant.npwp || '');
+              setValue('applicant.directorName', parentData.applicant.directorName || undefined);
+              setValue('applicant.phone', parentData.applicant.phone || '');
+              setValue('applicant.email', parentData.applicant.email || '');
+              setValue('applicant.address', parentData.applicant.address || '');
+            }
+            // Fill location details
+            if (parentData.locationDetails) {
+              setValue('location.locationName', parentData.locationDetails.locationName || '');
+              setValue('location.village', parentData.locationDetails.village || '');
+              setValue('location.district', parentData.locationDetails.district || '');
+              setValue('location.city', parentData.locationDetails.city || 'Kabupaten Bogor');
+              setValue('location.province', parentData.locationDetails.province || 'Jawa Barat');
+              setValue('location.fullAddress', parentData.locationDetails.fullAddress || '');
+              setValue('location.landArea', parentData.locationDetails.landArea || 0);
+              setValue('location.ownershipStatus', parentData.locationDetails.ownershipStatus || 'SHM');
+              setValue('location.certificateNumber', parentData.locationDetails.certificateNumber || '');
+              setValue('location.certificateOwner', parentData.locationDetails.certificateOwner || '');
+            }
+            toast.success('Data pemohon dan lokasi otomatis terisi dari SK Digital Induk!');
+          }
+        } catch (err) {
+          console.error('Gagal mengambil data SK induk untuk auto-fill:', err);
+        }
+      };
+      fetchAndFill();
+    }
+  }, [parentId, submissionType, baselineSource, setValue]);
 
   // --- OPSI A: AMBIL DAFTAR PERMOHONAN DISETUJUI YANG SAH SECARA REAL-TIME ---
   const { data: submissions = [], isLoading: isLoadingApproved } = useQuery({
@@ -49,7 +93,7 @@ export const SubmissionSection = () => {
       <div className="border-b border-border pb-3">
         <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
           <CheckCircle2 className="h-4.5 w-4.5 text-primary" />
-          2. Data Pengajuan
+          1. Data Pengajuan
         </h3>
         <p className="text-[10px] text-slate-400 mt-1">Klasifikasi administrasi jenis dokumen site plan yang diajukan ke dinas.</p>
       </div>

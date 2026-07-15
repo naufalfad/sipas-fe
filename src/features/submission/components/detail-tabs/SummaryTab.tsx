@@ -11,6 +11,14 @@
 import { File, MapPin, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { useState } from 'react';
 
+const resolveDocUrl = (url?: string | null) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `http://localhost:8000${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const getDocCategoryLabel = (key?: string) => {
   if (key === 'ktpDoc') return 'Scan KTP Pemohon / Penanggung Jawab';
   if (key === 'nibDoc') return 'Scan NIB Perusahaan';
@@ -112,7 +120,7 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Salinan SK Lama</span>
                 {sub.replaced_sk_doc_url ? (
                   <a
-                    href={sub.replaced_sk_doc_url}
+                    href={resolveDocUrl(sub.replaced_sk_doc_url)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline mt-1 leading-none decoration-none"

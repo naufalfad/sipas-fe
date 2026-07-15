@@ -265,5 +265,35 @@ export const SubmissionService = {
       throw new Error(errText || `Gagal memuat statistik laporan (HTTP ${response.status})`);
     }
     return await response.json();
+  },
+
+  /**
+   * Mengambil analisis tumpang tindih spasial bidang tanah (PostGIS ST_Intersection).
+   */
+  getSpatialOverlaps: async (id: string): Promise<any[]> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/spatial-overlaps`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat hasil tumpang tindih spasial (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Menautkan silsilah permohonan baru dengan permohonan induk lama (Revisi SK).
+   */
+  linkParent: async (id: string, payload: any): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/link-parent`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal menautkan silsilah berkas permohonan (HTTP ${response.status})`);
+    }
+    return await response.json();
   }
 };

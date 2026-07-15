@@ -20,7 +20,8 @@ export type SubmissionStatus =
   | 'Menunggu Persetujuan'
   | 'Proses TTE'
   | 'Disetujui'
-  | 'Ditolak';
+  | 'Ditolak'
+  | 'Tidak Berlaku';
 
 export type KKPRVerdict =
   | 'Sesuai'
