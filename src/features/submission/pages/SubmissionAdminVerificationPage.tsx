@@ -11,11 +11,11 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/app/store/useAuthStore';
-import { SubmissionService, API_BASE_URL } from '@/features/submission/services/submission.service';
+import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { SubmissionStatus } from '../types';
 import {
   ArrowLeft, CheckCircle2, XCircle, Loader2,
-  ShieldCheck, FileText, Info, ExternalLink, AlertTriangle
+  ShieldCheck, FileText, ExternalLink, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -49,7 +49,7 @@ export default function SubmissionAdminVerificationPage() {
   });
 
   // --- SPATIAL OVERLAPS QUERY ---
-  const { data: overlaps = [], isLoading: isLoadingOverlaps } = useQuery({
+  const { data: overlaps = [] } = useQuery({
     queryKey: ['spatial-overlaps', id],
     queryFn: () => SubmissionService.getSpatialOverlaps(id || ''),
     enabled: !!id,
@@ -65,8 +65,8 @@ export default function SubmissionAdminVerificationPage() {
       notes: string;
       checklist_items?: any[];
     }) => {
-      // Jika statusnya disetujui ('Sesuai') dan ada rencana tautan silsilah, lakukan penautan silsilah terlebih dahulu sebelum menyetujui!
-      if (status === 'Sesuai' && pendingParentId) {
+      // Jika statusnya disetujui ('Verifikasi Teknis') dan ada rencana tautan silsilah, lakukan penautan silsilah terlebih dahulu sebelum menyetujui!
+      if (status === 'Verifikasi Teknis' && pendingParentId) {
         await SubmissionService.linkParent(id || '', {
           baseline_source: 'DIGITAL',
           parent_id_permohonan: pendingParentId,
