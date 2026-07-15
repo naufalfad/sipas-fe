@@ -6,7 +6,7 @@ import re
 import argparse
 import fnmatch
 from pathlib import Path
-from typing import Set, List
+from typing import Set, List, Tuple
 
 # Set console output encoding to UTF-8 to prevent UnicodeEncodeError on Windows
 if hasattr(sys.stdout, "reconfigure"):
@@ -31,7 +31,8 @@ class AggregatorConfig:
     # 1. Folder Blacklist (Diabaikan secara mutlak)
     FORBIDDEN_DIRS = {
         "node_modules", ".git", "dist", "build", "out", "coverage",
-        ".vscode", ".idea", ".next", ".swc", "recovered", "temp", "tmp", "geojson"
+        ".vscode", ".idea", ".next", ".swc", "recovered", "temp", "tmp", "geojson",
+        ".nuxt", ".cache", ".parcel-cache", ".vercel", "dist-ssr", ".expo", ".yarn"
     }
 
     # 2. Berkas Blacklist (Diabaikan secara mutlak)
@@ -46,7 +47,7 @@ class AggregatorConfig:
         "context", "features", "layouts", "mock", "app", "tests"
     }
 
-    # 4. Ekstensi Berkas Teks yang Diizinkan
+    # 4. Ekstensi Berkas Teks yang Diizinkan untuk Frontend
     INCLUDE_EXTENSIONS = {
         ".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".scss", 
         ".html", ".vue", ".yaml", ".yml", ".md"
@@ -56,7 +57,7 @@ class AggregatorConfig:
     ESSENTIAL_ROOT_FILES = {
         "package.json", "tsconfig.json", "vite.config.ts", "vite.config.js",
         "tailwind.config.js", "postcss.config.js", "index.html", ".oxlintrc.json",
-        "tsconfig.app.json", "tsconfig.node.json"
+        "tsconfig.app.json", "tsconfig.node.json", "next.config.js", "next.config.mjs"
     }
 
     # 6. Batas Maksimum Ukuran Berkas (1 MB)
@@ -75,8 +76,36 @@ class AggregatorConfig:
 # =========================================================================
 class LLMContextOptimizer:
     @staticmethod
-    def compress_code(content: str) -> str:
-        """Menghapus spasi trailing dan baris kosong ganda secara efisien untuk menghemat token LLM."""
+    def strip_js_ts_comments(text: str) -> str:
+        """Menghapus komentar // dan /* ... */ secara aman tanpa merusak string literal."""
+        pattern = re.compile(
+            r'/\*.*?\*/|//.*?$|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"|`(?:\\.|[^\\`])*`',
+            re.DOTALL | re.MULTILINE
+        )
+        def replacer(match):
+            s = match.group(0)
+            if s.startswith('/'):
+                return ""
+            return s
+        return re.sub(pattern, replacer, text)
+
+    @staticmethod
+    def strip_html_comments(text: str) -> str:
+        """Menghapus komentar HTML <!-- ... -->."""
+        return re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+
+    @classmethod
+    def compress_code(cls, content: str, suffix: str = "", strip_comments: bool = True) -> str:
+        """Menghapus spasi trailing, baris kosong ganda, komentar, dan JSDoc/HTML comments."""
+        if strip_comments:
+            if suffix in (".js", ".jsx", ".ts", ".tsx", ".css", ".scss"):
+                content = cls.strip_js_ts_comments(content)
+            elif suffix == ".html":
+                content = cls.strip_html_comments(content)
+            elif suffix == ".vue":
+                content = cls.strip_html_comments(content)
+                content = cls.strip_js_ts_comments(content)
+
         lines = content.splitlines()
         optimized_lines = []
         previous_empty = False
@@ -108,9 +137,11 @@ class LLMContextOptimizer:
 # Orkestrator utama penelusuran dan pembangunan bundel berkas teks
 # =========================================================================
 class CodebaseAggregator:
-    def __init__(self, target_dir: str, output_name: str):
+    def __init__(self, target_dir: str, output_name: str, strip_comments: bool = True, exclude_tests: bool = False):
         self.config = AggregatorConfig()
         self.optimizer = LLMContextOptimizer()
+        self.strip_comments = strip_comments
+        self.exclude_tests = exclude_tests
         
         # Penyelarasan Portabilitas Jalur Direktori
         self.target_path = Path(target_dir).resolve()
@@ -159,29 +190,34 @@ class CodebaseAggregator:
                 return True
             if self.config.SENSITIVE_REGEX.match(path.name):
                 return True
+                
+            # Filter Berkas Pengujian (Unit Test/E2E) jika parameter diaktifkan
+            if self.exclude_tests:
+                lower_name = path.name.lower()
+                if "test" in lower_name or "spec" in lower_name:
+                    if path.suffix in (".ts", ".tsx", ".js", ".jsx"):
+                        return True
 
-        # 3. Cek kecocokan dengan pola gitignore
-        # Ubah path menggunakan slash '/' untuk konsistensi di Windows
+        # 3. Filter folder khusus pengujian secara mutlak
+        if self.exclude_tests and is_dir:
+            if path.name in ("tests", "__tests__", "cypress", "playwright"):
+                return True
+
+        # 4. Cek kecocokan dengan pola gitignore
         rel_path_str = rel_path.as_posix()
         
         for pattern in self.gitignore_patterns:
-            # Hapus leading slash untuk pencocokan relatif
             clean_pattern = pattern.lstrip('/')
             is_pattern_dir = pattern.endswith('/')
             match_pattern = clean_pattern.rstrip('/')
             
-            # Jika pola khusus direktori tapi path saat ini bukan direktori, skip
             if is_pattern_dir and not is_dir:
                 continue
                 
-            # Pencocokan pola:
-            # a. Jika pola mengandung '/', cocokkan terhadap rel_path_str lengkap
-            # b. Jika tidak, cocokkan terhadap tiap komponen path (parts) atau nama file/direktori langsung
             if '/' in match_pattern:
                 if fnmatch.fnmatch(rel_path_str, match_pattern) or fnmatch.fnmatch(rel_path_str, f"{match_pattern}/*"):
                     return True
             else:
-                # Cocokkan nama file/direktori langsung atau salah satu bagiannya
                 if any(fnmatch.fnmatch(part, match_pattern) for part in parts):
                     return True
                     
@@ -189,13 +225,19 @@ class CodebaseAggregator:
 
     def execute(self):
         print(f"🔍 Memulai penggabungan kode dari target: {self.target_path}")
-        
+        if self.strip_comments:
+            print("✂️ Pembersihan komentar & JSDoc diaktifkan untuk berkas JS/TS/CSS/HTML/Vue.")
+        if self.exclude_tests:
+            print("🚫 Berkas pengujian (*.test.*, *.spec.*, folder tests/) diabaikan.")
+            
         file_count = 0
         original_total_size = 0
         compressed_total_size = 0
+        
+        # Penampung data berkas untuk dianalisis ukurannya
+        processed_files_stats: List[Tuple[str, int]] = []
 
         try:
-            # Membuka file output dengan mode stream buffer langsung
             with open(self.output_file, "w", encoding="utf-8") as out_file:
                 out_file.write("=== STRUKTUR & ISI KODE (COMPRESSED PARADIGM) ===\n\n")
 
@@ -228,7 +270,7 @@ class CodebaseAggregator:
                         if not is_root_file and file_path.suffix not in self.config.INCLUDE_EXTENSIONS:
                             continue
 
-                        # Penapisan D: Cheap Binary Guard (Cegah membaca berkas gambar, font, pdf, dll.)
+                        # Penapisan D: Cheap Binary Guard
                         if self.optimizer.is_binary(file_path):
                             continue
 
@@ -240,7 +282,11 @@ class CodebaseAggregator:
                                 continue
 
                             content = file_path.read_text("utf-8", errors="ignore")
-                            compressed_content = self.optimizer.compress_code(content)
+                            compressed_content = self.optimizer.compress_code(
+                                content, 
+                                suffix=file_path.suffix, 
+                                strip_comments=self.strip_comments
+                            )
 
                             # Tulis langsung ke stream buffer tanpa menahan seluruh isi memori di RAM
                             out_file.write(f"\n--- FILE: {relative_file_path} ---\n")
@@ -248,8 +294,11 @@ class CodebaseAggregator:
                             out_file.write("\n")
 
                             file_count += 1
+                            comp_size = len(compressed_content.encode('utf-8'))
                             original_total_size += file_size
-                            compressed_total_size += len(compressed_content.encode('utf-8'))
+                            compressed_total_size += comp_size
+                            
+                            processed_files_stats.append((str(relative_file_path), comp_size))
                             print(f"-> Menyalin & mengompresi: {relative_file_path}")
 
                         except Exception as e:
@@ -259,10 +308,16 @@ class CodebaseAggregator:
             print(f"📊 Ukuran Asli: {original_total_size / 1024:.2f} KB")
             print(f"🚀 Ukuran Kompresi (LLM Ready): {compressed_total_size / 1024:.2f} KB")
             
-            # SINKRONISASI EVALUASI: Perbaikan Typo NameError secara presisi
             if original_total_size > 0:
                 saving_percent = ((original_total_size - compressed_total_size) / original_total_size) * 100
                 print(f"📉 Penghematan Ruang Konteks: ~{saving_percent:.1f}%")
+                
+            # Tampilkan 5 Berkas Terbesar setelah Kompresi
+            if processed_files_stats:
+                print("\n📦 5 Berkas Terbesar yang Disalin (Setelah Kompresi):")
+                sorted_files = sorted(processed_files_stats, key=lambda x: x[1], reverse=True)[:5]
+                for idx, (f_path, f_size) in enumerate(sorted_files, 1):
+                    print(f"   {idx}. {f_path} ({f_size / 1024:.2f} KB)")
 
         except Exception as e:
             print(f"Critical Error: Gagal menulis file output: {e}")
@@ -277,8 +332,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Optimasi Bundel Kode Frontend - GFW Paradigm")
     parser.add_argument("--dir", type=str, default=config_default.DEFAULT_TARGET, help="Direktori target yang akan dipindai")
     parser.add_argument("--out", type=str, default=config_default.DEFAULT_OUTPUT, help="Nama berkas keluaran (.txt)")
+    parser.add_argument("--keep-comments", action="store_true", help="Pertahankan komentar dan JSDoc/TSDoc di dalam kode")
+    parser.add_argument("--exclude-tests", action="store_true", help="Jangan sertakan berkas pengujian (*.test.*, *.spec.*, Cypress, Playwright)")
     
     args = parser.parse_args()
 
-    aggregator = CodebaseAggregator(target_dir=args.dir, output_name=args.out)
+    aggregator = CodebaseAggregator(
+        target_dir=args.dir, 
+        output_name=args.out,
+        strip_comments=not args.keep_comments,
+        exclude_tests=args.exclude_tests
+    )
     aggregator.execute()

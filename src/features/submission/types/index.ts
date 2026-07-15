@@ -1,11 +1,13 @@
 /**
  * ============================================================================
- * GEOSIPAS SYSTEM CONTRACTS — [src/features/submission/types/index.ts]
+ * GEOSIPAS SYSTEM CONTRACTS — [src/features/submission/types/index.ts] (REVISED v5.3)
  * ============================================================================
  * Peran: Kontrak tipe data (Single Source of Truth) untuk permohonan site plan.
  *        Diperbarui penuh untuk mendukung perbandingan metrik tiga sisi,
  *        dynamic checklist evaluasi dinas, metadata verifikasi KKPR, peran baru,
- *        snapshot dokumen Telaah Staf, serta draf Surat Keputusan (SK) resmi.
+ *        riwayat silsilah permohonan (Revisi) baik di tingkat root objek (GET) 
+ *        maupun tingkat skema biner (POST), snapshot dokumen Telaah Staf, 
+ *        serta draf Surat Keputusan (SK) resmi.
  * ============================================================================
  */
 
@@ -174,7 +176,7 @@ export interface EvaluationChecklistItem {
   verifiedAt?: string;               // ISO 8601 Timestamp pengisian evaluasi
 }
 
-// ─── UPDATE BARU TAHAP 1: VALUE OBJECT INTERFACES UNTUK DRAF SK ───────────────
+// ─── TAHAP 1: VALUE OBJECT INTERFACES UNTUK DRAF SK ───────────────────────────
 
 export interface SkSignerInfo {
   name: string;
@@ -240,6 +242,13 @@ export interface SkDraft {
   payload: SkDraftPayload;
 }
 
+// ─── UPDATE FASE 5 (REVISI): DETAIL METADATA FISIK/LEGACY SK LAMA ────────────
+export interface LegacyMetadata {
+  replaced_sk_number: string;
+  replaced_sk_date: string; // Format ISO: YYYY-MM-DD
+  replaced_sk_doc_url: string;
+}
+
 // ─── UTAMA: INTERFACE PERMOHONAN SINKRON (SOT) ───────────────────────────────
 
 export interface Submission {
@@ -256,6 +265,7 @@ export interface Submission {
   signedPdfUrl?: string;
   kabidSignature?: string;
   kadisSignature?: string;
+  skNumber?: string | null; // <-- SINKRONISASI KOMPILATOR TS FE
 
   // Penambahan parameter hasil hitung sistem lama (Baku Backwards-compatibility)
   kdbPercent?: number;
@@ -290,7 +300,7 @@ export interface Submission {
   // ─── REVISI: PROPOSED METRICS (DEKLARASI MANDIRI PEMOHON) ───
   applicantBuildingArea?: number; // Luas bangunan total (KDB m2)
   applicantGsb?: number;          // GSB usulan (m)
-  applicantRthArea?: number;      // RTH usulan (m2)
+  applicantRthArea?: number;      // Luas RTH usulan (m2)
 
   // ─── REVISI: BYLAW METRICS (BATAS RDTR DINAMIS DARI SYSTEM) ───
   bylawMaxKdb?: number;
@@ -326,6 +336,16 @@ export interface Submission {
 
   // ─── BARU TAHAP 1: SNAPSHOT METADATA KEPUTUSAN DRAF SK (TAHAP 5 INTEGRASI) ───
   skDraft?: SkDraft | null;
+
+  // ─── UPDATE FASE 5 (REVISI): SILSILAH PERMOHONAN SELF-REFERENTIAL ────────
+  baseline_source?: 'DIGITAL' | 'LEGACY' | null;
+  parent_id_permohonan?: string | null;
+  legacy_metadata?: LegacyMetadata | null;
+
+  // SINKRONISASI ROOT LEVEL PROPERTIES UNTUK DETAIL QUERY REVISI (GET HOOK)
+  replaced_sk_number?: string | null;
+  replaced_sk_date?: string | null;
+  replaced_sk_doc_url?: string | null;
 
   // ─── BARU FASE 2: DETAIL TPU & KOMPENSASI DEKLARASI MANDIRI ───
   tpu?: {

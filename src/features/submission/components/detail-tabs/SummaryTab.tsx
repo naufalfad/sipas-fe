@@ -1,7 +1,16 @@
-import { File, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+/**
+ * ============================================================================
+ * GEOSIPAS COMPONENT — SummaryTab [SummaryTab.tsx] (REVISED v5.1)
+ * ============================================================================
+ * Peran: Komponen tab ringkasan untuk menampilkan rangkuman berkas pengajuan.
+ *        Diperbarui penuh untuk merender seksi "Rujukan Dokumen Terdahulu" (Silsilah)
+ *        secara elegan di antara info umum dan lampiran dokumen utama.
+ * ============================================================================
+ */
+
+import { File, MapPin, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { useState } from 'react';
 
-// ─── PURE FABRICATION: RESOLVER LABEL DOKUMEN BERSIH (Decoupled from Steps) ───
 const getDocCategoryLabel = (key?: string) => {
   if (key === 'ktpDoc') return 'Scan KTP Pemohon / Penanggung Jawab';
   if (key === 'nibDoc') return 'Scan NIB Perusahaan';
@@ -25,14 +34,17 @@ interface SummaryTabProps {
 
 export const SummaryTab = ({ sub }: SummaryTabProps) => {
   const [openInfo, setOpenInfo] = useState(true);
+  const [openSilsilah, setOpenSilsilah] = useState(true); // State baru untuk collapsible silsilah
   const [openDocs, setOpenDocs] = useState(true);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+
+      {/* ─── SEKSI 1: INFORMASI UMUM PROYEK ─── */}
       <div>
-        <div className="flex items-center justify-between border-b border-border pb-2 mb-4">
+        <div className="flex items-center justify-between border-b border-border pb-2 mb-4 select-none">
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Informasi Umum Proyek</h3>
-          <button type="button" onClick={() => setOpenInfo((v) => !v)} className="text-slate-500">
+          <button type="button" onClick={() => setOpenInfo((v) => !v)} className="text-slate-500 cursor-pointer outline-none border-none bg-transparent">
             {openInfo ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
         </div>
@@ -73,10 +85,54 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
         )}
       </div>
 
+      {/* ─── BARU: SEKSI 1.5: RUJUKAN DOKUMEN TERDAHULU (SILSILAH) ─── */}
+      {sub.submissionDetails?.submissionType === 'REVISI' && (
+        <div>
+          <div className="flex items-center justify-between border-b border-border pb-2 mb-4 select-none">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Rujukan Dokumen Terdahulu (Silsilah)</h3>
+            <button type="button" onClick={() => setOpenSilsilah((v) => !v)} className="text-slate-500 cursor-pointer outline-none border-none bg-transparent">
+              {openSilsilah ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+          {openSilsilah && (
+            <div className="p-4 border-l-2 border-amber-500 bg-[#fdfbf7] grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-left animate-in fade-in duration-200">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nomor SK Terdahulu</span>
+                <span className="text-xs font-mono font-bold text-slate-800 block">
+                  {sub.replaced_sk_number || '-'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Tanggal Terbit</span>
+                <span className="text-xs font-bold text-slate-800 block">
+                  {sub.replaced_sk_date || '-'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Salinan SK Lama</span>
+                {sub.replaced_sk_doc_url ? (
+                  <a
+                    href={sub.replaced_sk_doc_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline mt-1 leading-none decoration-none"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Buka Salinan SK Lama
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-400 block mt-1 font-semibold">Tidak ada lampiran berkas</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── SEKSI 2: BERKAS LAMPIRAN PENGAJUAN ─── */}
       <div>
-        <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
+        <div className="flex items-center justify-between border-b border-border pb-2 mb-3 select-none">
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Berkas Lampiran Pengajuan</h3>
-          <button type="button" onClick={() => setOpenDocs((v) => !v)} className="text-slate-500">
+          <button type="button" onClick={() => setOpenDocs((v) => !v)} className="text-slate-500 cursor-pointer outline-none border-none bg-transparent">
             {openDocs ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
         </div>
@@ -102,7 +158,7 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
                     href={doc?.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs font-bold text-primary hover:underline shrink-0 pl-3"
+                    className="text-xs font-bold text-primary hover:underline shrink-0 pl-3 decoration-none"
                   >
                     Unduh Berkas
                   </a>

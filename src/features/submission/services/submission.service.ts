@@ -1,10 +1,11 @@
 /**
  * ============================================================================
- * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts]
+ * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts] (REVISED v5.1)
  * ============================================================================
  * Peran: Menangani seluruh komunikasi HTTP REST API dengan server backend.
- *        Diperbarui penuh untuk mendukung payload metrik usulan pemohon (proposed),
- *        pengiriman hasil audit dinas beserta data verifikator per aspek (verified_by_id, verified_at).
+ *        Diperbarui penuh untuk mendukung pengiriman silsilah permohonan lama (Revisi),
+ *        payload metrik usulan pemohon (proposed), serta pengiriman hasil audit
+ *        dinas beserta data verifikator per aspek (verified_by_id, verified_at).
  * ============================================================================
  */
 
@@ -45,11 +46,11 @@ export const SubmissionService = {
    */
   getAll: async (params: SubmissionListParams = {}): Promise<PaginatedSubmissions> => {
     const query = new URLSearchParams();
-    if (params.search)    query.set('search', params.search);
+    if (params.search) query.set('search', params.search);
     if (params.status && params.status !== 'Semua') query.set('status', params.status);
-    if (params.category)  query.set('category', params.category);
-    if (params.page)      query.set('page', String(params.page));
-    if (params.limit)     query.set('limit', String(params.limit));
+    if (params.category) query.set('category', params.category);
+    if (params.page) query.set('page', String(params.page));
+    if (params.limit) query.set('limit', String(params.limit));
 
     const url = query.toString() ? `${API_BASE_URL}?${query.toString()}` : API_BASE_URL;
     const response = await fetch(url, { headers: getAuthHeaders() });
@@ -91,7 +92,8 @@ export const SubmissionService = {
   },
 
   /**
-   * Membuat atau memperbarui draf/berkas pengajuan site plan (Proposed Metrics).
+   * Membuat atau memperbarui draf/berkas pengajuan site plan (Proposed Metrics & Revisi Silsilah).
+   * Properti baseline_source, parent_id_permohonan, dan legacy_metadata otomatis disalurkan murni.
    */
   create: async (data: FullSubmissionFormValues, isDraft = false): Promise<Submission> => {
     const id_permohonan = data.id_permohonan || `sub-${Date.now()}`;
@@ -176,7 +178,6 @@ export const SubmissionService = {
       catatan_verifikator: item.catatanVerifikator || null,
       attachment_url: item.attachmentUrl || null,
       verified_by_id: item.verifiedById || null,
-      // ─── KOREKSI: PENGHAPUSAN OPERATOR INSTANCEOF DARI TIPE PRIMITIF STRING ───
       verified_at: item.verifiedAt || null
     })) || [];
 

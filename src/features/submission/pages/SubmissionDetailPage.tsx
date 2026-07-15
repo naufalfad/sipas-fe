@@ -1,5 +1,14 @@
-// --- FILE: src/features/submission/pages/SubmissionDetailPage.tsx ---
-/* STREAMING_CHUNK:Configuring imports and base constants */
+/**
+ * ============================================================================
+ * GEOSIPAS HTTP CONTROLLER — SubmissionDetailPage [SubmissionDetailPage.tsx] (REVISED v8.2)
+ * ============================================================================
+ * Peran: Halaman detail berkas pengajuan bagi pemohon dan dinas.
+ *        Mendukung peninjauan data administratif, rincian teknis 13-aspek,
+ *        visualisasi peta AutoCAD PostGIS terintegrasi, jejak audit (audit-trail),
+ *        serta manajemen pendelegasian CTA untuk TTE Kadis.
+ * ============================================================================
+ */
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
@@ -22,8 +31,6 @@ import {
   SummaryTab, ApplicantTab, LocationTab,
   TechnicalTab, CompensationTab, PhotosTab
 } from '../components/detail-tabs';
-
-// Impor Komponen Peta Baru Berbasis Canvas & PostGIS (Fase 3)
 
 // ─── STYLING CONSTANTS (PROTECTED VARIATIONS) ──────────────────────────────────
 const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
@@ -57,7 +64,6 @@ function calculateCentroid(polygon: [number, number][]): [number, number] {
 }
 
 export default function SubmissionDetailPage() {
-  /* STREAMING_CHUNK:Initializing page queries and mutations */
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -139,8 +145,6 @@ export default function SubmissionDetailPage() {
       }
     }
   }, [sub]);
-
-  // Center Koordinat Peta
 
   // Mutation untuk Admin SIPAS (Administrasi)
   const mutation = useMutation({
@@ -328,7 +332,7 @@ export default function SubmissionDetailPage() {
             "rounded-none text-[8.5px] font-black tracking-widest px-2.5 py-1 uppercase leading-none border shrink-0",
             verdictLabel === 'Sesuai' || verdictLabel === 'Sesuai / Dapat Disetujui' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
               verdictLabel === 'Sesuai Bersyarat' || verdictLabel === 'Sesuai Bersyarat / Ketentuan Khusus' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                "bg-rose-50 text-rose-700 border-rose-200"
+                "bg-rose-50 text-rose-700 border-rose-100"
           )}>
             {verdictLabel}
           </span>
@@ -420,7 +424,7 @@ export default function SubmissionDetailPage() {
             </div>
             <span className={cn(
               "px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-none leading-none border",
-              subData.kkprVerdict === 'Sesuai' || subData.kkprVerdict === 'Sesuai Bersyarat' ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-200"
+              subData.kkprVerdict === 'Sesuai' || subData.kkprVerdict === 'Sesuai Bersyarat' ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-100"
             )}>
               {subData.kkprVerdict || 'Perlu Perbaikan / Revisi'}
             </span>
@@ -456,7 +460,7 @@ export default function SubmissionDetailPage() {
                     <span className={cn(
                       "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border leading-none rounded-none shrink-0",
                       isCompliant ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                        isConditional ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-200"
+                        isConditional ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-100"
                     )}>
                       {item.statusKelayakan}
                     </span>
@@ -680,7 +684,7 @@ export default function SubmissionDetailPage() {
                 {subData.status}
               </span>
 
-              {/* UPDATE TAHAP 5: prominent download button in status card once signed */}
+              {/* prominent download button in status card once signed */}
               {subData.status === 'Disetujui' && subData.signedPdfUrl && (
                 <div className="pt-4 mt-2">
                   <a
@@ -701,7 +705,7 @@ export default function SubmissionDetailPage() {
               <h4 className="font-bold text-xs text-slate-400 uppercase tracking-wide">Riwayat Proses Pelacakan</h4>
               <div className="max-h-[480px] overflow-y-auto pr-2 relative text-left">
 
-                {/* Sumbu Garis Vertikal (Tepat berada di koordinat left-4 / 16px) */}
+                {/* Sumbu Garis Vertikal */}
                 <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-200/80" />
 
                 <div className="space-y-6 pb-2">
@@ -709,7 +713,7 @@ export default function SubmissionDetailPage() {
                     const isApproved = hist.status === 'Disetujui';
                     const isRejected = hist.status === 'Ditolak';
 
-                    // Resolusi warna lingkaran solid untuk kontras tinggi (WCAG AA Compliant)
+                    // Resolusi warna lingkaran solid untuk kontras tinggi
                     const getCircleBgClass = (status: string) => {
                       switch (status) {
                         case 'Disetujui':
@@ -726,10 +730,9 @@ export default function SubmissionDetailPage() {
                     };
 
                     return (
-                      // Padding-left 10 (40px) memberikan ruang yang lega dari sumbu garis 16px
                       <div key={i} className="relative pl-10 pb-1">
 
-                        {/* Lingkaran Penanda (Tepat di sumbu left-4 / 16px dengan pergeseran jangkar -translate-x-1/2) */}
+                        {/* Lingkaran Penanda */}
                         <div className={cn(
                           "absolute left-4 top-0.5 rounded-full p-1.5 border-[3px] z-10 -translate-x-1/2 shadow-sm flex items-center justify-center",
                           getCircleBgClass(hist.status)
@@ -798,7 +801,7 @@ export default function SubmissionDetailPage() {
           </div>
         )}
 
-        {/* ─── TAHAP 5: REFACTORED KABID CTA PANEL ─── */}
+        {/* KABID CTA PANEL */}
         {showKabidPanel && (
           <div className="bg-white border border-[#415D43] p-5 shadow-sm text-left space-y-4 rounded-none animate-in fade-in duration-300">
             <div className="border-b border-slate-150 pb-3 flex justify-between items-center select-none">
@@ -811,7 +814,7 @@ export default function SubmissionDetailPage() {
                 </p>
               </div>
 
-              {/* Badge Solid, Sharp (Tanpa Rounded & Tanpa Outline) */}
+              {/* Badge Solid, Sharp */}
               <span className="px-3 py-1 bg-slate-800 text-white font-bold text-[8.5px] uppercase tracking-wider rounded-none">
                 VERIFIKASI KABID
               </span>
@@ -834,7 +837,7 @@ export default function SubmissionDetailPage() {
           </div>
         )}
 
-        {/* ─── TAHAP 5: REFACTORED KADIS CTA PANEL ─── */}
+        {/* KADIS CTA PANEL */}
         {showKadisPanel && (
           <div className="bg-white border-2 border-primary p-5 shadow-md text-left space-y-4 rounded-none animate-in fade-in duration-300">
             <div className="border-b border-slate-200 pb-3 flex justify-between items-center select-none">
@@ -850,7 +853,7 @@ export default function SubmissionDetailPage() {
               <div className="space-y-1 select-none">
                 <h5 className="font-bold uppercase tracking-wider text-[9px] text-emerald-900 leading-none">Pemeriksaan Dual-PDF &amp; TTE BSrE</h5>
                 <p className="text-[9px] leading-normal text-emerald-700 text-justify">
-                  Berkas pengesahan site plan telah disetujui Kabid dan nomor SK resmi telah digenerasi otomatis oleh sistem. Kepala Dinas diwajibkan untuk memeriksa draf Surat Keputusan bersama rekomendasi teknis secara berdampingan di modul aman sebelum menandatanganinya secara digital.
+                  Berkas pengesahan site plan telah disetujui Kabid and nomor SK resmi telah digenerasi otomatis oleh sistem. Kepala Dinas diwajibkan untuk memeriksa draf Surat Keputusan bersama rekomendasi teknis secara berdampingan di modul aman sebelum menandatanganinya secara digital.
                 </p>
               </div>
             </div>
