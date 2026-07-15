@@ -30,6 +30,7 @@ export interface SubmissionListParams {
   category?: string;
   page?: number;
   limit?: number;
+  my_verifications?: boolean;
 }
 
 export interface PaginatedSubmissions {
@@ -51,6 +52,7 @@ export const SubmissionService = {
     if (params.category) query.set('category', params.category);
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
+    if (params.my_verifications) query.set('my_verifications', 'true');
 
     const url = query.toString() ? `${API_BASE_URL}?${query.toString()}` : API_BASE_URL;
     const response = await fetch(url, { headers: getAuthHeaders() });
@@ -263,6 +265,55 @@ export const SubmissionService = {
     if (!response.ok) {
       const errText = await response.text();
       throw new Error(errText || `Gagal memuat statistik laporan (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Mengambil log aktivitas sistem (Audit Trail) dengan pagination dan filter pencarian.
+   */
+  getAuditLogs: async (page: number, limit: number, search: string): Promise<any> => {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search ? { search } : {})
+    });
+    const response = await fetch(`${API_BASE_URL_CONFIG}/api/v1/auth/audit-logs?${queryParams}`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat log aktivitas (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Mengklaim (mengunci) berkas verifikasi untuk admin aktif.
+   */
+  claimSubmission: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/claim`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal mengklaim berkas (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Melepas kunci klaim berkas verifikasi.
+   */
+  unclaimSubmission: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/unclaim`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal melepas klaim berkas (HTTP ${response.status})`);
     }
     return await response.json();
   },

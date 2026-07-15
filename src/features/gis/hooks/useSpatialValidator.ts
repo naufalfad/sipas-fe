@@ -326,13 +326,13 @@ export function useSpatialValidator() {
 
                 // ── Jalankan semua pemeriksaan secara paralel ─────────────────
                 await Promise.all([
-                    checkLayer('sungai',    'Sempadan Sungai 25m',          () => import('@/assets/geojson/bogor/SUNGAI_LN_25K.json'),          { meters: 25 }),
-                    checkLayer('relka',     'Sempadan Jalur Kereta Api 20m', () => import('@/assets/geojson/kab bogor/RELKA_LN_25K.json'),       { meters: 20 }),
-                    checkLayer('pasir',     'Kawasan Konservasi Gumuk Pasir',() => import('@/assets/geojson/kab bogor/PASIR_AR_25K.json')),
-                    checkLayer('sawah',     'Lahan Sawah Dilindungi (LSD)', () => import('@/assets/geojson/bogor/AGRISAWAH_AR_25K.json')),
-                    checkLayer('kebun',     'Kawasan Perkebunan',           () => import('@/assets/geojson/bogor/AGRIKEBUN_AR_25K.json')),
-                    checkLayer('ladang',    'Kawasan Ladang / Tegalan',     () => import('@/assets/geojson/bogor/AGRILADANG_AR_25K.json')),
-                    checkLayer('pemukiman', 'Zona Peruntukan Pemukiman',    () => import('@/assets/geojson/bogor/PEMUKIMAN_AR_25K.json')),
+                    checkLayer('sungai',    'Sempadan Sungai 25m',          () => fetch('/geojson/bogor/SUNGAI_LN_25K.json').then(res => res.json()),          { meters: 25 }),
+                    checkLayer('relka',     'Sempadan Jalur Kereta Api 20m', () => fetch('/geojson/kab bogor/RELKA_LN_25K.json').then(res => res.json()),       { meters: 20 }),
+                    checkLayer('pasir',     'Kawasan Konservasi Gumuk Pasir',() => fetch('/geojson/kab bogor/PASIR_AR_25K.json').then(res => res.json())),
+                    checkLayer('sawah',     'Lahan Sawah Dilindungi (LSD)', () => fetch('/geojson/bogor/AGRISAWAH_AR_25K.json').then(res => res.json())),
+                    checkLayer('kebun',     'Kawasan Perkebunan',           () => fetch('/geojson/bogor/AGRIKEBUN_AR_25K.json').then(res => res.json())),
+                    checkLayer('ladang',    'Kawasan Ladang / Tegalan',     () => fetch('/geojson/bogor/AGRILADANG_AR_25K.json').then(res => res.json())),
+                    checkLayer('pemukiman', 'Zona Peruntukan Pemukiman',    () => fetch('/geojson/bogor/PEMUKIMAN_AR_25K.json').then(res => res.json())),
                 ]);
 
                 const zoningScore = calculateZoningScore(details, applicantAreaSqm);

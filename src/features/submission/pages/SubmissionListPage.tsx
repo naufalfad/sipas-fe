@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import {
-  ClipboardList, Plus, Search, Eye, Pencil,
+  ClipboardList, Plus, Search, Eye, Pencil, Lock,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUIStore } from '@/app/store/useUIStore';
 import { useAuthStore } from '@/app/store/useAuthStore';
 import { normalizeRole } from '@/components/auth/ProtectedRoute';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 10;
 
@@ -40,7 +41,11 @@ function useDebounce<T>(value: T, delay = 400): T {
   return debounced;
 }
 
-export default function SubmissionListPage() {
+interface SubmissionListPageProps {
+  myVerificationsOnly?: boolean;
+}
+
+export default function SubmissionListPage({ myVerificationsOnly = false }: SubmissionListPageProps) {
   const { activeRole: uiActiveRole } = useUIStore();
   const { user } = useAuthStore();
   const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
@@ -73,13 +78,14 @@ export default function SubmissionListPage() {
 
   // ── Server-side query ──────────────────────────────────────────────────────
   const { data: response, isLoading, isFetching } = useQuery({
-    queryKey: ['submissions', debouncedSearch, selectedStatus, selectedCategory, page],
+    queryKey: ['submissions', debouncedSearch, selectedStatus, selectedCategory, page, myVerificationsOnly],
     queryFn: () => SubmissionService.getAll({
       search: debouncedSearch || undefined,
       status: selectedStatus !== 'Semua' ? selectedStatus : undefined,
       category: selectedCategory || undefined,
       page,
       limit: PAGE_SIZE,
+      my_verifications: myVerificationsOnly || undefined,
     }),
     placeholderData: (prev) => prev,
   });
@@ -114,9 +120,13 @@ export default function SubmissionListPage() {
       {/* ─── HEADER ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="text-left">
-          <h1 className="text-2xl font-bold text-[#111D13] leading-none">Daftar Pengajuan</h1>
+          <h1 className="text-2xl font-bold text-[#111D13] leading-none">
+            {myVerificationsOnly ? 'Verifikasi Saya' : 'Daftar Pengajuan'}
+          </h1>
           <p className="text-xs text-slate-500 mt-2">
-            Pantau dan kelola berkas pengajuan Site Plan melalui sistem penelusuran terpadu.
+            {myVerificationsOnly
+              ? 'Daftar berkas pengajuan yang sedang atau telah Anda kunci untuk diverifikasi.'
+              : 'Pantau dan kelola berkas pengajuan Site Plan melalui sistem penelusuran terpadu.'}
           </p>
         </div>
         {(activeRole === 'Pemohon' || activeRole === 'Super Admin') && (
@@ -251,7 +261,27 @@ export default function SubmissionListPage() {
                     </td>
                     <td className="px-6 py-4 text-left">
                       <div className="font-bold text-slate-800 text-xs leading-tight mb-1">{sub.housingName}</div>
-                      <div className="text-[10px] text-slate-400 font-medium">{sub.developerName}</div>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] text-slate-400 font-medium">{sub.developerName}</span>
+                        {(() => {
+                          // Badge kunci hanya ditampilkan untuk verifikator (Admin & Tim Teknis)
+                          if (!['ADMIN', 'TIM_TEKNIS'].includes(user?.role ?? '')) return null;
+                          const lockId = user?.role === 'TIM_TEKNIS' ? sub.teknisiLockId : sub.adminLockId;
+                          const lockName = user?.role === 'TIM_TEKNIS' ? sub.teknisiLockName : sub.adminLockName;
+                          if (!lockId) return null;
+                          return (
+                            <span className={cn(
+                              "inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] font-semibold border leading-none rounded-none",
+                              lockId === user?.id
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            )}>
+                              <Lock className="h-2 w-2 shrink-0" />
+                              {lockId === user?.id ? "Saya Kunci" : `Kunci: ${lockName}`}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-slate-600 font-medium">
                       {sub.landArea ? `${sub.landArea.toLocaleString('id-ID')} m²` : '-'}

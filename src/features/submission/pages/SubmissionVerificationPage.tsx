@@ -358,12 +358,31 @@ export default function SubmissionVerificationPage() {
 
   // REVISI: Gerbang Masuk Halaman Menggunakan Permission-Based Access Control (PBAC) [Pylance & SoD Enforcer]
   const isAuthorizedVerifier = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL);
+  const isLockedByMe = sub.teknisiLockId === userProfile?.id || (!!userProfile?.full_name && sub.teknisiLockName === userProfile.full_name);
+
   if (!isAuthorizedVerifier || sub.status !== 'Verifikasi Teknis') {
     return (
       <div className="p-8 text-left bg-white border border-slate-300 max-w-md mx-auto mt-12 rounded-none space-y-4">
         <ShieldCheck className="h-8 w-8 text-amber-600" />
         <h4 className="font-bold text-slate-900 uppercase tracking-wide">Akses Terbatas</h4>
         <p className="text-xs text-slate-500 leading-relaxed">Halaman verifikasi teknis hanya dapat diakses oleh pejabat berwenang ketika berkas berada pada tahapan Verifikasi Teknis.</p>
+        <button onClick={() => navigate(`/pengajuan/detail/${sub.id}`)} className="text-xs font-bold text-slate-900 underline hover:text-slate-700 bg-transparent border-none cursor-pointer p-0">
+          Kembali ke Detail Permohonan
+        </button>
+      </div>
+    );
+  }
+
+  if (!sub.teknisiLockId || !isLockedByMe) {
+    return (
+      <div className="p-8 text-left bg-white border border-slate-300 max-w-md mx-auto mt-12 rounded-none space-y-4">
+        <AlertTriangle className="h-8 w-8 text-rose-600" />
+        <h4 className="font-bold text-slate-900 uppercase tracking-wide">Berkas Terkunci</h4>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          {!sub.teknisiLockId
+            ? "Berkas ini belum dikunci. Silakan kembali ke halaman detail permohonan untuk mengunci berkas terlebih dahulu."
+            : `Berkas ini sedang diperiksa dan dikunci oleh ${sub.teknisiLockName}.`}
+        </p>
         <button onClick={() => navigate(`/pengajuan/detail/${sub.id}`)} className="text-xs font-bold text-slate-900 underline hover:text-slate-700 bg-transparent border-none cursor-pointer p-0">
           Kembali ke Detail Permohonan
         </button>

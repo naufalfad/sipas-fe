@@ -122,127 +122,145 @@ export function useSipasMapData(localZoom: number) {
   // ─── DYNAMIC LOAD EFFECTS ───
   useEffect(() => {
     if (activeLayers.includes('layer-river') && localZoom >= 10 && !sungaiData) {
-      import('@/assets/geojson/bogor/SUNGAI_LN_25K.json')
-        .then((m) => setSungaiData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/SUNGAI_LN_25K.json')
+        .then((res) => res.json())
+        .then((data) => setSungaiData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, sungaiData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-kontur') && localZoom >= 10 && !konturData) {
-      import('@/assets/geojson/bogor/KONTUR_LN_25K.json')
-        .then((m) => setKonturData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/KONTUR_LN_25K.json')
+        .then((res) => res.json())
+        .then((data) => setKonturData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, konturData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-aqi') && localZoom >= 10 && !pemukimanData) {
-      import('@/assets/geojson/bogor/PEMUKIMAN_AR_25K.json')
-        .then((m) => setPemukimanData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/PEMUKIMAN_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setPemukimanData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, pemukimanData]);
 
   useEffect(() => {
     if (localZoom >= 14 && !bangunanData) {
-      import('@/assets/geojson/bogor/BANGUNAN_AR_25K.json')
-        .then((m) => setBangunanData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/BANGUNAN_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setBangunanData(data)).catch(console.error);
     }
   }, [localZoom, bangunanData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-sawah') && localZoom >= 10 && !sawahData) {
-      import('@/assets/geojson/bogor/AGRISAWAH_AR_25K.json')
-        .then((m) => setSawahData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/AGRISAWAH_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setSawahData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, sawahData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-pasir') && localZoom >= 10 && !pasirData) {
-      import('@/assets/geojson/kab bogor/PASIR_AR_25K.json')
-        .then((m) => setPasirData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/PASIR_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setPasirData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, pasirData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-kebun') && localZoom >= 10 && !kebunData) {
-      import('@/assets/geojson/bogor/AGRIKEBUN_AR_25K.json')
-        .then((m) => setKebunData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/AGRIKEBUN_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setKebunData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, kebunData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-ladang') && localZoom >= 10 && !ladangData) {
-      import('@/assets/geojson/bogor/AGRILADANG_AR_25K.json')
-        .then((m) => setLadangData(m.default)).catch(console.error);
+      fetch('/geojson/bogor/AGRILADANG_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setLadangData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, ladangData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-administrasi') && localZoom >= 8 && !administrasiData) {
-      import('@/assets/geojson/kab bogor/ADMINISTRASI_LN_25K.json')
-        .then((m) => setAdministrasiData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/ADMINISTRASI_LN_25K.json')
+        .then((res) => res.json())
+        .then((data) => setAdministrasiData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, administrasiData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-desa') && localZoom >= 10 && !desaData) {
-      import('@/assets/geojson/kab bogor/ADMINISTRASIDESA_AR_25K.json')
-        .then((m) => setDesaData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/ADMINISTRASIDESA_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setDesaData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, desaData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-danau') && localZoom >= 8 && !danauData) {
-      import('@/assets/geojson/kab bogor/DANAU_AR_25K.json')
-        .then((m) => setDanauData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/DANAU_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setDanauData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, danauData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-jalan') && localZoom >= 10 && !jalanData) {
-      import('@/assets/geojson/kab bogor/JALAN_LN_25K.json')
-        .then((m) => setJalanData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/JALAN_LN_25K.json')
+        .then((res) => res.json())
+        .then((data) => setJalanData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, jalanData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-tanamcampur') && localZoom >= 10 && !tanamCampurData) {
-      import('@/assets/geojson/kab bogor/AGRITANAMCAMPUR_AR_25K.json')
-        .then((m) => setTanamCampurData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/AGRITANAMCAMPUR_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setTanamCampurData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, tanamCampurData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-hutankering') && localZoom >= 10 && !hutanKeringData) {
-      import('@/assets/geojson/kab bogor/NONAGRIHUTANKERING_AR_25K.json')
-        .then((m) => setHutanKeringData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/NONAGRIHUTANKERING_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setHutanKeringData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, hutanKeringData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-alang') && localZoom >= 10 && !alangData) {
-      import('@/assets/geojson/kab bogor/NONAGRIALANG_AR_25K.json')
-        .then((m) => setAlangData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/NONAGRIALANG_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setAlangData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, alangData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-semak') && localZoom >= 10 && !semakData) {
-      import('@/assets/geojson/kab bogor/NONAGRISEMAKBELUKAR_AR_25K.json')
-        .then((m) => setSemakData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/NONAGRISEMAKBELUKAR_AR_25K.json')
+        .then((res) => res.json())
+        .then((data) => setSemakData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, semakData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-punggungbukit') && localZoom >= 10 && !punggungBukitData) {
-      import('@/assets/geojson/kab bogor/PUNGGUNGBUKIT_LN_25K.json')
-        .then((m) => setPunggungBukitData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/PUNGGUNGBUKIT_LN_25K.json')
+        .then((res) => res.json())
+        .then((data) => setPunggungBukitData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, punggungBukitData]);
 
   useEffect(() => {
     if (activeLayers.includes('layer-relka') && localZoom >= 8 && !relkaData) {
-      import('@/assets/geojson/kab bogor/RELKA_LN_25K.json')
-        .then((m) => setRelkaData(m.default)).catch(console.error);
+      fetch('/geojson/kab bogor/RELKA_LN_25K.json')
+        .then((res) => res.json())
+        .then((data) => setRelkaData(data)).catch(console.error);
     }
   }, [activeLayers, localZoom, relkaData]);
 

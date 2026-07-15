@@ -18,7 +18,7 @@ import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import { useGisUIStore, type LahanKompensasi } from '@/app/store/useGisUIStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import { API_BASE_URL } from '@/config';
-import type { SubmissionStatus, Submission } from '../types';
+import type { Submission } from '../types';
 import {
   ArrowLeft, Clock, CheckCircle2, Download,
   XCircle, CheckCircle, FileSignature, AlertTriangle, Loader2,
@@ -67,15 +67,11 @@ export default function SubmissionDetailPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const { activeRole: uiActiveRole, userProfile: uiUserProfile } = useUIStore();
+  const { activeRole: uiActiveRole } = useUIStore();
   const { user, hasPermission } = useAuthStore();
 
   const effectiveRole = user ? (normalizeRole(user.role) as string) : uiActiveRole;
   const activeRole = effectiveRole;
-  const userProfile = user ? {
-    name: user.full_name || user.username,
-    email: user.email,
-  } : uiUserProfile;
 
   // Zustand State Binding
   const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
@@ -133,6 +129,35 @@ export default function SubmissionDetailPage() {
   }, [sub]);
 
 
+
+  // Mutation untuk Kunci Berkas (Claim Lock)
+  const claimMutation = useMutation({
+    mutationFn: async () => {
+      return SubmissionService.claimSubmission(id || '');
+    },
+    onSuccess: async (res) => {
+      await queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true });
+      toast.success(res.message || 'Berkas berhasil dikunci untuk verifikasi Anda.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Gagal mengunci berkas.');
+    }
+  });
+
+  // Mutation untuk Lepas Kunci Berkas (Unclaim Lock)
+  const unclaimMutation = useMutation({
+    mutationFn: async () => {
+      return SubmissionService.unclaimSubmission(id || '');
+    },
+    onSuccess: async (res) => {
+      await queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true });
+      toast.success(res.message || 'Kunci berkas berhasil dilepaskan.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Gagal melepaskan kunci berkas.');
+    }
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-[50vh] flex flex-col justify-center items-center space-y-4">
@@ -169,6 +194,9 @@ export default function SubmissionDetailPage() {
   const showKadisPanel = isKadisActive && subData.status === 'Menunggu Persetujuan';
 
   const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && subData.status === 'Verifikasi Teknis';
+  const isLockedByMe = subData.adminLockId === user?.id || (!!user?.full_name && subData.adminLockName === user.full_name);
+  const isTeknisiLockedByMe = subData.teknisiLockId === user?.id || (!!user?.full_name && subData.teknisiLockName === user.full_name);
+
 
 
   // ─── SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ───
@@ -399,9 +427,7 @@ export default function SubmissionDetailPage() {
             )}
             {activeTab === 'foto' && <PhotosTab sub={subData} />}
             {activeTab === 'silsilah' && <SilsilahTab sub={subData} />}
-            {activeTab === 'audit' && (
-              <AuditTrailViewer submissionId={subData.id} />
-            )}
+            {activeTab === 'audit' && <AuditTrailViewer submissionId={subData.id} />}
           </div>
 
 
@@ -528,13 +554,56 @@ export default function SubmissionDetailPage() {
               </p>
             </div>
 
-            <Link
-              to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
-              className="w-full py-2.5 bg-primary hover:opacity-90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              <span>Mulai Verifikasi Administrasi</span>
-            </Link>
+            {!subData.adminLockId ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                  <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Berkas Belum Dikunci</p>
+                    <p className="mt-1 text-slate-600">
+                      Anda harus mengunci berkas ini terlebih dahulu sebelum dapat mengisi checklist verifikasi persyaratan formal. Mengunci berkas mencegah admin lain memverifikasi berkas yang sama secara bersamaan.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={claimMutation.isPending}
+                  onClick={() => claimMutation.mutate()}
+                  className="w-full py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-primary transition-colors cursor-pointer shadow-md"
+                >
+                  {claimMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  <span>Kunci &amp; Mulai Verifikasi Administrasi</span>
+                </button>
+              </div>
+            ) : !isLockedByMe ? (
+              <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Berkas Sedang Terkunci</p>
+                  <p className="mt-1 text-slate-600">
+                    Berkas ini sedang diperiksa dan dikunci oleh <span className="font-bold text-slate-800">{subData.adminLockName}</span>. Anda tidak dapat melakukan verifikasi administrasi untuk berkas ini kecuali kunci dilepaskan.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={unclaimMutation.isPending}
+                  onClick={() => unclaimMutation.mutate()}
+                  className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
+                >
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
+                </button>
+                <Link
+                  to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
+                  className="flex-1 py-2.5 bg-primary hover:opacity-90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Mulai Verifikasi Administrasi</span>
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
@@ -556,13 +625,56 @@ export default function SubmissionDetailPage() {
               </p>
             </div>
 
-            <Link
-              to={`/pengajuan/verifikasi/${subData.id}`}
-              className="w-full py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              <span>Mulai Verifikasi Teknis</span>
-            </Link>
+            {!subData.teknisiLockId ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                  <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Berkas Belum Dikunci</p>
+                    <p className="mt-1 text-slate-600">
+                      Anda harus mengunci berkas ini terlebih dahulu sebelum dapat melakukan verifikasi teknis. Mengunci berkas mencegah tim teknis lain memverifikasi berkas yang sama secara bersamaan.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={claimMutation.isPending}
+                  onClick={() => claimMutation.mutate()}
+                  className="w-full py-2.5 bg-[#415D43] hover:bg-[#415D43]/95 text-white font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-[#415D43] transition-colors cursor-pointer shadow-md"
+                >
+                  {claimMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  <span>Kunci &amp; Mulai Verifikasi Teknis</span>
+                </button>
+              </div>
+            ) : !isTeknisiLockedByMe ? (
+              <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Berkas Sedang Terkunci</p>
+                  <p className="mt-1 text-slate-600">
+                    Berkas ini sedang diperiksa dan dikunci oleh <span className="font-bold text-slate-800">{subData.teknisiLockName}</span>. Anda tidak dapat melakukan verifikasi teknis untuk berkas ini kecuali kunci dilepaskan.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={unclaimMutation.isPending}
+                  onClick={() => unclaimMutation.mutate()}
+                  className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
+                >
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
+                </button>
+                <Link
+                  to={`/pengajuan/verifikasi/${subData.id}`}
+                  className="flex-1 py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Mulai Verifikasi Teknis</span>
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
