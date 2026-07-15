@@ -57,7 +57,13 @@ const menuItems: MenuItem[] = [
         title: 'Daftar Pengajuan',
         path: '/pengajuan/daftar',
         icon: ClipboardList,
-        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
+        roles: ['Pemohon', 'Kepala Bidang', 'Kadis'],
+      },
+      {
+        title: 'Verifikasi Saya',
+        path: '/pengajuan/verifikasi-saya',
+        icon: ClipboardList,
+        roles: ['Admin SIPAS', 'Tim Teknis'],
       },
       {
         title: 'Pengajuan Baru',

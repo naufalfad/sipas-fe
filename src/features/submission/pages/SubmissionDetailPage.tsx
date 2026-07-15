@@ -192,8 +192,33 @@ export default function SubmissionDetailPage() {
       });
       toast.success('Penyimpanan verifikasi administrasi berhasil diselesaikan!');
     },
+  });
+
+  // Mutation untuk Kunci Berkas (Claim Lock)
+  const claimMutation = useMutation({
+    mutationFn: async () => {
+      return SubmissionService.claimSubmission(id || '');
+    },
+    onSuccess: async (res) => {
+      await queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true });
+      toast.success(res.message || 'Berkas berhasil dikunci untuk verifikasi Anda.');
+    },
     onError: (error: Error) => {
-      toast.error(`Gagal memproses transaksi: ${error.message}`);
+      toast.error(error.message || 'Gagal mengunci berkas.');
+    }
+  });
+
+  // Mutation untuk Lepas Kunci Berkas (Unclaim Lock)
+  const unclaimMutation = useMutation({
+    mutationFn: async () => {
+      return SubmissionService.unclaimSubmission(id || '');
+    },
+    onSuccess: async (res) => {
+      await queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true });
+      toast.success(res.message || 'Kunci berkas berhasil dilepaskan.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Gagal melepaskan kunci berkas.');
     }
   });
 
@@ -234,6 +259,8 @@ export default function SubmissionDetailPage() {
 
   const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && subData.status === 'Verifikasi Teknis';
   const allAdminChecked = Object.values(adminChecks).every(Boolean);
+  const isLockedByMe = subData.adminLockId === user?.id || (!!user?.full_name && subData.adminLockName === user.full_name);
+  const isTeknisiLockedByMe = subData.teknisiLockId === user?.id || (!!user?.full_name && subData.teknisiLockName === user.full_name);
 
   // ─── HANDLER: ACTIONS ADMINISTRATOR ───
   const handleAdminAction = (approved: boolean) => {
@@ -556,116 +583,161 @@ export default function SubmissionDetailPage() {
                 <span className="px-2 py-0.5 bg-secondary text-primary font-bold text-[9px] uppercase border border-border">ADMINISTRATOR</span>
               </div>
 
-              <div className="space-y-2.5">
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.ktp}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">
-                    {subData.applicant?.type === 'BADAN_USAHA'
-                      ? "Nomor Induk Berusaha (NIB) Badan Usaha"
-                      : "Kartu Tanda Penduduk (KTP) Pemohon"
-                    }
-                  </span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.sertifikat}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, sertifikat: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Dokumen Hak Milik Lahan / Sertifikat BPN</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.npwp}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">NPWP Wajib Pajak Pemohon</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.kkpr}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, kkpr: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Terlampir</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.technical}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, technical: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Gambar Rencana Teknis CAD / PSU</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.support2}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, support2: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Kajian Andalalin / Persetujuan Teknis Lingkungan</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.ska}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, ska: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">Sertifikat Keahlian (SKA) Arsitek</span>
-                </label>
-                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminChecks.cad}
-                    onChange={(e) => setAdminChecks(prev => ({ ...prev, cad: e.target.checked }))}
-                    className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
-                  />
-                  <span className="text-xs font-semibold text-slate-700">File Peta Koordinat CAD (.dwg/.dxf)</span>
-                </label>
-              </div>
+              {!subData.adminLockId ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                    <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Berkas Belum Dikunci</p>
+                      <p className="mt-1 text-slate-600">
+                        Anda harus mengunci berkas ini terlebih dahulu sebelum dapat mengisi checklist verifikasi persyaratan formal. Mengunci berkas mencegah admin lain memverifikasi berkas yang sama secara bersamaan.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={claimMutation.isPending}
+                    onClick={() => claimMutation.mutate()}
+                    className="w-full py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-primary transition-colors cursor-pointer shadow-md"
+                  >
+                    {claimMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                    <span>Kunci &amp; Mulai Verifikasi</span>
+                  </button>
+                </div>
+              ) : !isLockedByMe ? (
+                <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                  <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Berkas Sedang Terkunci</p>
+                    <p className="mt-1 text-slate-600">
+                      Berkas ini sedang diperiksa dan dikunci oleh <span className="font-bold text-slate-800">{subData.adminLockName}</span>. Anda tidak dapat melakukan verifikasi administrasi untuk berkas ini kecuali kunci dilepaskan.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2.5">
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.ktp}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, ktp: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">
+                        {subData.applicant?.type === 'BADAN_USAHA'
+                          ? "Nomor Induk Berusaha (NIB) Badan Usaha"
+                          : "Kartu Tanda Penduduk (KTP) Pemohon"
+                        }
+                      </span>
+                    </label>
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.sertifikat}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, sertifikat: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">Dokumen Hak Milik Lahan / Sertifikat BPN</span>
+                    </label>
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.npwp}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, npwp: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">NPWP Wajib Pajak Pemohon</span>
+                    </label>
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.kkpr}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, kkpr: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">Dokumen Kesesuaian Kegiatan Pemanfaatan Ruang (KKPR) Terlampir</span>
+                    </label>
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.technical}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, technical: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">Gambar Rencana Teknis CAD / PSU</span>
+                    </label>
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.support2}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, support2: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">Kajian Andalalin / Persetujuan Teknis Lingkungan</span>
+                    </label>
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.ska}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, ska: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">Sertifikat Keahlian (SKA) Arsitek</span>
+                    </label>
+                    <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={adminChecks.cad}
+                        onChange={(e) => setAdminChecks(prev => ({ ...prev, cad: e.target.checked }))}
+                        className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">File Peta Koordinat CAD (.dwg/.dxf)</span>
+                    </label>
+                  </div>
 
-              <div className="space-y-1.5">
-                <label className={labelClass}>Catatan Tambahan Administrasi</label>
-                <textarea
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Berikan catatan perbaikan draf kelayakan jika berkas dikembalikan ke pemohon..."
-                  className={inputClass}
-                />
-              </div>
+                  <div className="space-y-1.5">
+                    <label className={labelClass}>Catatan Tambahan Administrasi</label>
+                    <textarea
+                      rows={3}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Berikan catatan perbaikan draf kelayakan jika berkas dikembalikan ke pemohon..."
+                      className={inputClass}
+                    />
+                  </div>
 
-              <div className="pt-2 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  disabled={mutation.isPending}
-                  onClick={() => handleAdminAction(false)}
-                  className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all rounded-none cursor-pointer"
-                >
-                  Tolak Berkas
-                </button>
-                <button
-                  type="button"
-                  disabled={mutation.isPending || !allAdminChecked}
-                  onClick={() => handleAdminAction(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white text-xs font-bold transition-all rounded-none cursor-pointer"
-                >
-                  {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Setujui & Teruskan ke Teknis
-                </button>
-              </div>
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100 mt-4">
+                    <button
+                      type="button"
+                      disabled={unclaimMutation.isPending}
+                      onClick={() => unclaimMutation.mutate()}
+                      className="px-3 py-2 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-[11px] font-semibold transition-all rounded-none cursor-pointer border border-border bg-white"
+                    >
+                      {unclaimMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1 inline" /> : "🔓 Batal Verifikasi (Lepas Kunci)"}
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={mutation.isPending}
+                        onClick={() => handleAdminAction(false)}
+                        className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all rounded-none cursor-pointer"
+                      >
+                        Tolak Berkas
+                      </button>
+                      <button
+                        type="button"
+                        disabled={mutation.isPending || !allAdminChecked}
+                        onClick={() => handleAdminAction(true)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/95 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white text-xs font-bold transition-all rounded-none cursor-pointer"
+                      >
+                        {mutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Setujui & Teruskan ke Teknis
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -791,13 +863,56 @@ export default function SubmissionDetailPage() {
               </p>
             </div>
 
-            <Link
-              to={`/pengajuan/verifikasi/${subData.id}`}
-              className="w-full py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              <span>Mulai Verifikasi Teknis</span>
-            </Link>
+            {!subData.teknisiLockId ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                  <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Berkas Belum Dikunci</p>
+                    <p className="mt-1 text-slate-600">
+                      Anda harus mengunci berkas ini terlebih dahulu sebelum dapat melakukan verifikasi teknis. Mengunci berkas mencegah tim teknis lain memverifikasi berkas yang sama secara bersamaan.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={claimMutation.isPending}
+                  onClick={() => claimMutation.mutate()}
+                  className="w-full py-2.5 bg-[#415D43] hover:bg-[#415D43]/95 text-white font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-[#415D43] transition-colors cursor-pointer shadow-md"
+                >
+                  {claimMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  <span>Kunci &amp; Mulai Verifikasi Teknis</span>
+                </button>
+              </div>
+            ) : !isTeknisiLockedByMe ? (
+              <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Berkas Sedang Terkunci</p>
+                  <p className="mt-1 text-slate-600">
+                    Berkas ini sedang diperiksa dan dikunci oleh <span className="font-bold text-slate-800">{subData.teknisiLockName}</span>. Anda tidak dapat melakukan verifikasi teknis untuk berkas ini kecuali kunci dilepaskan.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={unclaimMutation.isPending}
+                  onClick={() => unclaimMutation.mutate()}
+                  className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
+                >
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
+                </button>
+                <Link
+                  to={`/pengajuan/verifikasi/${subData.id}`}
+                  className="flex-1 py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Mulai Verifikasi Teknis</span>
+                </Link>
+              </div>
+            )}
           </div>
         )}
 

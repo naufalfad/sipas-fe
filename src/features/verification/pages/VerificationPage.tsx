@@ -7,7 +7,10 @@ import {
   ShieldCheck, FileText, Map, AlertTriangle, Eye
 } from 'lucide-react';
 
+import { useAuthStore } from '@/app/store/useAuthStore';
+
 export default function VerificationPage() {
+  const { user } = useAuthStore();
   const { data: submissions = [] } = useQuery<Submission[]>({
     queryKey: ['submissions-all'],
     queryFn: SubmissionService.getAllList,
@@ -15,8 +18,8 @@ export default function VerificationPage() {
 
   // Ambil data antrean pengajuan yang saat ini berada dalam tahapan evaluasi/verifikasi dinas
   const verificationQueue = useMemo(() =>
-    submissions.filter((s) =>
-      [
+    submissions.filter((s) => {
+      const isStageMatch = [
         'Draft',
         'Pengajuan Dokumen',
         'Verifikasi Administrasi',
@@ -24,9 +27,16 @@ export default function VerificationPage() {
         'Menunggu Rekomendasi',
         'Menunggu Persetujuan',
         'Disetujui'
-      ].includes(s.status)
-    ),
-    [submissions]
+      ].includes(s.status);
+      if (!isStageMatch) return false;
+
+      // Filter penguncian berdasarkan peran verifikator agar tidak saling memblokir
+      if (user?.role === 'TIM_TEKNIS') {
+        return !s.teknisiLockId;
+      }
+      return !s.adminLockId;
+    }),
+    [submissions, user?.role]
   );
 
   // Resolusi warna status badge sesuai standardisasi sistem organik baru (Celadon & Amber Pastel)

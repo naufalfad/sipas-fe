@@ -265,7 +265,11 @@ export interface Submission {
   signedPdfUrl?: string;
   kabidSignature?: string;
   kadisSignature?: string;
-  skNumber?: string | null; // <-- SINKRONISASI KOMPILATOR TS FE
+  skNumber?: string | null;
+  adminLockId?: number | null;
+  adminLockName?: string | null;
+  teknisiLockId?: number | null;
+  teknisiLockName?: string | null;
 
   // Penambahan parameter hasil hitung sistem lama (Baku Backwards-compatibility)
   kdbPercent?: number;

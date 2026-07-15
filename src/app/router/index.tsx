@@ -88,6 +88,14 @@ export const router = createBrowserRouter([
             element: <SubmissionListPage />,
           },
           {
+            path: 'verifikasi-saya',
+            element: (
+              <ProtectedRoute allowedRoles={['Admin SIPAS', 'Tim Teknis', 'Super Admin']}>
+                <SubmissionListPage myVerificationsOnly={true} />
+              </ProtectedRoute>
+            ),
+          },
+          {
             path: 'penerimaan/:id',
             element: (
               <ProtectedRoute allowedRoles={['Pemohon', 'Super Admin']}>
