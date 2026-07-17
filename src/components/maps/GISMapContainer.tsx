@@ -10,9 +10,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, useMap, Polygon, GeoJSON } from 'react-leaflet';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe, Map } from 'lucide-react';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import * as turf from '@turf/turf';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -36,7 +35,7 @@ const BASEMAPS = {
         maxNativeZoom: 19,
     },
     'google-hybrid': {
-        name: 'Google Hybrid',
+        name: 'Bing',
         url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
         attribution: '&copy; Google Maps',
         maxNativeZoom: 20,
@@ -260,7 +259,7 @@ function MapControls({
                         type="button"
                         onClick={handleToggleBatas}
                         className={cn(
-                            "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer w-full",
+                            "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer",
                             isMaskActive ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                         )}
                         title="Batas Wilayah"
