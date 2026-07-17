@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * GEOSIPAS HTTP CONTROLLER — SubmissionDetailPage [SubmissionDetailPage.tsx] (REVISED v8.3)
+ * GEOSIPAS HTTP CONTROLLER ΓÇö SubmissionDetailPage [SubmissionDetailPage.tsx] (REVISED v8.3)
  * ============================================================================
  * Peran: Halaman detail berkas pengajuan bagi pemohon dan dinas.
  *        Mendukung peninjauan data administratif, rincian teknis 13-aspek,
@@ -201,7 +201,7 @@ export default function SubmissionDetailPage() {
   const isLockedByMe = subData.adminLockId === user?.id || (!!user?.full_name && subData.adminLockName === user.full_name);
   const isTeknisiLockedByMe = subData.teknisiLockId === user?.id || (!!user?.full_name && subData.teknisiLockName === user.full_name);
 
-  // ─── SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ───
+  // ΓöÇΓöÇΓöÇ SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ΓöÇΓöÇΓöÇ
   const renderTelaahStafSection = (data: Submission) => {
     const hasTechnicalResult = data.kkprVerdict || data.telaahStaf;
     if (!hasTechnicalResult) return null;
@@ -258,7 +258,7 @@ export default function SubmissionDetailPage() {
   return (
     <div className="space-y-6 font-sans text-slate-700">
 
-      {/* ─── SEKSI 1: HEADER SUMMARY BLOCK ─── */}
+      {/* ΓöÇΓöÇΓöÇ SEKSI 1: HEADER SUMMARY BLOCK ΓöÇΓöÇΓöÇ */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none border-b border-slate-200 pb-4">
         <div className="flex items-center gap-4 text-left">
           <button
@@ -342,7 +342,7 @@ export default function SubmissionDetailPage() {
                           rel="noreferrer"
                           className="inline-block text-[10px] font-bold text-teal-600 hover:underline mt-1"
                         >
-                          📥 Unduh Berkas Coretan Dinas
+                          ≡ƒôÑ Unduh Berkas Coretan Dinas
                         </a>
                       )}
                     </div>
@@ -377,7 +377,7 @@ export default function SubmissionDetailPage() {
         </div>
       )}
 
-      {/* ─── SEKSI 2: CORE WORKSPACE GRID ─── */}
+      {/* ΓöÇΓöÇΓöÇ SEKSI 2: CORE WORKSPACE GRID ΓöÇΓöÇΓöÇ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
         {/* KOLOM KIRI (8 col): DETAIL DATA TABULAR */}
@@ -527,7 +527,7 @@ export default function SubmissionDetailPage() {
                           </h5>
                           <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-1.5">
                             <span className="font-mono">{hist.date}</span>
-                            <span>•</span>
+                            <span>ΓÇó</span>
                             <span className="font-bold text-slate-500">{hist.actor}</span>
                           </div>
                           {hist.notes && (
@@ -608,7 +608,7 @@ export default function SubmissionDetailPage() {
                   onClick={() => unclaimMutation.mutate()}
                   className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
                 >
-                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "Lepas Kunci (Batal)"}
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "≡ƒöô Lepas Kunci (Batal)"}
                 </button>
                 <Link
                   to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
@@ -716,7 +716,7 @@ export default function SubmissionDetailPage() {
                       setActiveTab('inspeksi');
                       document.getElementById('root')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="w-full py-2.5 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-widest rounded-none flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm text-center"
+                    className="w-full py-2.5 bg-slate-100 border border-slate-350 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-widest rounded-none flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm text-center"
                   >
                     <Camera size={13} className="text-slate-500" />
                     <span>Ambil Foto Lapangan Tambahan</span>
