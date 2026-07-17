@@ -260,24 +260,26 @@ export default function GISMapContainer({
                     <button
                         type="button"
                         onClick={() => setIsFullscreen(false)}
-                        className="flex items-center gap-2 px-4 py-2 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer rounded-none outline-none"
+                        className="group flex items-center gap-2 text-slate-500 hover:text-rose-600 transition-all rounded-none outline-none border-none bg-transparent cursor-pointer"
                     >
-                        <Minimize2 size={15} />
-                        <span>Keluar Layar Penuh</span>
+                        <Minimize2 size={18} className="text-slate-500 group-hover:text-rose-600 transition-colors" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                            Keluar
+                        </span>
                     </button>
                 </header>
 
                 {/* 2. AREA WORKSPACE UTAMA DENGAN SIDEBAR KIRI */}
                 <div className="flex flex-1 relative overflow-hidden">
                     {/* SIDEBAR KIRI (Lebar 64px) TEMA BRIGHT COHESIVE */}
-                    <aside className="w-16 h-full flex flex-col items-center bg-white border-r border-slate-200 shrink-0 py-4 gap-4 z-[1000]">
+                    <aside className="w-16 h-full flex flex-col items-center bg-white border-r border-slate-200 shrink-0 z-[1000] py-0">
                         {/* Selector Basemap */}
-                        <div className="relative group w-full flex justify-center">
+                        <div className="relative group w-full flex justify-center h-16">
                             <button
                                 type="button"
                                 onClick={() => setIsLayerMenuOpen(!isLayerMenuOpen)}
                                 className={cn(
-                                    "w-12 h-12 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
+                                    "w-full h-full flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
                                     isLayerMenuOpen
                                         ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
                                         : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
@@ -285,7 +287,7 @@ export default function GISMapContainer({
                                 title="Pilih Base Map / Satelit"
                             >
                                 <Layers size={18} />
-                                <span className="text-[7.5px] font-black uppercase tracking-widest leading-none">
+                                <span className="text-[8px] font-black uppercase tracking-widest leading-none">
                                     Base Map
                                 </span>
                             </button>
@@ -318,29 +320,35 @@ export default function GISMapContainer({
                             )}
                         </div>
 
-                        <div className="w-8 h-px bg-slate-200" />
+                        <div className="w-full h-px bg-slate-150" />
 
-                        {/* Zoom In & Zoom Out Buttons di Sidebar */}
-                        <div className="flex flex-col bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                            <button
-                                type="button"
-                                onClick={() => setZoomInTrigger((t) => t + 1)}
-                                disabled={currentZoom >= 20}
-                                className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-white transition-colors border-b border-slate-100 cursor-pointer"
-                                title="Perbesar (Zoom In)"
-                            >
-                                <ZoomIn size={18} />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setZoomOutTrigger((t) => t + 1)}
-                                disabled={currentZoom <= 4}
-                                className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-white transition-colors cursor-pointer"
-                                title="Perkecil (Zoom Out)"
-                            >
-                                <ZoomOut size={18} />
-                            </button>
-                        </div>
+                        {/* Zoom In Button di Sidebar */}
+                        <button
+                            type="button"
+                            onClick={() => setZoomInTrigger((t) => t + 1)}
+                            disabled={currentZoom >= 20}
+                            className="w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-30 disabled:hover:bg-white cursor-pointer"
+                            title="Perbesar (Zoom In)"
+                        >
+                            <ZoomIn size={18} />
+                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                Zoom In
+                            </span>
+                        </button>
+
+                        {/* Zoom Out Button di Sidebar */}
+                        <button
+                            type="button"
+                            onClick={() => setZoomOutTrigger((t) => t + 1)}
+                            disabled={currentZoom <= 4}
+                            className="w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-30 disabled:hover:bg-white cursor-pointer"
+                            title="Perkecil (Zoom Out)"
+                        >
+                            <ZoomOut size={18} />
+                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                Zoom Out
+                            </span>
+                        </button>
                     </aside>
 
                     {/* KANVAS PETA UTAMA */}
