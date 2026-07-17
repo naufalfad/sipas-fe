@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * GIS MAP CONTAINER — Leaflet Wrapper
+ * GIS MAP CONTAINER — Leaflet Wrapper (Upgrade Premium Fullscreen & GIS Layout)
  * ============================================================================
  * Komponen pembungkus peta generik berbasis Leaflet.
  * Digunakan oleh form pengajuan dan komponen lain yang membutuhkan
@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check } from 'lucide-react';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import 'leaflet/dist/leaflet.css';
 
@@ -49,6 +49,64 @@ const BASEMAPS = {
     },
 };
 
+/**
+ * Listener internal untuk menjembatani event eksternal (dari sidebar)
+ * ke fungsi Leaflet (zoomIn, zoomOut, invalidateSize).
+ */
+interface ZoomListenerProps {
+    zoomInTrigger: number;
+    zoomOutTrigger: number;
+    onZoomChange: (zoom: number) => void;
+    isFullscreen: boolean;
+}
+
+function ZoomListener({
+    zoomInTrigger,
+    zoomOutTrigger,
+    onZoomChange,
+    isFullscreen,
+}: ZoomListenerProps) {
+    const map = useMap();
+
+    // Sinkronisasi status zoom ke state luar
+    useEffect(() => {
+        const onZoom = () => {
+            onZoomChange(map.getZoom());
+        };
+        map.on('zoomend', onZoom);
+        return () => {
+            map.off('zoomend', onZoom);
+        };
+    }, [map, onZoomChange]);
+
+    // Handle trigger zoom in
+    useEffect(() => {
+        if (zoomInTrigger > 0) {
+            map.zoomIn();
+        }
+    }, [zoomInTrigger, map]);
+
+    // Handle trigger zoom out
+    useEffect(() => {
+        if (zoomOutTrigger > 0) {
+            map.zoomOut();
+        }
+    }, [zoomOutTrigger, map]);
+
+    // Paksa Leaflet menghitung ulang ukuran kontainer saat status fullscreen berubah
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            map.invalidateSize();
+        }, 150);
+        return () => clearTimeout(timer);
+    }, [map, isFullscreen]);
+
+    return null;
+}
+
+/**
+ * Controls default overlay untuk tampilan normal/embedded
+ */
 interface MapControlsProps {
     isFullscreen: boolean;
     setIsFullscreen: (v: boolean) => void;
@@ -66,7 +124,6 @@ function MapControls({
     const [currentZoom, setCurrentZoom] = useState(map.getZoom());
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
 
-    // Sinkronisasi status zoom
     useEffect(() => {
         const onZoom = () => {
             setCurrentZoom(map.getZoom());
@@ -76,14 +133,6 @@ function MapControls({
             map.off('zoomend', onZoom);
         };
     }, [map]);
-
-    // Paksa Leaflet menghitung ulang ukuran kontainer saat status fullscreen berubah
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            map.invalidateSize();
-        }, 150);
-        return () => clearTimeout(timer);
-    }, [map, isFullscreen]);
 
     const handleZoomIn = () => {
         if (currentZoom < 20) {
@@ -132,7 +181,7 @@ function MapControls({
                     </button>
                 </div>
 
-                {/* Menu Pemilih Layer Citra Satelit */}
+                {/* Menu Pemilih Layer */}
                 <div className="relative">
                     <button
                         type="button"
@@ -183,17 +232,153 @@ export default function GISMapContainer({
 }: GISMapContainerProps) {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [activeBaseMap, setActiveBaseMap] = useState<keyof typeof BASEMAPS>('osm');
+    const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
 
+    // Zoom state untuk sidebar eksternal (saat fullscreen)
+    const [zoomInTrigger, setZoomInTrigger] = useState(0);
+    const [zoomOutTrigger, setZoomOutTrigger] = useState(0);
+    const [currentZoom, setCurrentZoom] = useState(zoom);
+
+    // Mode Fullscreen dengan struktur navbar & sidebar terintegrasi
+    if (isFullscreen) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-slate-50 w-screen h-screen flex flex-col font-sans select-none antialiased">
+                {/* 1. NAVBAR ATAS TEMA GIS VIEWERS */}
+                <header className="h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 shadow-sm shrink-0">
+                    <div className="flex items-center gap-3 text-left">
+                        <Globe size={22} className="text-teal-600 shrink-0" strokeWidth={2} />
+                        <div className="flex flex-col leading-none">
+                            <span className="font-sans font-semibold text-lg tracking-tight text-slate-800">
+                                Geo <span className="text-teal-600">SIPAS</span>
+                            </span>
+                            <span className="text-[8px] text-slate-400 font-bold tracking-[0.2em] uppercase mt-0.5">
+                                Visualisasi Spasial Lahan
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsFullscreen(false)}
+                        className="flex items-center gap-2 px-4 py-2 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer rounded-none outline-none"
+                    >
+                        <Minimize2 size={15} />
+                        <span>Keluar Layar Penuh</span>
+                    </button>
+                </header>
+
+                {/* 2. AREA WORKSPACE UTAMA DENGAN SIDEBAR KIRI */}
+                <div className="flex flex-1 relative overflow-hidden">
+                    {/* SIDEBAR KIRI (Lebar 64px) TEMA BRIGHT COHESIVE */}
+                    <aside className="w-16 h-full flex flex-col items-center bg-white border-r border-slate-200 shrink-0 py-4 gap-4 z-[1000]">
+                        {/* Selector Basemap */}
+                        <div className="relative group w-full flex justify-center">
+                            <button
+                                type="button"
+                                onClick={() => setIsLayerMenuOpen(!isLayerMenuOpen)}
+                                className={cn(
+                                    "w-12 h-12 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
+                                    isLayerMenuOpen
+                                        ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
+                                        : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                                )}
+                                title="Pilih Base Map / Satelit"
+                            >
+                                <Layers size={18} />
+                                <span className="text-[7.5px] font-black uppercase tracking-widest leading-none">
+                                    Base Map
+                                </span>
+                            </button>
+
+                            {isLayerMenuOpen && (
+                                <div className="absolute left-16 top-0 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 w-44 flex flex-col text-left z-[1010]">
+                                    {(Object.keys(BASEMAPS) as Array<keyof typeof BASEMAPS>).map((key) => {
+                                        const selected = activeBaseMap === key;
+                                        return (
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveBaseMap(key);
+                                                    setIsLayerMenuOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "px-3 py-2 text-xs flex items-center justify-between transition-colors focus:outline-none w-full text-left cursor-pointer",
+                                                    selected
+                                                        ? 'bg-emerald-50 text-emerald-700 font-bold'
+                                                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                                                )}
+                                            >
+                                                <span>{BASEMAPS[key].name}</span>
+                                                {selected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="w-8 h-px bg-slate-200" />
+
+                        {/* Zoom In & Zoom Out Buttons di Sidebar */}
+                        <div className="flex flex-col bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                            <button
+                                type="button"
+                                onClick={() => setZoomInTrigger((t) => t + 1)}
+                                disabled={currentZoom >= 20}
+                                className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-white transition-colors border-b border-slate-100 cursor-pointer"
+                                title="Perbesar (Zoom In)"
+                            >
+                                <ZoomIn size={18} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setZoomOutTrigger((t) => t + 1)}
+                                disabled={currentZoom <= 4}
+                                className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-white transition-colors cursor-pointer"
+                                title="Perkecil (Zoom Out)"
+                            >
+                                <ZoomOut size={18} />
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* KANVAS PETA UTAMA */}
+                    <div className="flex-1 h-full relative">
+                        <MapContainer
+                            center={center}
+                            zoom={zoom}
+                            minZoom={4}
+                            maxZoom={20}
+                            zoomControl={false}
+                            style={{ width: '100%', height: '100%' }}
+                            maxBounds={[[-15, 90], [15, 150]]}
+                            maxBoundsViscosity={1.0}
+                        >
+                            <TileLayer
+                                key={activeBaseMap}
+                                url={BASEMAPS[activeBaseMap].url}
+                                attribution={BASEMAPS[activeBaseMap].attribution}
+                                maxZoom={20}
+                                maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
+                            />
+                            <ZoomListener
+                                zoomInTrigger={zoomInTrigger}
+                                zoomOutTrigger={zoomOutTrigger}
+                                onZoomChange={setCurrentZoom}
+                                isFullscreen={isFullscreen}
+                            />
+                            {children}
+                        </MapContainer>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Tampilan default inline map
     return (
-        <div 
-            className={cn(
-                isFullscreen 
-                    ? 'fixed inset-0 z-[9999] bg-white w-screen h-screen' 
-                    : className,
-                'relative'
-            )}
-            style={isFullscreen ? { width: '100vw', height: '100vh' } : { width: '100%', height: '100%' }}
-        >
+        <div className={cn(className, 'relative')} style={{ width: '100%', height: '100%' }}>
             <MapContainer
                 center={center}
                 zoom={zoom}
@@ -211,9 +396,9 @@ export default function GISMapContainer({
                     maxZoom={20}
                     maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
                 />
-                <MapControls 
-                    isFullscreen={isFullscreen} 
-                    setIsFullscreen={setIsFullscreen} 
+                <MapControls
+                    isFullscreen={isFullscreen}
+                    setIsFullscreen={setIsFullscreen}
                     activeBaseMap={activeBaseMap}
                     setActiveBaseMap={setActiveBaseMap}
                 />
