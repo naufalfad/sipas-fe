@@ -9,8 +9,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, useMap, Polygon } from 'react-leaflet';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe } from 'lucide-react';
+import { MapContainer, TileLayer, useMap, Polygon, GeoJSON } from 'react-leaflet';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe, Map } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as turf from '@turf/turf';
 import L from 'leaflet';
@@ -214,6 +214,8 @@ interface MapControlsProps {
     setActiveBaseMap: (v: keyof typeof BASEMAPS) => void;
     isMaskActive: boolean;
     setIsMaskActive: (v: boolean) => void;
+    showDesaBorders: boolean;
+    setShowDesaBorders: (v: boolean) => void;
 }
 
 function MapControls({
@@ -223,6 +225,8 @@ function MapControls({
     setActiveBaseMap,
     isMaskActive,
     setIsMaskActive,
+    showDesaBorders,
+    setShowDesaBorders,
 }: MapControlsProps) {
     const map = useMap();
     const [currentZoom, setCurrentZoom] = useState(map.getZoom());
@@ -274,6 +278,19 @@ function MapControls({
                     title={isMaskActive ? 'Hilangkan Redup Wilayah' : 'Redupkan Luar Wilayah'}
                 >
                     <Globe className="w-4.5 h-4.5" />
+                </button>
+
+                {/* Tombol Batas Desa */}
+                <button
+                    type="button"
+                    onClick={() => setShowDesaBorders(!showDesaBorders)}
+                    className={cn(
+                        "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer",
+                        showDesaBorders ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    )}
+                    title={showDesaBorders ? 'Sembunyikan Batas Desa' : 'Tampilkan Batas Desa'}
+                >
+                    <Map className="w-4.5 h-4.5" />
                 </button>
 
                 {/* Tombol Zoom */}
@@ -351,6 +368,25 @@ export default function GISMapContainer({
     const [activeBaseMap, setActiveBaseMap] = useState<keyof typeof BASEMAPS>('osm');
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
     const [isMaskActive, setIsMaskActive] = useState(true);
+    const [showDesaBorders, setShowDesaBorders] = useState(false);
+    const [desaGeoJson, setDesaGeoJson] = useState<any>(null);
+
+    // Fetch batas desa secara dinamis saat diaktifkan
+    useEffect(() => {
+        if (showDesaBorders && !desaGeoJson) {
+            fetch('/geojson/kab%20bogor/ADMINISTRASIDESA_AR_25K.json')
+                .then((res) => {
+                    if (!res.ok) throw new Error('File not found');
+                    return res.json();
+                })
+                .then((data) => {
+                    setDesaGeoJson(data);
+                })
+                .catch((err) => {
+                    console.error('[GISMapContainer] Gagal memuat batas desa:', err);
+                });
+        }
+    }, [showDesaBorders, desaGeoJson]);
 
     // Zoom state untuk sidebar eksternal (saat fullscreen)
     const [zoomInTrigger, setZoomInTrigger] = useState(0);
@@ -445,6 +481,46 @@ export default function GISMapContainer({
 
                         <div className="w-full h-px bg-slate-150" />
 
+                        {/* Toggle Mask Wilayah */}
+                        <button
+                            type="button"
+                            onClick={() => setIsMaskActive(!isMaskActive)}
+                            className={cn(
+                                "w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
+                                isMaskActive
+                                    ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
+                                    : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                            )}
+                            title="Redupkan Wilayah Luar Kabupaten Bogor"
+                        >
+                            <Globe size={18} />
+                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                Fokus
+                            </span>
+                        </button>
+
+                        <div className="w-full h-px bg-slate-150" />
+
+                        {/* Toggle Batas Desa */}
+                        <button
+                            type="button"
+                            onClick={() => setShowDesaBorders(!showDesaBorders)}
+                            className={cn(
+                                "w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
+                                showDesaBorders
+                                    ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
+                                    : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                            )}
+                            title="Tampilkan Batas Desa Resmi Kabupaten Bogor"
+                        >
+                            <Map size={18} />
+                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                Batas Desa
+                            </span>
+                        </button>
+
+                        <div className="w-full h-px bg-slate-150" />
+
                         {/* Zoom In Button di Sidebar */}
                         <button
                             type="button"
@@ -514,6 +590,20 @@ export default function GISMapContainer({
                                         weight: 2,
                                         dashArray: '8, 8',
                                         fill: false,
+                                        interactive: false
+                                    }}
+                                />
+                            )}
+                            {/* Render Batas Desa Resmi Kabupaten Bogor */}
+                            {showDesaBorders && desaGeoJson && (
+                                <GeoJSON
+                                    data={desaGeoJson}
+                                    style={{
+                                        color: '#0d9488',
+                                        weight: 1.0,
+                                        dashArray: '3, 3',
+                                        fillColor: '#14b8a6',
+                                        fillOpacity: 0.05,
                                         interactive: false
                                     }}
                                 />
@@ -625,6 +715,20 @@ export default function GISMapContainer({
                             weight: 2,
                             dashArray: '8, 8',
                             fill: false,
+                            interactive: false
+                        }}
+                    />
+                )}
+                {/* Render Batas Desa Resmi Kabupaten Bogor */}
+                {showDesaBorders && desaGeoJson && (
+                    <GeoJSON
+                        data={desaGeoJson}
+                        style={{
+                            color: '#0d9488',
+                            weight: 1.0,
+                            dashArray: '3, 3',
+                            fillColor: '#14b8a6',
+                            fillOpacity: 0.05,
                             interactive: false
                         }}
                     />
