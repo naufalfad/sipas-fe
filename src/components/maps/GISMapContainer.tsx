@@ -13,6 +13,8 @@ import { MapContainer, TileLayer, useMap, Polygon, GeoJSON } from 'react-leaflet
 import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import L from 'leaflet';
+// @ts-ignore
+import * as turf from '@turf/turf';
 import 'leaflet/dist/leaflet.css';
 
 interface GISMapContainerProps {
@@ -358,7 +360,7 @@ export default function GISMapContainer({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [activeBaseMap, setActiveBaseMap] = useState<keyof typeof BASEMAPS>('osm');
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
-    const [isMaskActive, setIsMaskActive] = useState(true);
+    const [isMaskActive, setIsMaskActive] = useState(false);
     const [maskOpacity, setMaskOpacity] = useState(45); // Keredupan default 45%
     const [isBatasMenuOpen, setIsBatasMenuOpen] = useState(false);
     const [bogorGeoJson, setBogorGeoJson] = useState<any>(null);
@@ -629,7 +631,7 @@ export default function GISMapContainer({
                                 />
                             )}
                             {/* Garis Batas Administrasi Terluar Resmi dari GeoJSON */}
-                            {bogorOutlineGeoJson && (
+                            {isMaskActive && bogorOutlineGeoJson && (
                                 <GeoJSON
                                     data={bogorOutlineGeoJson}
                                     style={{
@@ -740,7 +742,7 @@ export default function GISMapContainer({
                     />
                 )}
                 {/* Garis Batas Administrasi Terluar Resmi dari GeoJSON */}
-                {bogorOutlineGeoJson && (
+                {isMaskActive && bogorOutlineGeoJson && (
                     <GeoJSON
                         data={bogorOutlineGeoJson}
                         style={{
