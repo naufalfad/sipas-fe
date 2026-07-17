@@ -197,7 +197,9 @@ export default function SubmissionDetailPage() {
   const showKabidPanel = isKabidActive && subData.status === 'Menunggu Rekomendasi';
   const showKadisPanel = isKadisActive && subData.status === 'Menunggu Persetujuan';
 
-  const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && subData.status === 'Verifikasi Teknis';
+  // Panel Tim Teknis: tampil selama berkas aktif (bukan terminal: Disetujui/Ditolak/Tidak Berlaku)
+  const terminalStatuses = ['Disetujui', 'Ditolak', 'Tidak Berlaku'];
+  const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && !terminalStatuses.includes(subData.status);
   const isLockedByMe = subData.adminLockId === user?.id || (!!user?.full_name && subData.adminLockName === user.full_name);
   const isTeknisiLockedByMe = subData.teknisiLockId === user?.id || (!!user?.full_name && subData.teknisiLockName === user.full_name);
 
@@ -385,7 +387,7 @@ export default function SubmissionDetailPage() {
 
           {/* Tab Navigation Menu */}
           <div className="flex border-b border-border overflow-x-auto select-none bg-slate-50 p-1 gap-1">
-            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit', ...((activeRole && activeRole !== 'Pemohon') ? ['dokumen-sidak'] : []), ...((activeRole && activeRole !== 'Pemohon' && activeRole !== 'Kepala Bidang' && activeRole !== 'Kepala Dinas') ? ['inspeksi'] : [])] as const).map((tab) => {
+            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit', ...(((activeRole && activeRole !== 'Pemohon') || hasPermission(AppPermission.CAN_VERIFY_TECHNICAL)) ? ['dokumen-sidak'] : []), ...(((activeRole && activeRole !== 'Pemohon' && activeRole !== 'Kepala Bidang' && activeRole !== 'Kepala Dinas') || hasPermission(AppPermission.CAN_VERIFY_TECHNICAL)) ? ['inspeksi'] : [])] as const).map((tab) => {
               const isActive = activeTab === tab;
               const labels: Record<string, string> = {
                 ringkasan: 'Ringkasan',
