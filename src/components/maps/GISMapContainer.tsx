@@ -24,21 +24,7 @@ interface GISMapContainerProps {
     className?: string;
 }
 
-// Batas wilayah administrasi Kabupaten Bogor (Simplified)
-const BOGOR_KAB_BOUNDARY: [number, number][] = [
-    [-6.3470, 106.5298], // Barat Laut (Tenjo)
-    [-6.3270, 106.7298], // Utara (Parung)
-    [-6.3470, 106.9298], // Timur Laut (Gunung Putri)
-    [-6.3870, 107.0298], // Timur Laut Jauh (Cileungsi)
-    [-6.4270, 107.1298], // Timur (Jonggol)
-    [-6.5670, 107.2598], // Tenggara (Cariu)
-    [-6.6870, 107.1598], // Selatan (Puncak/Cisarua)
-    [-6.7870, 106.9298], // Selatan-Barat (Halimun)
-    [-6.7270, 106.6298], // Barat Daya (Jasinga)
-    [-6.4870, 106.3598], // Barat Jauh (Cigudeg)
-    [-6.3770, 106.4298], // Cigudeg / Tenjo kembali
-    [-6.3470, 106.5298]  // Tutup
-];
+
 
 
 
@@ -204,8 +190,6 @@ interface MapControlsProps {
     setIsMaskActive: (v: boolean) => void;
     maskOpacity: number;
     setMaskOpacity: (v: number) => void;
-    showDesaBorders: boolean;
-    setShowDesaBorders: (v: boolean) => void;
 }
 
 function MapControls({
@@ -217,12 +201,11 @@ function MapControls({
     setIsMaskActive,
     maskOpacity,
     setMaskOpacity,
-    showDesaBorders,
-    setShowDesaBorders,
 }: MapControlsProps) {
     const map = useMap();
     const [currentZoom, setCurrentZoom] = useState(map.getZoom());
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
+    const [isBatasMenuOpen, setIsBatasMenuOpen] = useState(false);
 
     useEffect(() => {
         const onZoom = () => {
@@ -246,6 +229,18 @@ function MapControls({
         }
     };
 
+    const handleToggleBatas = () => {
+        const nextVal = !isBatasMenuOpen;
+        setIsBatasMenuOpen(nextVal);
+        setIsMaskActive(nextVal);
+        setIsLayerMenuOpen(false); // Saling menutup
+    };
+
+    const handleToggleBasemap = () => {
+        setIsLayerMenuOpen(!isLayerMenuOpen);
+        setIsBatasMenuOpen(false); // Saling menutup
+    };
+
     return (
         <div className="leaflet-top leaflet-right" style={{ zIndex: 1000, pointerEvents: 'auto' }}>
             <div className="leaflet-control flex flex-col gap-2 m-3 select-none">
@@ -259,20 +254,20 @@ function MapControls({
                     {isFullscreen ? <Minimize2 className="w-4.5 h-4.5 text-slate-600" /> : <Maximize2 className="w-4.5 h-4.5 text-slate-600" />}
                 </button>
 
-                {/* Tombol Mask / Fokus Wilayah */}
+                {/* Tombol Batas Wilayah (Redupkan Wilayah) */}
                 <div className="relative">
                     <button
                         type="button"
-                        onClick={() => setIsMaskActive(!isMaskActive)}
+                        onClick={handleToggleBatas}
                         className={cn(
                             "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer w-full",
                             isMaskActive ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                         )}
-                        title={isMaskActive ? 'Hilangkan Redup Wilayah' : 'Redupkan Luar Wilayah'}
+                        title="Batas Wilayah"
                     >
                         <Globe className="w-4.5 h-4.5" />
                     </button>
-                    {isMaskActive && (
+                    {isBatasMenuOpen && isMaskActive && (
                         <div className="absolute right-11 top-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 w-44 flex flex-col gap-1 z-[1010] text-left">
                             <div className="flex justify-between items-center text-[10px] select-none">
                                 <span className="font-bold text-slate-500 uppercase">Keredupan:</span>
@@ -289,19 +284,6 @@ function MapControls({
                         </div>
                     )}
                 </div>
-
-                {/* Tombol Batas Desa */}
-                <button
-                    type="button"
-                    onClick={() => setShowDesaBorders(!showDesaBorders)}
-                    className={cn(
-                        "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer",
-                        showDesaBorders ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    )}
-                    title={showDesaBorders ? 'Sembunyikan Batas Desa' : 'Tampilkan Batas Desa'}
-                >
-                    <Map className="w-4.5 h-4.5" />
-                </button>
 
                 {/* Tombol Zoom */}
                 <div className="flex flex-col bg-white border border-slate-200 rounded-lg shadow-md overflow-hidden">
@@ -329,7 +311,7 @@ function MapControls({
                 <div className="relative">
                     <button
                         type="button"
-                        onClick={() => setIsLayerMenuOpen(!isLayerMenuOpen)}
+                        onClick={handleToggleBasemap}
                         className="w-9 h-9 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-md flex items-center justify-center hover:bg-slate-50 transition-all focus:outline-none cursor-pointer"
                         title="Pilih Citra Satelit / Base Map"
                     >
@@ -379,23 +361,30 @@ export default function GISMapContainer({
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
     const [isMaskActive, setIsMaskActive] = useState(true);
     const [maskOpacity, setMaskOpacity] = useState(45); // Keredupan default 45%
-    const [showDesaBorders, setShowDesaBorders] = useState(false);
+    const [isBatasMenuOpen, setIsBatasMenuOpen] = useState(false);
     const [bogorGeoJson, setBogorGeoJson] = useState<any>(null);
+    const [bogorOutlineGeoJson, setBogorOutlineGeoJson] = useState<any>(null);
 
-    // Fetch batas administrasi desa resmi Kabupaten Bogor (simplified) saat mount
+    // Fetch batas administrasi resmi Kabupaten Bogor saat mount
     useEffect(() => {
         let active = true;
+        
+        // 1. Load Batas Kecamatan (Kecamatan)
         fetch('/geojson/kab%20bogor/KAB_BOGOR_KECAMATAN.json')
-            .then((res) => {
-                if (!res.ok) throw new Error('File outline not found');
-                return res.json();
-            })
+            .then((res) => res.json())
             .then((data) => {
                 if (active) setBogorGeoJson(data);
             })
-            .catch((err) => {
-                console.error('[GISMapContainer] Gagal memuat batas wilayah administrasi:', err);
-            });
+            .catch((err) => console.error('[GISMapContainer] Gagal memuat batas wilayah:', err));
+
+        // 2. Load Batas Garis Terluar Resmi Kabupaten Bogor
+        fetch('/geojson/kab%20bogor/KAB_BOGOR_OUTLINE.json')
+            .then((res) => res.json())
+            .then((data) => {
+                if (active) setBogorOutlineGeoJson(data);
+            })
+            .catch((err) => console.error('[GISMapContainer] Gagal memuat garis batas terluar:', err));
+
         return () => {
             active = false;
         };
@@ -445,6 +434,18 @@ export default function GISMapContainer({
     const [centerPoint, setCenterPoint] = useState<string>('-');
     const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
 
+    const handleToggleBasemapFs = () => {
+        setIsLayerMenuOpen(!isLayerMenuOpen);
+        setIsBatasMenuOpen(false);
+    };
+
+    const handleToggleBatasFs = () => {
+        const nextVal = !isBatasMenuOpen;
+        setIsBatasMenuOpen(nextVal);
+        setIsMaskActive(nextVal);
+        setIsLayerMenuOpen(false);
+    };
+
     // Mode Fullscreen dengan struktur navbar & sidebar terintegrasi
     if (isFullscreen) {
         return (
@@ -483,7 +484,7 @@ export default function GISMapContainer({
                         <div className="relative group w-full flex justify-center h-16">
                             <button
                                 type="button"
-                                onClick={() => setIsLayerMenuOpen(!isLayerMenuOpen)}
+                                onClick={handleToggleBasemapFs}
                                 className={cn(
                                     "w-full h-full flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
                                     isLayerMenuOpen
@@ -528,26 +529,26 @@ export default function GISMapContainer({
 
                         <div className="w-full h-px bg-slate-150" />
 
-                        {/* Toggle Mask Wilayah */}
+                        {/* Toggle Batas Wilayah (Mask Redup) */}
                         <div className="relative w-full flex justify-center h-16">
                             <button
                                 type="button"
-                                onClick={() => setIsMaskActive(!isMaskActive)}
+                                onClick={handleToggleBatasFs}
                                 className={cn(
                                     "w-full h-full flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
                                     isMaskActive
                                         ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
                                         : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
                                 )}
-                                title="Redupkan Wilayah Luar Kabupaten Bogor"
+                                title="Batas Wilayah"
                             >
                                 <Globe size={18} />
                                 <span className="text-[8px] font-black uppercase tracking-widest leading-none">
-                                    Fokus
+                                    Batas Wilayah
                                 </span>
                             </button>
 
-                            {isMaskActive && (
+                            {isBatasMenuOpen && isMaskActive && (
                                 <div className="absolute left-16 top-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 w-44 flex flex-col gap-1 z-[1010] text-left">
                                     <div className="flex justify-between items-center text-[10px] select-none">
                                         <span className="font-bold text-slate-500 uppercase">Keredupan:</span>
@@ -564,26 +565,6 @@ export default function GISMapContainer({
                                 </div>
                             )}
                         </div>
-
-                        <div className="w-full h-px bg-slate-150" />
-
-                        {/* Toggle Batas Desa */}
-                        <button
-                            type="button"
-                            onClick={() => setShowDesaBorders(!showDesaBorders)}
-                            className={cn(
-                                "w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
-                                showDesaBorders
-                                    ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
-                                    : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
-                            )}
-                            title="Tampilkan Batas Desa Resmi Kabupaten Bogor"
-                        >
-                            <Map size={18} />
-                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
-                                Batas Desa
-                            </span>
-                        </button>
 
                         <div className="w-full h-px bg-slate-150" />
 
@@ -648,27 +629,14 @@ export default function GISMapContainer({
                                     }}
                                 />
                             )}
-                            {/* Garis Batas Administrasi Terluar */}
-                            <Polygon
-                                positions={BOGOR_KAB_BOUNDARY}
-                                pathOptions={{
-                                    color: '#0f766e',
-                                    weight: 2,
-                                    dashArray: '8, 8',
-                                    fill: false,
-                                    interactive: false
-                                }}
-                            />
-                            {/* Render Batas Kecamatan/Desa Resmi Kabupaten Bogor dari GeoJSON */}
-                            {showDesaBorders && bogorGeoJson && (
+                            {/* Garis Batas Administrasi Terluar Resmi dari GeoJSON */}
+                            {bogorOutlineGeoJson && (
                                 <GeoJSON
-                                    data={bogorGeoJson}
+                                    data={bogorOutlineGeoJson}
                                     style={{
-                                        color: '#0d9488',
-                                        weight: 1.0,
-                                        dashArray: '3, 3',
-                                        fillColor: '#14b8a6',
-                                        fillOpacity: 0.05,
+                                        color: '#0f766e',
+                                        weight: 2,
+                                        fill: false,
                                         interactive: false
                                     }}
                                 />
@@ -772,27 +740,14 @@ export default function GISMapContainer({
                         }}
                     />
                 )}
-                {/* Garis Batas Administrasi Terluar */}
-                <Polygon
-                    positions={BOGOR_KAB_BOUNDARY}
-                    pathOptions={{
-                        color: '#0f766e',
-                        weight: 2,
-                        dashArray: '8, 8',
-                        fill: false,
-                        interactive: false
-                    }}
-                />
-                {/* Render Batas Kecamatan/Desa Resmi Kabupaten Bogor dari GeoJSON */}
-                {showDesaBorders && bogorGeoJson && (
+                {/* Garis Batas Administrasi Terluar Resmi dari GeoJSON */}
+                {bogorOutlineGeoJson && (
                     <GeoJSON
-                        data={bogorGeoJson}
+                        data={bogorOutlineGeoJson}
                         style={{
-                            color: '#0d9488',
-                            weight: 1.0,
-                            dashArray: '3, 3',
-                            fillColor: '#14b8a6',
-                            fillOpacity: 0.05,
+                            color: '#0f766e',
+                            weight: 2,
+                            fill: false,
                             interactive: false
                         }}
                     />
@@ -815,8 +770,6 @@ export default function GISMapContainer({
                     setIsMaskActive={setIsMaskActive}
                     maskOpacity={maskOpacity}
                     setMaskOpacity={setMaskOpacity}
-                    showDesaBorders={showDesaBorders}
-                    setShowDesaBorders={setShowDesaBorders}
                 />
                 {children}
             </MapContainer>
