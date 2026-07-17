@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Polygon } from 'react-leaflet';
 import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as turf from '@turf/turf';
@@ -23,6 +23,22 @@ interface GISMapContainerProps {
     children?: React.ReactNode;
     className?: string;
 }
+
+// Batas wilayah administrasi Kabupaten Bogor (Simplified)
+const BOGOR_KAB_BOUNDARY: [number, number][] = [
+    [-6.3470, 106.5298], // Barat Laut (Tenjo)
+    [-6.3270, 106.7298], // Utara (Parung)
+    [-6.3470, 106.9298], // Timur Laut (Gunung Putri)
+    [-6.3870, 107.0298], // Timur Laut Jauh (Cileungsi)
+    [-6.4270, 107.1298], // Timur (Jonggol)
+    [-6.5670, 107.2598], // Tenggara (Cariu)
+    [-6.6870, 107.1598], // Selatan (Puncak/Cisarua)
+    [-6.7870, 106.9298], // Selatan-Barat (Halimun)
+    [-6.7270, 106.6298], // Barat Daya (Jasinga)
+    [-6.4870, 106.3598], // Barat Jauh (Cigudeg)
+    [-6.3770, 106.4298], // Cigudeg / Tenjo kembali
+    [-6.3470, 106.5298]  // Tutup
+];
 
 const BASEMAPS = {
     osm: {
@@ -295,8 +311,8 @@ function MapControls({
 }
 
 export default function GISMapContainer({
-    center = [-6.595189, 106.816629],
-    zoom = 13,
+    center = [-6.4816, 106.8560], // Centroid Kabupaten Bogor (PEMDA Cibinong)
+    zoom = 14,
     children,
     className = 'w-full h-full rounded-xl shadow-inner border border-slate-200',
 }: GISMapContainerProps) {
@@ -445,6 +461,17 @@ export default function GISMapContainer({
                                 maxZoom={20}
                                 maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
                             />
+                            {/* Batas Administrasi Wilayah Kabupaten Bogor */}
+                            <Polygon
+                                positions={BOGOR_KAB_BOUNDARY}
+                                pathOptions={{
+                                    color: '#0f766e',
+                                    weight: 2,
+                                    dashArray: '8, 8',
+                                    fill: false,
+                                    interactive: false
+                                }}
+                            />
                             <MapSyncListener
                                 zoomInTrigger={zoomInTrigger}
                                 zoomOutTrigger={zoomOutTrigger}
@@ -530,6 +557,17 @@ export default function GISMapContainer({
                     attribution={BASEMAPS[activeBaseMap].attribution}
                     maxZoom={20}
                     maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
+                />
+                {/* Batas Administrasi Wilayah Kabupaten Bogor */}
+                <Polygon
+                    positions={BOGOR_KAB_BOUNDARY}
+                    pathOptions={{
+                        color: '#0f766e',
+                        weight: 2,
+                        dashArray: '8, 8',
+                        fill: false,
+                        interactive: false
+                    }}
                 />
                 <MapSyncListener
                     zoomInTrigger={zoomInTrigger}
