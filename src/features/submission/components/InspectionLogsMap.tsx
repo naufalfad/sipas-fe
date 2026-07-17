@@ -5,7 +5,8 @@
  */
 
 import { useEffect, useMemo, Fragment, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap, Polyline, CircleMarker, GeoJSON } from 'react-leaflet';
+import { Polygon, Marker, Popup, useMap, Polyline, CircleMarker, GeoJSON } from 'react-leaflet';
+import GISMapContainer from '@/components/maps/GISMapContainer';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { API_BASE_URL } from '@/config';
@@ -233,18 +234,11 @@ export function InspectionLogsMap({ polygon, logs, focusedCoords, onFocusReset, 
 
     return (
         <div className="w-full h-full relative" style={{ minHeight: '100%' }}>
-            <MapContainer
+            <GISMapContainer
                 center={defaultCenter}
                 zoom={14}
-                scrollWheelZoom={false}
                 className="w-full h-full"
-                zoomControl={true}
             >
-                {/* Peta Dasar Standard Light untuk kontras tinggi */}
-                <TileLayer
-                    attribution='&copy; <a href="https://carto.com/">CartoDB</a> contributors'
-                    url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
 
                 {/* 1. Render Poligon Batas Lahan Perumahan */}
                 {parsedPolygonCoords.length > 2 && (
@@ -362,7 +356,7 @@ export function InspectionLogsMap({ polygon, logs, focusedCoords, onFocusReset, 
                     focusedCoords={focusedCoords}
                     onFocusReset={onFocusReset}
                 />
-            </MapContainer>
+            </GISMapContainer>
         </div>
     );
 }
