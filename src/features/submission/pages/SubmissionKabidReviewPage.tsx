@@ -1,13 +1,14 @@
 /**
  * ============================================================================
- * GEOSIPAS PORTAL — Kabid Review & SK Generator Page [SubmissionKabidReviewPage.tsx] (REVISED v2)
+ * GEOSIPAS PORTAL — Kabid Review & SK Generator Page [SubmissionKabidReviewPage.tsx] (REVISED v3)
  * ============================================================================
  * Peran  : Halaman khusus Kepala Bidang (KABID_PUPR) untuk meninjau berkas PDF
- *          Telaah Staf teknis, membubuhkan paraf visual, merakit dictums, serta
- *          mengompilasi draf Surat Keputusan (SkDraft) ke database.
- * 
+ *          Telaah Staf teknis, membubuhkan paraf visual, dan menerbitkan keputusan
+ *          resmi berdasarkan 4 opsi keputusan yang masing-masing menghasilkan
+ *          produk hukum berbeda sesuai UU No. 30 Tahun 2014 tentang Administrasi Pemerintahan.
+ *
  * Desain : Split-screen layout (60% Preview Dokumen, 40% Panel Otoritas).
- *          Menjunjung tinggi prinsip High Cohesion & Segregation of Duties.
+ *          4-option radio selector menggantikan toggle mode diskresi.
  * ============================================================================
  */
 
@@ -19,8 +20,8 @@ import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import { API_BASE_URL } from '@/config';
 import {
-    ArrowLeft, Loader2, FileText, Info,
-    Reply, XCircle, FileSignature, AlertTriangle
+    ArrowLeft, Loader2, FileText,
+    CheckCircle2, XCircle, AlertTriangle, Reply, FileSignature, RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -28,7 +29,79 @@ import { SignatureCanvasPad } from '@/features/submission/components/SignatureCa
 
 // ─── STYLING CONSTANTS (SAGE THEME SHARP STYLE) ────────────────────────────────
 const inputClass = "w-full px-3.5 py-2 bg-white border border-border text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-sans text-xs rounded-none";
-const labelClass = "block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide text-left";
+const labelClass = "block text-[10px] font-black text-slate-500 mb-1.5 uppercase tracking-wider text-left";
+
+// ─── VERDICT OPTION CONFIG ────────────────────────────────────────────────────
+type VerdictKey = 'APPROVE' | 'BERSYARAT' | 'REVISI' | 'TOLAK';
+
+interface VerdictOption {
+    key: VerdictKey;
+    label: string;
+    sublabel: string;
+    produk: string;
+    alur: string;
+    colorClass: string;
+    borderClass: string;
+    bgClass: string;
+    icon: React.ReactNode;
+    requiresNotes: boolean;
+    requiresSignature: boolean;
+}
+
+const VERDICT_OPTIONS: VerdictOption[] = [
+    {
+        key: 'APPROVE',
+        label: 'Disetujui',
+        sublabel: 'Rencana tapak memenuhi seluruh parameter tata ruang RDTR',
+        produk: 'SK Pengesahan Site Plan',
+        alur: '→ Diteruskan ke Kadis untuk TTE → Berkas selesai & Disetujui',
+        colorClass: 'text-emerald-800',
+        borderClass: 'border-emerald-400',
+        bgClass: 'bg-emerald-50',
+        icon: <CheckCircle2 size={18} className="text-emerald-600" />,
+        requiresNotes: false,
+        requiresSignature: true,
+    },
+    {
+        key: 'BERSYARAT',
+        label: 'Disetujui Bersyarat',
+        sublabel: 'Memenuhi parameter utama, namun ada syarat teknis wajib dipenuhi pemohon',
+        produk: 'SK Persetujuan Bersyarat + Lampiran Catatan',
+        alur: '→ Diteruskan ke Kadis untuk TTE → Berkas selesai dengan kewajiban',
+        colorClass: 'text-amber-800',
+        borderClass: 'border-amber-400',
+        bgClass: 'bg-amber-50',
+        icon: <AlertTriangle size={18} className="text-amber-600" />,
+        requiresNotes: true,
+        requiresSignature: true,
+    },
+    {
+        key: 'REVISI',
+        label: 'Perlu Revisi',
+        sublabel: 'Berkas dikembalikan ke pemohon untuk diperbaiki tanpa menutup permohonan',
+        produk: 'Surat Pemberitahuan Revisi (bukan SK formal)',
+        alur: '→ Langsung dikembalikan ke Pemohon untuk revisi, tanpa TTE Kadis',
+        colorClass: 'text-orange-800',
+        borderClass: 'border-orange-300',
+        bgClass: 'bg-orange-50',
+        icon: <RotateCcw size={18} className="text-orange-600" />,
+        requiresNotes: true,
+        requiresSignature: false,
+    },
+    {
+        key: 'TOLAK',
+        label: 'Ditolak',
+        sublabel: 'Rencana tapak tidak memenuhi persyaratan. Berkas ditutup secara resmi',
+        produk: 'SK Penolakan (wajib formal — dasar hukum gugatan PTUN)',
+        alur: '→ Diteruskan ke Kadis untuk TTE → Berkas ditutup resmi',
+        colorClass: 'text-rose-800',
+        borderClass: 'border-rose-400',
+        bgClass: 'bg-rose-50',
+        icon: <XCircle size={18} className="text-rose-600" />,
+        requiresNotes: true,
+        requiresSignature: true,
+    },
+];
 
 export default function SubmissionKabidReviewPage() {
     const { id } = useParams<{ id: string }>();
@@ -41,43 +114,48 @@ export default function SubmissionKabidReviewPage() {
 
     // Form states
     const [notes, setNotes] = useState<string>('');
+    const [revertNotes, setRevertNotes] = useState<string>(''); // State terpisah untuk pengembalian ke Tim Teknis
     const [signature, setSignature] = useState<string>('');
     const [kabidAgreed, setKabidAgreed] = useState<boolean>(false);
+    const [selectedVerdict, setSelectedVerdict] = useState<VerdictKey | null>(null);
 
-    // Veto Override Form States (Fase 3 Diskresi Hukum Kabid)
-    const [isVetoModeActive, setIsVetoModeActive] = useState<boolean>(false);
-    const [vetoVerdict, setVetoVerdict] = useState<string>('Sesuai');
+    const selectedOption = VERDICT_OPTIONS.find((o) => o.key === selectedVerdict) ?? null;
 
-    // 1. Fetch data detail permohonan menggunakan react-query
+    // 1. Fetch data permohonan
     const { data: sub, isLoading } = useQuery({
         queryKey: ['submission', id],
         queryFn: () => SubmissionService.getById(id || ''),
         enabled: !!id,
     });
 
-    // Guard: Hanya peran Kepala Bidang atau Super Admin yang diizinkan memproses draf SK
+    // Guard: Hanya Kepala Bidang atau Super Admin
     const isAuthorized = effectiveRole === 'Kepala Bidang' || effectiveRole === 'Super Admin';
 
-    // 2. Mutation untuk mutasi status dan penyuntingan draf SK secara asinkron di BE
+    // 2. Mutation untuk mutasi status dan SK
     const mutation = useMutation({
         mutationFn: async ({
-            status,
             actionType,
-            kkprVerdictOverride
+            kkprVerdictOverride,
         }: {
-            status: 'Menunggu Persetujuan' | 'Verifikasi Teknis' | 'Ditolak';
-            actionType: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'OVERRIDE_VERDICT';
+            actionType: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'OVERRIDE_VERDICT' | 'REVERT_TO_PEMOHON';
             kkprVerdictOverride?: string;
         }) => {
             if (!id) throw new Error('ID Permohonan ilegal.');
 
+            const targetStatus =
+                actionType === 'REVERT_TO_PEMOHON'
+                    ? 'Ditolak'
+                    : actionType === 'REVERT_TO_TECHNICAL'
+                    ? 'Verifikasi Teknis'
+                    : 'Menunggu Persetujuan';
+
             return SubmissionService.updateStatus(
                 id,
-                status,
+                targetStatus as any,
                 `${userProfile?.full_name || userProfile?.username || 'Pimpinan Kabid'} (${activeRole})`,
-                notes.trim() || (actionType === 'APPROVE' ? 'Dokumen Telaah Staf disetujui Kabid.' : 'Catatan audit direkam.'),
+                notes.trim() || 'Keputusan diterbitkan oleh Kepala Bidang.',
                 undefined,
-                signature || undefined, // Base64 coretan tangan pimpinan
+                signature || undefined,
                 actionType,
                 kkprVerdictOverride
             );
@@ -87,8 +165,11 @@ export default function SubmissionKabidReviewPage() {
                 queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true }),
                 queryClient.invalidateQueries({ queryKey: ['submissions'] })
             ]);
-            toast.success('Mutasi keputusan dinas berhasil disahkan!', {
-                description: 'Draf SK berhasil diterbitkan dan diteruskan ke Kepala Dinas.',
+            toast.success('Keputusan Kabid berhasil diterbitkan!', {
+                description:
+                    selectedVerdict === 'REVISI'
+                        ? 'Surat Pemberitahuan Revisi dikirim ke Pemohon.'
+                        : 'Draf SK berhasil diteruskan ke meja Kepala Dinas.',
             });
             navigate(`/pengajuan/detail/${id}`);
         },
@@ -99,62 +180,47 @@ export default function SubmissionKabidReviewPage() {
 
     // ─── ACTION HANDLERS ─────────────────────────────────────────────────────
 
-    // REVISI COMPILATION: handleStandardEndorse tidak membutuhkan parameter biner approved
-    const handleStandardEndorse = () => {
+    const handlePublishDecision = () => {
+        if (!selectedVerdict || !selectedOption) {
+            toast.warning('Pilih jenis keputusan terlebih dahulu.');
+            return;
+        }
+        if (selectedOption.requiresNotes && !notes.trim()) {
+            toast.warning('Catatan/alasan keputusan wajib diisi.');
+            return;
+        }
+        if (selectedOption.requiresSignature && !signature) {
+            toast.warning('Paraf pimpinan wajib dibubuhkan pada kolom tanda paraf.');
+            return;
+        }
         if (!kabidAgreed) {
             toast.warning('Pernyataan konfirmasi peninjauan wajib dicentang.');
             return;
         }
-        if (!signature) {
-            toast.warning('Paraf pimpinan wajib dibubuhkan pada canvas drawer.');
-            return;
-        }
+
+        const actionMap: Record<VerdictKey, 'APPROVE' | 'REJECT' | 'OVERRIDE_VERDICT' | 'REVERT_TO_PEMOHON'> = {
+            APPROVE: 'APPROVE',
+            BERSYARAT: 'OVERRIDE_VERDICT',
+            REVISI: 'REVERT_TO_PEMOHON',
+            TOLAK: 'REJECT',
+        };
+
+        const kkprMap: Partial<Record<VerdictKey, string>> = {
+            BERSYARAT: 'Sesuai Bersyarat',
+        };
 
         mutation.mutate({
-            status: 'Menunggu Persetujuan',
-            actionType: 'APPROVE'
-        });
-    };
-
-    const handleVetoOverride = () => {
-        if (!notes.trim()) {
-            toast.warning('Justifikasi dan alasan diskresi wajib diisi sebagai dasar legalitas penyesuaian.');
-            return;
-        }
-        if (!signature) {
-            toast.warning('Paraf pimpinan wajib dibubuhkan untuk mengesahkan penyesuaian keputusan.');
-            return;
-        }
-
-        mutation.mutate({
-            status: 'Menunggu Persetujuan',
-            actionType: 'OVERRIDE_VERDICT',
-            kkprVerdictOverride: vetoVerdict
+            actionType: actionMap[selectedVerdict],
+            kkprVerdictOverride: kkprMap[selectedVerdict],
         });
     };
 
     const handleRevertToTechnical = () => {
-        if (!notes.trim()) {
+        if (!revertNotes.trim()) {
             toast.warning('Catatan perbaikan teknis wajib dilampirkan sebelum dikembalikan.');
             return;
         }
-
-        mutation.mutate({
-            status: 'Verifikasi Teknis',
-            actionType: 'REVERT_TO_TECHNICAL'
-        });
-    };
-
-    const handleReject = () => {
-        if (!notes.trim()) {
-            toast.warning('Alasan penolakan berkas wajib diisi.');
-            return;
-        }
-
-        mutation.mutate({
-            status: 'Ditolak',
-            actionType: 'REJECT'
-        });
+        mutation.mutate({ actionType: 'REVERT_TO_TECHNICAL' });
     };
 
     if (isLoading) {
@@ -180,7 +246,7 @@ export default function SubmissionKabidReviewPage() {
     }
 
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col font-sans text-slate-800 text-left select-none max-w-[1600px] mx-auto space-y-4">
+        <div className="space-y-6 font-sans text-slate-800 text-left select-none max-w-[1600px] mx-auto">
 
             {/* TOP ACTIONS BAR */}
             <div className="flex items-center justify-between border-b border-slate-200 pb-3 shrink-0">
@@ -194,8 +260,11 @@ export default function SubmissionKabidReviewPage() {
                     </button>
                     <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 mt-1">
                         <FileText size={16} className="text-primary" />
-                        PENINJAUAN TELAAH STAF & PENERBITAN DRAF SK
+                        PENINJAUAN TELAAH STAF & PENERBITAN KEPUTUSAN KABID
                     </h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                        Berkas No. <span className="font-bold text-slate-600">{sub.submissionNo}</span> — {sub.developerName}
+                    </p>
                 </div>
                 <div className="border border-amber-300 px-2.5 py-1 text-[9px] font-black bg-amber-50 text-amber-800 tracking-wider uppercase rounded-none">
                     STATUS: {sub.status.toUpperCase()}
@@ -203,16 +272,16 @@ export default function SubmissionKabidReviewPage() {
             </div>
 
             {/* SPLIT LAYOUT WORKSPACE */}
-            <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 items-stretch">
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
 
                 {/* SISI KIRI (60%): PENINJAU PDF DOKUMEN TELAAH STAF */}
-                <div className="lg:w-3/5 flex flex-col border border-slate-300 bg-slate-100 min-h-[400px]">
+                <div className="lg:w-3/5 flex flex-col border border-slate-300 bg-slate-100">
                     <div className="px-4 py-2.5 bg-slate-200 border-b border-slate-300 flex items-center justify-between shrink-0">
                         <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider">
-                            File Rekomendasi Teknis (Telaah_Staf_{sub.id}.pdf)
+                            Dokumen Rekomendasi Teknis (Telaah_Staf_{sub.id}.pdf)
                         </span>
                         <a
-                            href={`${API_BASE_URL}/docs/Telaah_Staf_{sub.id}.pdf`}
+                            href={`${API_BASE_URL}/docs/Telaah_Staf_${sub.id}.pdf`}
                             target="_blank"
                             rel="noreferrer"
                             className="text-[9px] font-black text-teal-700 hover:underline uppercase"
@@ -222,173 +291,188 @@ export default function SubmissionKabidReviewPage() {
                     </div>
                     <iframe
                         src={`${API_BASE_URL}/docs/Telaah_Staf_${sub.id}.pdf#toolbar=1`}
-                        className="w-full flex-1 border-none bg-slate-100"
+                        className="w-full border-none bg-slate-100"
+                        style={{ height: '80vh', minHeight: '600px' }}
                         title="Pratinjau Telaah Staf PDF"
                     />
                 </div>
 
-                {/* SISI KANAN (40%): PANEL OTORITAS VERIFIKATOR KABID */}
-                <div className="lg:w-2/5 flex flex-col bg-white border border-slate-300 p-5 overflow-y-auto custom-scrollbar shadow-inner justify-between space-y-6">
-                    <div className="space-y-5">
+                {/* SISI KANAN (40%): PANEL OTORITAS KEPUTUSAN KABID */}
+                <div className="lg:w-2/5 flex flex-col bg-white border border-slate-300 sticky top-4 self-start">
 
-                        {/* Title Section */}
-                        <div className="border-b border-slate-200 pb-3">
-                            <span className="text-[8px] font-black text-[#709775] uppercase tracking-widest block mb-0.5">Kabid Otoritas &amp; Diskresi</span>
-                            <h3 className="text-sm font-bold text-slate-900 uppercase">Otorisasi &amp; Penyesuaian Rekomendasi</h3>
-                        </div>
+                    {/* PANEL HEADER */}
+                    <div className="px-5 py-4 border-b border-slate-100">
+                        <span className="text-[8px] font-black text-primary uppercase tracking-widest block mb-0.5">Kepala Bidang — Hak Keputusan Substantif</span>
+                        <h3 className="text-sm font-bold text-slate-900">Pilih Keputusan & Produk Hukum</h3>
+                        <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                            Tinjau Telaah Staf dan pilih keputusan yang sesuai. Setiap keputusan menghasilkan produk hukum berbeda.
+                        </p>
+                    </div>
 
-                        {/* SOP Info Alert */}
-                        <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 flex items-start gap-2.5 text-xs">
-                            <Info size={16} className="text-teal-700 shrink-0 mt-0.5" />
-                            <p className="text-[10px] leading-relaxed text-justify">
-                                Sesuai Perbup Bogor No. 4 Tahun 2025, Kepala Bidang memegang hak otorisasi peninjauan teknis. Anda dapat langsung mengesahkan Telaah Staf untuk men-generate draf Surat Keputusan (SK) bagi Kepala Dinas, atau menggunakan wewenang **Diskresi Penyesuaian Rekomendasi** jika diperlukan.
-                            </p>
-                        </div>
+                    <div className="p-5 space-y-5 flex-1">
 
-                        {/* Hak Veto Toggle Switch */}
-                        <div className="flex justify-between items-center py-2 border-y border-slate-100 bg-slate-50/50 px-3">
-                            <div className="text-left">
-                                <span className="text-xs font-bold text-slate-800 block">Gunakan Wewenang Diskresi</span>
-                                <span className="text-[9px] text-slate-400 block mt-0.5">Sesuaikan rekomendasi Tim Teknis berdasarkan pertimbangan khusus</span>
+                        {/* ─── STEP 1: VERDICT RADIO SELECTOR ─── */}
+                        <div className="space-y-2">
+                            <span className={labelClass}>Langkah 1 — Pilih Jenis Keputusan</span>
+                            <div className="space-y-2">
+                                {VERDICT_OPTIONS.map((opt) => {
+                                    const isSelected = selectedVerdict === opt.key;
+                                    return (
+                                        <button
+                                            key={opt.key}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedVerdict(opt.key);
+                                                setSignature('');
+                                                setNotes('');
+                                                setKabidAgreed(false);
+                                            }}
+                                            className={cn(
+                                                'w-full text-left p-3 border-2 transition-all cursor-pointer rounded-none flex items-start gap-3',
+                                                isSelected ? `${opt.borderClass} ${opt.bgClass}` : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                                            )}
+                                        >
+                                            <div className="shrink-0 mt-0.5">{opt.icon}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className={cn('text-xs font-black uppercase tracking-wide', isSelected ? opt.colorClass : 'text-slate-700')}>
+                                                    {opt.label}
+                                                </div>
+                                                <div className="text-[9.5px] text-slate-500 mt-0.5 leading-normal">{opt.sublabel}</div>
+                                                <div className={cn(
+                                                    'text-[8.5px] font-black uppercase tracking-wider mt-1.5 truncate',
+                                                    isSelected ? opt.colorClass : 'text-slate-400'
+                                                )}>
+                                                    {opt.produk}
+                                                </div>
+                                                {isSelected && (
+                                                    <div className="text-[8.5px] text-slate-500 mt-0.5">{opt.alur}</div>
+                                                )}
+                                            </div>
+                                            <div className={cn(
+                                                'w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center',
+                                                isSelected ? `${opt.borderClass} bg-white` : 'border-slate-300'
+                                            )}>
+                                                {isSelected && <div className={cn('w-2 h-2 rounded-full', opt.bgClass.replace('bg-', 'bg-').replace('-50', '-500'))} />}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsVetoModeActive(!isVetoModeActive);
-                                    setSignature('');
-                                }}
-                                className={cn(
-                                    "relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-slate-500",
-                                    isVetoModeActive ? "bg-amber-500" : "bg-slate-200"
-                                )}
-                            >
-                                <span className={cn(
-                                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200",
-                                    isVetoModeActive ? "translate-x-5" : "translate-x-0"
-                                )} />
-                            </button>
                         </div>
 
-                        {/* VETO/OVERRIDE INTERFACE */}
-                        {isVetoModeActive ? (
-                            <div className="space-y-4 animate-in fade-in duration-300">
-                                <div className="space-y-1.5">
-                                    <label className={labelClass}>Penyesuaian Keputusan Akhir</label>
-                                    <select
-                                        value={vetoVerdict}
-                                        onChange={(e) => setVetoVerdict(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border border-slate-350 text-xs font-bold text-slate-800 rounded-none outline-none focus:border-slate-800"
-                                    >
-                                        <option value="Sesuai">Sesuai (Dapat Disetujui)</option>
-                                        <option value="Sesuai Bersyarat">Sesuai Bersyarat (Ketentuan Khusus)</option>
-                                    </select>
-                                </div>
+                        {/* ─── STEP 2: NOTES & SIGNATURE (Dynamic based on selection) ─── */}
+                        {selectedOption && (
+                            <div className="space-y-4 border-t border-slate-100 pt-4">
+                                <span className={labelClass}>Langkah 2 — Isi Detail Keputusan</span>
 
-                                <div className="space-y-1.5 text-left">
-                                    <label className={labelClass}>Justifikasi &amp; Alasan Diskresi</label>
+                                {/* NOTES FIELD */}
+                                <div className="space-y-1">
+                                    <label className={cn(labelClass, 'mb-0')}>
+                                        {selectedOption.key === 'APPROVE'
+                                            ? 'Catatan / Memo Kabid (Opsional)'
+                                            : selectedOption.key === 'BERSYARAT'
+                                            ? 'Syarat & Ketentuan Wajib (Wajib Diisi)'
+                                            : selectedOption.key === 'REVISI'
+                                            ? 'Alasan Revisi & Petunjuk Perbaikan (Wajib Diisi)'
+                                            : 'Alasan Penolakan (Wajib Diisi — Dasar Hukum PTUN)'}
+                                    </label>
                                     <textarea
                                         rows={3}
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        placeholder="Tuliskan pertimbangan atau alasan khusus mengapa rekomendasi disesuaikan..."
+                                        placeholder={
+                                            selectedOption.key === 'APPROVE'
+                                                ? 'Tulis pesan arahan untuk pimpinan dinas/Kadis (opsional)...'
+                                                : selectedOption.key === 'BERSYARAT'
+                                                ? 'Tuliskan secara detail kewajiban yang harus dipenuhi pemohon sebelum berkas dinyatakan selesai...'
+                                                : selectedOption.key === 'REVISI'
+                                                ? 'Tuliskan bagian mana yang harus direvisi pemohon dan apa yang kurang sesuai...'
+                                                : 'Tuliskan alasan penolakan secara jelas dan komprehensif karena akan tercantum dalam SK resmi...'
+                                        }
                                         className={inputClass}
-                                        required
+                                        required={selectedOption.requiresNotes}
                                     />
                                 </div>
 
-                                <SignatureCanvasPad
-                                    value={signature}
-                                    onChange={setSignature}
-                                    onClear={() => setSignature('')}
-                                    placeholder="Goreskan paraf otorisasi pimpinan"
-                                />
-
-                                <button
-                                    type="button"
-                                    disabled={mutation.isPending || !notes.trim() || !signature}
-                                    onClick={handleVetoOverride}
-                                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-widest rounded-none border-none transition-colors cursor-pointer disabled:opacity-50 shadow-md"
-                                >
-                                    Terapkan Penyesuaian Kabid
-                                </button>
-                            </div>
-                        ) : (
-                            /* STANDARD ENDORSEMENT INTERFACE */
-                            <div className="space-y-4 animate-in fade-in duration-300">
-                                <div className="space-y-1.5 text-left">
-                                    <label className={labelClass}>Catatan Tambahan / Memo Kabid</label>
-                                    <textarea
-                                        rows={2}
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                        placeholder="Tulis pesan arahan draf SK untuk pimpinan dinas/Kadis..."
-                                        className={inputClass}
+                                {/* SIGNATURE PAD — hanya untuk keputusan yang butuh TTE */}
+                                {selectedOption.requiresSignature && (
+                                    <SignatureCanvasPad
+                                        value={signature}
+                                        onChange={setSignature}
+                                        onClear={() => setSignature('')}
+                                        placeholder="Goreskan paraf otorisasi pimpinan Kabid"
                                     />
-                                </div>
+                                )}
 
-                                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                                {/* KONFIRMASI CHECKBOX */}
+                                <label className="flex items-start gap-2.5 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={kabidAgreed}
                                         onChange={(e) => setKabidAgreed(e.target.checked)}
-                                        className="mt-0.5 h-4.5 w-4.5 border-slate-300 rounded-none text-teal-600 focus:ring-teal-500"
+                                        className="mt-0.5 h-4 w-4 border-slate-300 rounded-none text-primary focus:ring-primary"
                                     />
                                     <span className="text-[10px] font-semibold text-slate-500 leading-normal text-justify">
-                                        Saya mengonfirmasi bahwa seluruh rincian metrik sandingan pada dokumen Telaah Staf telah diperiksa and layak diteruskan ke tahap draf Surat Keputusan (SK).
+                                        Saya mengonfirmasi telah meninjau dokumen Telaah Staf teknis secara seksama dan keputusan ini diambil berdasarkan pertimbangan hukum dan teknis yang sah.
                                     </span>
                                 </label>
 
-                                <SignatureCanvasPad
-                                    value={signature}
-                                    onChange={setSignature}
-                                    onClear={() => setSignature('')}
-                                    placeholder="Goreskan paraf ulasan pimpinan"
-                                />
-
-                                {/* Primary Confirm Action */}
+                                {/* MAIN ACTION BUTTON */}
                                 <button
                                     type="button"
-                                    disabled={mutation.isPending || !kabidAgreed || !signature}
-                                    onClick={handleStandardEndorse} // PERBAIKAN TS2554: Memanggil handler standard endorse murni tanpa argumen
-                                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer disabled:opacity-50 shadow-md"
+                                    disabled={mutation.isPending}
+                                    onClick={handlePublishDecision}
+                                    className={cn(
+                                        'w-full py-3 font-black text-xs uppercase tracking-widest rounded-none border-none flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50 shadow-md text-white',
+                                        selectedOption.key === 'APPROVE' ? 'bg-emerald-700 hover:bg-emerald-800' :
+                                        selectedOption.key === 'BERSYARAT' ? 'bg-amber-600 hover:bg-amber-700' :
+                                        selectedOption.key === 'REVISI' ? 'bg-orange-600 hover:bg-orange-700' :
+                                        'bg-rose-700 hover:bg-rose-800'
+                                    )}
                                 >
                                     {mutation.isPending ? (
                                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                     ) : (
-                                        <FileSignature className="h-3.5 w-3.5 text-teal-400" />
+                                        <FileSignature className="h-3.5 w-3.5" />
                                     )}
-                                    <span>Setujui &amp; Terbitkan Draf SK</span>
+                                    <span>
+                                        {selectedOption.key === 'APPROVE' ? 'Setujui & Terbitkan Draf SK' :
+                                         selectedOption.key === 'BERSYARAT' ? 'Terbitkan SK Bersyarat' :
+                                         selectedOption.key === 'REVISI' ? 'Kirim Surat Revisi ke Pemohon' :
+                                         'Terbitkan Rekomendasi SK Penolakan'}
+                                    </span>
                                 </button>
                             </div>
                         )}
                     </div>
 
-                    {/* INTERN REVERT & REJECT BOTTOM ROW (Only visible if veto isn't forced or for normal routing) */}
-                    <div className="border-t border-slate-100 pt-4 space-y-2.5 shrink-0 select-none">
-                        <div className="grid grid-cols-2 gap-2">
+                    {/* ─── SEPARATOR: INTERNAL ACTIONS ─── */}
+                    <div className="px-5 pb-5 pt-3 border-t border-slate-200 shrink-0">
+                        <span className={cn(labelClass, 'mb-2 block')}>Tindakan Internal</span>
+                        <div className="space-y-2">
+                            <div className="space-y-1">
+                                <label className={cn(labelClass, 'mb-1 text-[9px]')}>Catatan untuk Tim Teknis (Wajib)</label>
+                                <textarea
+                                    rows={2}
+                                    value={revertNotes}
+                                    onChange={(e) => setRevertNotes(e.target.value)}
+                                    placeholder="Tuliskan catatan spesifik perbaikan untuk Tim Teknis..."
+                                    className={cn(inputClass, 'text-[10px]')}
+                                />
+                            </div>
                             <button
                                 type="button"
                                 disabled={mutation.isPending}
                                 onClick={handleRevertToTechnical}
-                                className="py-1.5 border border-amber-300 bg-amber-50/50 hover:bg-amber-100 text-amber-800 font-bold text-[9px] uppercase tracking-wider rounded-none flex items-center justify-center gap-1 transition-all cursor-pointer outline-none"
-                                title="Kembalikan Berkas ke Tim Teknis secara Internal"
+                                className="w-full py-2 border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-[10px] uppercase tracking-wider rounded-none flex items-center justify-center gap-1.5 transition-all cursor-pointer outline-none"
                             >
-                                <Reply size={12} /> Revert ke Teknis
-                            </button>
-                            <button
-                                type="button"
-                                disabled={mutation.isPending}
-                                onClick={handleReject}
-                                className="py-1.5 border border-rose-300 bg-rose-50/50 hover:bg-rose-100 text-rose-700 font-bold text-[9px] uppercase tracking-wider rounded-none flex items-center justify-center gap-1 transition-all cursor-pointer outline-none"
-                                title="Tolak Berkas Pengajuan secara Mutlak (Kembalikan ke Developer)"
-                            >
-                                <XCircle size={12} /> Tolak Berkas
+                                <Reply size={12} />
+                                Kembalikan ke Tim Teknis (Internal)
                             </button>
                         </div>
                     </div>
 
                 </div>
-
             </div>
         </div>
     );

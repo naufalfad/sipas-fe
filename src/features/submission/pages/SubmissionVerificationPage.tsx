@@ -1,15 +1,13 @@
 // --- FILE: src/features/submission/pages/SubmissionVerificationPage.tsx ---
-/* STREAMING_CHUNK:Configuring imports and verification schemas */
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore, AppPermission } from '@/app/store/useAuthStore';
 import { SubmissionService } from '@/features/submission/services/submission.service';
 import type { SubmissionStatus } from '../types';
 import {
-  ArrowLeft, Loader2, UploadCloud,
-  FileSignature, AlertTriangle, ShieldCheck,
-  ChevronDown, Trash2, Info, FileText
+  ArrowLeft, Loader2, ShieldCheck, FileText, AlertTriangle, Ruler,
+  ChevronDown, Info, Trash2, UploadCloud, FileSignature, Calculator, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -30,9 +28,9 @@ const getDocCategoryLabel = (key?: string) => {
 };
 
 const labelClass = "block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider";
+const inputClass = "w-full px-3.5 py-2 bg-white border border-slate-300 placeholder:text-slate-400 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all font-sans text-xs rounded-none";
 
 export default function SubmissionVerificationPage() {
-  /* STREAMING_CHUNK:Initializing react state and queries */
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -41,11 +39,13 @@ export default function SubmissionVerificationPage() {
   const activeRole = userProfile?.role || '';
 
   const [kkprVerdict, setKkprVerdict] = useState<string>('Sesuai');
-  const [verifiedKdb, setVerifiedKdb] = useState<number | ''>('');
-  const [verifiedKlb, setVerifiedKlb] = useState<number | ''>('');
-  const [verifiedKdh, setVerifiedKdh] = useState<number | ''>('');
-  const [verifiedGsb, setVerifiedGsb] = useState<number | ''>('');
+
+  // ─── REVISED v10.3: STATE DIUBAH DARI PERSENTASE MENJADI LUASAN FISIK RIIL (m²) ───
+  const [verifiedLandArea, setVerifiedLandArea] = useState<number | ''>('');
+  const [verifiedBuildingArea, setVerifiedBuildingArea] = useState<number | ''>('');
+  const [verifiedTotalFloorArea, setVerifiedTotalFloorArea] = useState<number | ''>('');
   const [verifiedRthArea, setVerifiedRthArea] = useState<number | ''>('');
+  const [verifiedGsb, setVerifiedGsb] = useState<number | ''>('');
   const [notes, setNotes] = useState<string>('');
 
   const [checklistStates, setChecklistStates] = useState<Record<string, {
@@ -63,22 +63,26 @@ export default function SubmissionVerificationPage() {
     enabled: !!id,
   });
 
+  const { data: inspectionLogsRes } = useQuery({
+    queryKey: ['submission-logs', id],
+    queryFn: () => SubmissionService.getInspectionLogs(id || ''),
+    enabled: !!id,
+  });
+  const logsCount = inspectionLogsRes?.data?.length || 0;
+  const hasVerifiedLog = inspectionLogsRes?.data?.some((log: any) => log.isVerified) || false;
+
   // ─── FILTERED ASPECTS BY CATEGORY ───
   const filteredAspects = useMemo(() => {
     if (!sub) return VERIFICATION_ASPECTS;
     const category = sub.submissionDetails?.category || 'PERUMAHAN';
 
     return VERIFICATION_ASPECTS.filter((aspect) => {
-      // TPU (tech_cemetery) hanya berlaku untuk perumahan
       if (aspect.code === 'tech_cemetery' && category !== 'PERUMAHAN') {
         return false;
       }
-
-      // 1. Perumahan: tidak ada amdal (REQ_ENV_IMPACT)
       if (category === 'PERUMAHAN') {
         return aspect.code !== 'REQ_ENV_IMPACT';
       }
-      // 2. Fasum: adanya andalin (REQ_TRAFFIC), tidak ada amdal (REQ_ENV_IMPACT)
       if (category === 'FASUM') {
         return aspect.code !== 'REQ_ENV_IMPACT';
       }
@@ -86,26 +90,27 @@ export default function SubmissionVerificationPage() {
     });
   }, [sub]);
 
-  /* STREAMING_CHUNK:Syncing baseline parameters from database schema */
+  // Synchronize baseline parameters and fallbacks
   useEffect(() => {
     if (sub) {
       if (sub.kkprVerdict) setKkprVerdict(sub.kkprVerdict);
-      if (sub.verifiedKdb !== undefined && sub.verifiedKdb !== null) setVerifiedKdb(sub.verifiedKdb);
-      if (sub.verifiedKlb !== undefined && sub.verifiedKlb !== null) setVerifiedKlb(sub.verifiedKlb);
-      if (sub.verifiedKdh !== undefined && sub.verifiedKdh !== null) setVerifiedKdh(sub.verifiedKdh);
-      if (sub.verifiedGsb !== undefined && sub.verifiedGsb !== null) setVerifiedGsb(sub.verifiedGsb);
-      if (sub.verifiedRthArea !== undefined && sub.verifiedRthArea !== null) setVerifiedRthArea(sub.verifiedRthArea);
+
+      // Sinkronisasi data fisik absolut terverifikasi dari DB ke state lokal
+      setVerifiedLandArea(sub.verifiedLandArea ?? sub.landArea ?? '');
+      setVerifiedBuildingArea(sub.verifiedBuildingArea ?? sub.applicantBuildingArea ?? '');
+      setVerifiedTotalFloorArea(sub.verifiedTotalFloorArea ?? sub.technical?.totalFloorArea ?? '');
+      setVerifiedRthArea(sub.verifiedRthArea ?? sub.applicantRthArea ?? '');
+      setVerifiedGsb(sub.verifiedGsb ?? sub.applicantGsb ?? '');
 
       if (sub.evaluationChecklist && sub.evaluationChecklist.length > 0) {
-        const mappedStates: typeof checklistStates = {};
+        const mappedStates: Record<string, any> = {};
         sub.evaluationChecklist.forEach((item) => {
           mappedStates[item.aspekCode] = {
-            status: item.statusKelayakan as any,
+            status: item.statusKelayakan,
             catatan: item.catatanVerifikator || '',
             attachmentUrl: item.attachmentUrl
           };
         });
-        // Map compensations if not explicitly in evaluationChecklist yet
         if (sub.compensations) {
           sub.compensations.forEach((comp: any) => {
             if (!mappedStates[comp.id]) {
@@ -119,7 +124,7 @@ export default function SubmissionVerificationPage() {
         }
         setChecklistStates(mappedStates);
       } else {
-        const defaultStates: typeof checklistStates = {};
+        const defaultStates: Record<string, any> = {};
         filteredAspects.forEach((aspect) => {
           defaultStates[aspect.code] = {
             status: 'Sesuai',
@@ -139,16 +144,127 @@ export default function SubmissionVerificationPage() {
     }
   }, [sub, filteredAspects]);
 
-  const checklistStatesMapped = useMemo(() => {
-    const output: Record<string, {
-      aspekLabel: string;
-      statusKelayakan: 'Sesuai' | 'Sesuai Bersyarat' | 'Tidak Sesuai';
-      catatanVerifikator: string;
-      attachmentUrl?: string;
-      verifiedById?: number;
-      verifiedAt?: string;
-    }> = {};
+  // ─── REVISI: CLIENT-SIDE REACTIVE CALCULATOR ENGINE (KDB, KLB, KDH %) ───
+  const computedKdb = useMemo(() => {
+    if (verifiedBuildingArea !== '' && verifiedLandArea) {
+      return (Number(verifiedBuildingArea) / Number(verifiedLandArea)) * 100;
+    }
+    return null;
+  }, [verifiedBuildingArea, verifiedLandArea]);
 
+  const computedKlb = useMemo(() => {
+    if (verifiedTotalFloorArea !== '' && verifiedLandArea) {
+      return Number(verifiedTotalFloorArea) / Number(verifiedLandArea);
+    }
+    return null;
+  }, [verifiedTotalFloorArea, verifiedLandArea]);
+
+  const computedKdh = useMemo(() => {
+    if (verifiedRthArea !== '' && verifiedLandArea) {
+      return (Number(verifiedRthArea) / Number(verifiedLandArea)) * 100;
+    }
+    return null;
+  }, [verifiedRthArea, verifiedLandArea]);
+
+  // ─── REVISI: PERHITUNGAN QUANTITATIVE GALAT SPASIAL (m² & %) ───
+  const proposedLandArea = sub?.landArea ?? 0;
+  const proposedBuildingArea = sub?.technical?.applicantBuildingArea ?? sub?.applicantBuildingArea ?? 0;
+  const proposedTotalFloorArea = sub?.technical?.totalFloorArea ?? 0;
+  const proposedRthArea = sub?.technical?.applicantRthArea ?? sub?.applicantRthArea ?? 0;
+
+  const landError = useMemo(() => {
+    if (verifiedLandArea !== '' && proposedLandArea > 0) {
+      const diff = Number(verifiedLandArea) - proposedLandArea;
+      const pct = (diff / proposedLandArea) * 100;
+      return { diff, pct };
+    }
+    return null;
+  }, [verifiedLandArea, proposedLandArea]);
+
+  const buildingError = useMemo(() => {
+    if (verifiedBuildingArea !== '' && proposedBuildingArea > 0) {
+      const diff = Number(verifiedBuildingArea) - proposedBuildingArea;
+      const pct = (diff / proposedBuildingArea) * 100;
+      return { diff, pct };
+    }
+    return null;
+  }, [verifiedBuildingArea, proposedBuildingArea]);
+
+  const floorError = useMemo(() => {
+    if (verifiedTotalFloorArea !== '' && proposedTotalFloorArea > 0) {
+      const diff = Number(verifiedTotalFloorArea) - proposedTotalFloorArea;
+      const pct = (diff / proposedTotalFloorArea) * 100;
+      return { diff, pct };
+    }
+    return null;
+  }, [verifiedTotalFloorArea, proposedTotalFloorArea]);
+
+  const rthError = useMemo(() => {
+    if (verifiedRthArea !== '' && proposedRthArea > 0) {
+      const diff = Number(verifiedRthArea) - proposedRthArea;
+      const pct = (diff / proposedRthArea) * 100;
+      return { diff, pct };
+    }
+    return null;
+  }, [verifiedRthArea, proposedRthArea]);
+
+  // Aturan Batas Pelanggaran Perda RDTR secara Live
+  const isKdbViolated = useMemo(() => {
+    const limit = sub?.bylawMaxKdb ?? 60;
+    if (computedKdb !== null) {
+      return computedKdb > limit;
+    }
+    return false;
+  }, [computedKdb, sub?.bylawMaxKdb]);
+
+  const isKlbViolated = useMemo(() => {
+    const limit = sub?.bylawMaxKlb ?? 3.5;
+    if (computedKlb !== null) {
+      return computedKlb > limit;
+    }
+    return false;
+  }, [computedKlb, sub?.bylawMaxKlb]);
+
+  const isKdhViolated = useMemo(() => {
+    const limit = sub?.bylawMinKdh ?? 10;
+    if (computedKdh !== null) {
+      return computedKdh < limit;
+    }
+    return false;
+  }, [computedKdh, sub?.bylawMinKdh]);
+
+  const isGsbViolated = useMemo(() => {
+    const limit = sub?.bylawMinGsb ?? 5;
+    if (verifiedGsb !== '') {
+      return Number(verifiedGsb) < limit;
+    }
+    return false;
+  }, [verifiedGsb, sub?.bylawMinGsb]);
+
+  const dynamicMinRth = useMemo(() => {
+    const minKdhPercent = sub?.bylawMinKdh ?? 10;
+    const currentLandArea = verifiedLandArea !== '' ? Number(verifiedLandArea) : (sub?.landArea ?? 0);
+    return (minKdhPercent / 100) * currentLandArea;
+  }, [sub?.bylawMinKdh, sub?.landArea, verifiedLandArea]);
+
+  const isRthViolated = useMemo(() => {
+    if (verifiedRthArea !== '') {
+      return Number(verifiedRthArea) < dynamicMinRth;
+    }
+    return false;
+  }, [verifiedRthArea, dynamicMinRth]);
+
+  const centerCoord = useMemo<[number, number] | undefined>(() => {
+    if (sub?.coordinate?.polygon && sub.coordinate.polygon.length > 0) {
+      const pts = sub.coordinate.polygon;
+      const sum = pts.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1]], [0, 0]);
+      return [sum[0] / pts.length, sum[1] / pts.length];
+    }
+    return undefined;
+  }, [sub]);
+
+  const checklistStatesMapped = useMemo(() => {
+    const output: Record<string, any> = {};
     filteredAspects.forEach((aspect) => {
       const state = checklistStates[aspect.code] || { status: 'Sesuai', catatan: '' };
       output[aspect.code] = {
@@ -174,7 +290,6 @@ export default function SubmissionVerificationPage() {
         };
       });
     }
-
     return output;
   }, [checklistStates, userProfile, filteredAspects, sub]);
 
@@ -193,21 +308,6 @@ export default function SubmissionVerificationPage() {
     return list;
   }, [filteredAspects, sub]);
 
-  const centerCoord = useMemo<[number, number]>(() => {
-    if (sub?.location?.lat !== undefined && sub?.location?.lng !== undefined) {
-      return [sub.location.lat, sub.location.lng];
-    }
-    return [-6.595189, 106.816629]; // Cibinong default
-  }, [sub]);
-
-  const kkpr_verdict_final = useMemo(() => kkprVerdict, [kkprVerdict]);
-  const verified_kdb_final = useMemo(() => (verifiedKdb === '' ? undefined : verifiedKdb), [verifiedKdb]);
-  const verified_klb_final = useMemo(() => (verifiedKlb === '' ? undefined : verifiedKlb), [verifiedKlb]);
-  const verified_kdh_final = useMemo(() => (verifiedKdh === '' ? undefined : verifiedKdh), [verifiedKdh]);
-  const verified_gsb_final = useMemo(() => (verifiedGsb === '' ? undefined : verifiedGsb), [verifiedGsb]);
-  const verified_rth_area_final = useMemo(() => (verifiedRthArea === '' ? undefined : verifiedRthArea), [verifiedRthArea]);
-
-  /* STREAMING_CHUNK:Configuring status transition and save mutations */
   const mutation = useMutation({
     mutationFn: async ({
       status,
@@ -228,6 +328,7 @@ export default function SubmissionVerificationPage() {
         verifiedAt: item.verifiedAt
       }));
 
+      // Kirim data luasan fisik absolut (m²) langsung ke BE
       return SubmissionService.updateStatus(
         sub?.id || '',
         status,
@@ -236,12 +337,12 @@ export default function SubmissionVerificationPage() {
         undefined,
         undefined,
         actionTypeOverride,
-        kkpr_verdict_final,
-        verified_kdb_final,
-        verified_klb_final,
-        verified_kdh_final,
-        verified_gsb_final,
-        verified_rth_area_final,
+        kkprVerdict,
+        verifiedLandArea === '' ? undefined : Number(verifiedLandArea),
+        verifiedBuildingArea === '' ? undefined : Number(verifiedBuildingArea),
+        verifiedTotalFloorArea === '' ? undefined : Number(verifiedTotalFloorArea),
+        verifiedRthArea === '' ? undefined : Number(verifiedRthArea),
+        verifiedGsb === '' ? undefined : Number(verifiedGsb),
         checklistItemsPayload
       );
     },
@@ -251,11 +352,10 @@ export default function SubmissionVerificationPage() {
         queryClient.invalidateQueries({ queryKey: ['submissions'] })
       ]);
       toast.success('Penyimpanan matriks berhasil! Membuka halaman draf Telaah Staf.');
-      // Dialihkan langsung ke halaman pratinjau Telaah Staf
       navigate(`/pengajuan/verifikasi/${id}/preview-telaah`);
     },
     onError: (error: Error) => {
-      toast.error(`Gagal memproses draf draf dokumen telaah: ${error.message}`);
+      toast.error(`Gagal memproses draf dokumen telaah: ${error.message}`);
     }
   });
 
@@ -273,7 +373,6 @@ export default function SubmissionVerificationPage() {
     }));
   };
 
-  /* STREAMING_CHUNK:Handling physical attachment uploads for technical checklist */
   const handleAspectAttachmentUpload = async (code: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -310,12 +409,16 @@ export default function SubmissionVerificationPage() {
   };
 
   const handleCreateStaffAnalysisDraft = () => {
+    if (logsCount === 0) {
+      toast.error('Gagal memproses draf dokumen telaah!', {
+        description: 'Anda wajib mengunggah setidaknya 1 bukti kunjungan lapangan (Log Inspeksi) sebelum dapat mengesahkan matriks verifikasi teknis.',
+      });
+      return;
+    }
     if (!notes.trim()) {
       toast.warning('Tolong isi Catatan Penilaian Global / Justifikasi terlebih dahulu.');
       return;
     }
-
-    // Mengunci status permohonan agar tetap di 'Verifikasi Teknis' untuk proses peninjauan final
     mutation.mutate({
       status: 'Verifikasi Teknis',
       notes: notes.trim(),
@@ -334,29 +437,17 @@ export default function SubmissionVerificationPage() {
     });
   };
 
-  if (isLoading) {
+  if (isLoading || !sub) {
     return (
-      <div className="min-h-[400px] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
-        <span className="text-slate-500 font-medium text-xs tracking-wider uppercase">Memuat Formulir Verifikasi Teknis...</span>
+      <div className="flex h-screen items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Memuat Berkas...</p>
+        </div>
       </div>
     );
   }
 
-  if (!sub) {
-    return (
-      <div className="p-8 text-left bg-white border border-slate-300 max-w-md mx-auto mt-12 rounded-none space-y-4">
-        <AlertTriangle className="h-8 w-8 text-rose-600" />
-        <h4 className="font-bold text-slate-900 uppercase tracking-wide">Permohonan Tidak Ditemukan</h4>
-        <p className="text-xs text-slate-500 leading-relaxed">Berkas pendaftaran dengan ID yang dicari tidak terdaftar dalam pangkalan data.</p>
-        <Link to="/pengajuan" className="inline-block text-xs font-bold text-slate-900 underline hover:text-slate-700">
-          Kembali ke Daftar Antrean
-        </Link>
-      </div>
-    );
-  }
-
-  // REVISI: Gerbang Masuk Halaman Menggunakan Permission-Based Access Control (PBAC) [Pylance & SoD Enforcer]
   const isAuthorizedVerifier = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL);
   const isLockedByMe = sub.teknisiLockId === userProfile?.id || (!!userProfile?.full_name && sub.teknisiLockName === userProfile.full_name);
 
@@ -396,7 +487,7 @@ export default function SubmissionVerificationPage() {
       <div className="border-b border-slate-300 pb-6 space-y-4">
         <button
           onClick={() => navigate(`/pengajuan/detail/${sub.id}`)}
-          className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors bg-transparent border-none cursor-pointer uppercase tracking-wider p-0"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors bg-transparent border-none cursor-pointer uppercase tracking-wider p-0"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Kembali ke Detail Permohonan
@@ -418,119 +509,297 @@ export default function SubmissionVerificationPage() {
         </div>
       </div>
 
-      {/* Sandingan Metrik Tapak - Full Width */}
+      {/* REVISED v10.3: DEDICATED RAW m² INPUT FIELDS WITH REAL-TIME DISCREPANCY (GALAT) PANEL */}
+      <div className="space-y-4 bg-white border border-slate-300 p-5 rounded-none text-left">
+        <div className="border-b border-slate-200 pb-2 flex items-center gap-2">
+          <Ruler className="h-4.5 w-4.5 text-slate-800 shrink-0" />
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 tracking-widest flex items-center gap-1.5 leading-none">
+              <span className="uppercase">Input Dimensi Fisik Riil Terverifikasi</span>
+              <span className="text-[11px] font-semibold text-slate-400 lowercase">(m² / meter)</span>
+            </h2>
+            <p className="text-[10px] text-slate-500 mt-0.5">Kunci luasan fisik riil hasil sidak spasial Anda. Perbandingan galat langsung dideklarasikan di bawah input.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Input: Luas Lahan */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold block leading-normal text-slate-500">
+              <span className="uppercase tracking-wider">Luas Lahan Terverifikasi</span>
+              <span className="block text-[9px] font-medium text-slate-400 lowercase mt-0.5">(m²)</span>
+            </span>
+            <input
+              type="number"
+              value={verifiedLandArea}
+              onChange={(e) => setVerifiedLandArea(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="Input m²"
+              className={inputClass}
+            />
+            {landError && (
+              <span className={cn(
+                "text-[9px] font-bold block leading-snug mt-1",
+                landError.diff >= 0 ? "text-emerald-700" : "text-rose-600"
+              )}>
+                Selisih: {landError.diff >= 0 ? '+' : ''}{landError.diff.toLocaleString('id-ID')} m² ({landError.pct >= 0 ? '+' : ''}{landError.pct.toFixed(1)}%)
+              </span>
+            )}
+          </div>
+
+          {/* Input: Luas Dasar Bangunan */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold block leading-normal text-slate-500">
+              <span className="uppercase tracking-wider">Luas Dasar Bangunan</span>
+              <span className="block text-[9px] font-medium text-slate-400 lowercase mt-0.5">(m²)</span>
+            </span>
+            <input
+              type="number"
+              value={verifiedBuildingArea}
+              onChange={(e) => setVerifiedBuildingArea(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="Input m²"
+              className={inputClass}
+            />
+            {buildingError && (
+              <span className={cn(
+                "text-[9px] font-bold block leading-snug mt-1",
+                buildingError.diff <= 0 ? "text-emerald-700" : "text-rose-600 animate-pulse"
+              )}>
+                Selisih: {buildingError.diff >= 0 ? '+' : ''}{buildingError.diff.toLocaleString('id-ID')} m² ({buildingError.pct >= 0 ? '+' : ''}{buildingError.pct.toFixed(1)}%)
+              </span>
+            )}
+          </div>
+
+          {/* Input: Luas Total Lantai */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold block leading-normal text-slate-500">
+              <span className="uppercase tracking-wider">Luas Total Lantai</span>
+              <span className="block text-[9px] font-medium text-slate-400 lowercase mt-0.5">(m²)</span>
+            </span>
+            <input
+              type="number"
+              value={verifiedTotalFloorArea}
+              onChange={(e) => setVerifiedTotalFloorArea(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="Input m²"
+              className={inputClass}
+            />
+            {floorError && (
+              <span className={cn(
+                "text-[9px] font-bold block leading-snug mt-1",
+                floorError.diff <= 0 ? "text-emerald-700" : "text-rose-600 animate-pulse"
+              )}>
+                Selisih: {floorError.diff >= 0 ? '+' : ''}{floorError.diff.toLocaleString('id-ID')} m² ({floorError.pct >= 0 ? '+' : ''}{floorError.pct.toFixed(1)}%)
+              </span>
+            )}
+          </div>
+
+          {/* Input: Luas RTH Terverifikasi */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold block leading-normal text-slate-500">
+              <span className="uppercase tracking-wider">Luas RTH Terverifikasi</span>
+              <span className="block text-[9px] font-medium text-slate-400 lowercase mt-0.5">(m²)</span>
+            </span>
+            <input
+              type="number"
+              value={verifiedRthArea}
+              onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="Input m²"
+              className={inputClass}
+            />
+            {rthError && (
+              <span className={cn(
+                "text-[9px] font-bold block leading-snug mt-1",
+                rthError.diff >= 0 ? "text-emerald-700" : "text-rose-600 animate-pulse"
+              )}>
+                Selisih: {rthError.diff >= 0 ? '+' : ''}{rthError.diff.toLocaleString('id-ID')} m² ({rthError.pct >= 0 ? '+' : ''}{rthError.pct.toFixed(1)}%)
+              </span>
+            )}
+          </div>
+
+          {/* Input: GSB */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold block leading-normal text-slate-500">
+              <span className="uppercase tracking-wider">Garis Sempadan</span>
+              <span className="block text-[9px] font-medium text-slate-400 lowercase mt-0.5">(m)</span>
+            </span>
+            <input
+              type="number"
+              step="0.1"
+              value={verifiedGsb}
+              onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="Input meter"
+              className={inputClass}
+            />
+            {isGsbViolated && (
+              <span className="text-[9px] font-bold text-rose-600 block mt-1 animate-pulse">
+                ⚠ Melanggar GSB Min {sub.bylawMinGsb}m
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Laporan Galat & Narasi Selisih Spasial */}
+        {(landError || buildingError || floorError || rthError) && (
+          <div className="mt-4 p-4 bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-slate-800 uppercase tracking-wide">
+              <Calculator className="h-4 w-4 text-slate-500" />
+              Laporan Analisis Galat / Selisih Dimensi Fisik (Verifikasi Lapangan vs Usulan)
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-1.5">
+                <p className="leading-relaxed">
+                  <strong>Luas Lahan:</strong> Usulan pemohon adalah <span className="font-mono font-semibold">{proposedLandArea.toLocaleString('id-ID')} m²</span>, 
+                  sedangkan hasil verifikasi fisik lapangan adalah <span className="font-mono font-semibold">{verifiedLandArea !== '' ? Number(verifiedLandArea).toLocaleString('id-ID') : '-'} m²</span>. 
+                  {landError && (
+                    <span className={cn("font-bold ml-1", landError.diff >= 0 ? "text-emerald-700" : "text-rose-600")}>
+                      Terdapat selisih sebesar {landError.diff >= 0 ? `tambahan +${landError.diff.toLocaleString('id-ID')}` : `pengurangan ${landError.diff.toLocaleString('id-ID')}`} m² ({landError.diff >= 0 ? '+' : ''}{landError.pct.toFixed(1)}%).
+                    </span>
+                  )}
+                </p>
+                <p className="leading-relaxed">
+                  <strong>Luas Dasar Bangunan (KDB):</strong> Usulan pemohon adalah <span className="font-mono font-semibold">{proposedBuildingArea.toLocaleString('id-ID')} m²</span>, 
+                  sedangkan hasil verifikasi adalah <span className="font-mono font-semibold">{verifiedBuildingArea !== '' ? Number(verifiedBuildingArea).toLocaleString('id-ID') : '-'} m²</span>. 
+                  {buildingError && (
+                    <span className={cn("font-bold ml-1", buildingError.diff <= 0 ? "text-emerald-700" : "text-rose-600")}>
+                      Selisih sebesar {buildingError.diff >= 0 ? `+${buildingError.diff.toLocaleString('id-ID')}` : `${buildingError.diff.toLocaleString('id-ID')}`} m² ({buildingError.diff >= 0 ? '+' : ''}{buildingError.pct.toFixed(1)}%).
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="leading-relaxed">
+                  <strong>Luas Total Lantai (KLB):</strong> Usulan pemohon adalah <span className="font-mono font-semibold">{proposedTotalFloorArea.toLocaleString('id-ID')} m²</span>, 
+                  sedangkan hasil verifikasi adalah <span className="font-mono font-semibold">{verifiedTotalFloorArea !== '' ? Number(verifiedTotalFloorArea).toLocaleString('id-ID') : '-'} m²</span>. 
+                  {floorError && (
+                    <span className={cn("font-bold ml-1", floorError.diff <= 0 ? "text-emerald-700" : "text-rose-600")}>
+                      Selisih sebesar {floorError.diff >= 0 ? `+${floorError.diff.toLocaleString('id-ID')}` : `${floorError.diff.toLocaleString('id-ID')}`} m² ({floorError.diff >= 0 ? '+' : ''}{floorError.pct.toFixed(1)}%).
+                    </span>
+                  )}
+                </p>
+                <p className="leading-relaxed">
+                  <strong>Luas Ruang Terbuka Hijau (RTH):</strong> Usulan pemohon adalah <span className="font-mono font-semibold">{proposedRthArea.toLocaleString('id-ID')} m²</span>, 
+                  sedangkan hasil verifikasi adalah <span className="font-mono font-semibold">{verifiedRthArea !== '' ? Number(verifiedRthArea).toLocaleString('id-ID') : '-'} m²</span>. 
+                  {rthError && (
+                    <span className={cn("font-bold ml-1", rthError.diff >= 0 ? "text-emerald-700" : "text-rose-600")}>
+                      Selisih sebesar {rthError.diff >= 0 ? `+${rthError.diff.toLocaleString('id-ID')}` : `${rthError.diff.toLocaleString('id-ID')}`} m² ({rthError.diff >= 0 ? '+' : ''}{rthError.pct.toFixed(1)}%).
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* REVISED v10.3: LIVE INTERACTIVE SCORECARD TABLE */}
       <div className="space-y-4 bg-white border border-slate-300 p-5 rounded-none">
         <div className="border-b border-slate-300 pb-2">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Sandingan Metrik Tapak (3-Sisi)</h2>
-          <p className="text-[10px] text-slate-500 mt-0.5">Perbandingan rencana usulan pemohon, regulasi tata ruang (bylaw), dan hasil verifikasi dinas.</p>
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Live Scorecard Kepatuhan Perda RDTR</h2>
+          <p className="text-[10px] text-slate-500 mt-0.5">Persentase dihitung secara reaktif oleh sistem mengikuti input luasan fisik (m²) Anda di form atas.</p>
         </div>
 
         <div className="w-full overflow-x-auto border border-slate-300 bg-white rounded-none">
           <table className="w-full min-w-[500px] text-xs font-sans text-left border-collapse">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                <th className="px-4 py-3 border-r border-slate-300">Parameter</th>
-                <th className="px-4 py-3 border-r border-slate-300">Proposed (Usulan)</th>
-                <th className="px-4 py-3 border-r border-slate-300">Bylaws (Aturan)</th>
-                <th className="px-4 py-3 w-[120px]">Verified (Dinas)</th>
+                <th className="px-4 py-3 border-r border-slate-300">Parameter RDTR</th>
+                <th className="px-4 py-3 border-r border-slate-300">Proposed (Pemohon)</th>
+                <th className="px-4 py-3 border-r border-slate-300">Bylaws (Standar Perda)</th>
+                <th className="px-4 py-3">Live Verified (Dinas)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-300 text-slate-800 bg-white">
+              {/* Row: KDB */}
               <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB</td>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDB (Koefisien Dasar Bangunan)</td>
                 <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
-                  {sub.technical?.applicantBuildingArea ? `${sub.technical.applicantBuildingArea.toLocaleString('id-ID')} m²` : '-'}
-                  {sub.landArea && sub.technical?.applicantBuildingArea ? (
-                    <span className="text-slate-500 block text-[9px] font-sans mt-1">({((sub.technical.applicantBuildingArea / sub.landArea) * 100).toFixed(1)}%)</span>
-                  ) : ''}
+                  {proposedBuildingArea ? `${proposedBuildingArea.toLocaleString('id-ID')} m²` : '-'}
+                  <span className="text-slate-500 block text-[9px] font-sans mt-0.5">({sub.kdbPercent ? `${sub.kdbPercent}%` : '—'})</span>
                 </td>
                 <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKdb || 60}%</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={verifiedKdb}
-                      onChange={(e) => setVerifiedKdb(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="KDB"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                  </div>
+                <td className="px-4 py-3.5">
+                  {computedKdb !== null ? (
+                    <span className={cn(
+                      "font-bold font-mono text-[11px] px-2 py-0.5 border leading-none inline-block",
+                      !isKdbViolated ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                    )}>
+                      {verifiedBuildingArea !== '' ? `${Number(verifiedBuildingArea).toLocaleString('id-ID')} m² (${computedKdb.toFixed(1)}%)` : '-'} {!isKdbViolated ? "Memenuhi" : "Melanggar Batas"}
+                    </span>
+                  ) : <span className="text-slate-400 italic">Menunggu Luas Lahan &amp; Tapak...</span>}
                 </td>
               </tr>
+              {/* Row: KLB */}
               <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB</td>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KLB (Koefisien Lantai Bangunan)</td>
                 <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
-                  {sub.technical?.totalFloorArea ? `${sub.technical.totalFloorArea.toLocaleString('id-ID')} m²` : '-'}
-                  {sub.technical?.klb ? ` (${Number(sub.technical.klb).toFixed(2)}x)` : ''}
+                  {proposedTotalFloorArea ? `${proposedTotalFloorArea.toLocaleString('id-ID')} m²` : '-'}
+                  <span className="text-slate-500 block text-[9px] font-sans mt-0.5">({sub.klbValue ? `${sub.klbValue}x` : '—'})</span>
                 </td>
                 <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Maks {sub.bylawMaxKlb || 3.5}</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={verifiedKlb}
-                    onChange={(e) => setVerifiedKlb(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="KLB"
-                    className="w-full px-2 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                  />
+                <td className="px-4 py-3.5">
+                  {computedKlb !== null ? (
+                    <span className={cn(
+                      "font-bold font-mono text-[11px] px-2 py-0.5 border leading-none inline-block",
+                      !isKlbViolated ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                    )}>
+                      {verifiedTotalFloorArea !== '' ? `${Number(verifiedTotalFloorArea).toLocaleString('id-ID')} m² (${computedKlb.toFixed(2)}x)` : '-'} {!isKlbViolated ? "Memenuhi" : "Melanggar Batas"}
+                    </span>
+                  ) : <span className="text-slate-400 italic">Menunggu Luas Lahan &amp; Lantai...</span>}
                 </td>
               </tr>
+              {/* Row: KDH */}
               <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH</td>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">KDH (Koefisien Dasar Hijau)</td>
                 <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
-                  {sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}
-                  {sub.technical?.kdh ? ` (${Number(sub.technical.kdh).toFixed(1)}%)` : ''}
+                  {proposedRthArea ? `${proposedRthArea.toLocaleString('id-ID')} m²` : '-'}
+                  <span className="text-slate-500 block text-[9px] font-sans mt-0.5">({sub.kdhPercent ? `${sub.kdhPercent}%` : '—'})</span>
                 </td>
                 <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinKdh || 10}%</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={verifiedKdh}
-                      onChange={(e) => setVerifiedKdh(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="KDH"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">%</span>
-                  </div>
+                <td className="px-4 py-3.5">
+                  {computedKdh !== null ? (
+                    <span className={cn(
+                      "font-bold font-mono text-[11px] px-2 py-0.5 border leading-none inline-block",
+                      !isKdhViolated ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                    )}>
+                      {verifiedRthArea !== '' ? `${Number(verifiedRthArea).toLocaleString('id-ID')} m² (${computedKdh.toFixed(1)}%)` : '-'} {!isKdhViolated ? "Memenuhi" : "Kurang Dari Batas"}
+                    </span>
+                  ) : <span className="text-slate-400 italic">Menunggu Luas Lahan &amp; RTH...</span>}
                 </td>
               </tr>
+              {/* Row: GSB */}
               <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '-'}</td>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">GSB (Garis Sempadan Bangunan)</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                  {sub.technical?.applicantGsb ? `${sub.technical.applicantGsb} m` : '—'}
+                </td>
                 <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinGsb || 5} m</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={verifiedGsb}
-                      onChange={(e) => setVerifiedGsb(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="GSB"
-                      className="w-full pl-2 pr-6 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[10px] font-bold text-slate-400 pointer-events-none">m</span>
-                  </div>
+                <td className="px-4 py-3.5">
+                  {verifiedGsb !== '' ? (
+                    <span className={cn(
+                      "font-bold font-mono text-[11px] px-2 py-0.5 border leading-none inline-block",
+                      !isGsbViolated ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                    )}>
+                      {verifiedGsb} m {!isGsbViolated ? "Memenuhi" : "Kurang Dari Batas"}
+                    </span>
+                  ) : <span className="text-slate-400 italic">Menunggu GSB...</span>}
                 </td>
               </tr>
+              {/* Row: RTH */}
               <tr>
-                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH</td>
-                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">{sub.technical?.applicantRthArea ? `${sub.technical.applicantRthArea.toLocaleString('id-ID')} m²` : '-'}</td>
-                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {sub.bylawMinRthArea || 1400} m²</td>
-                <td className="px-3 py-2 bg-slate-50/30">
-                  <div className="relative flex items-center w-full">
-                    <input
-                      type="number"
-                      value={verifiedRthArea}
-                      onChange={(e) => setVerifiedRthArea(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="RTH"
-                      className="w-full pl-2 pr-8 py-1.5 bg-white border border-slate-300 focus:border-slate-800 text-xs font-mono rounded-none outline-none"
-                    />
-                    <span className="absolute right-2 text-[9px] font-bold text-slate-400 pointer-events-none">m²</span>
-                  </div>
+                <td className="px-4 py-3.5 font-bold border-r border-slate-300 bg-slate-50/50">RTH (Ruang Terbuka Hijau)</td>
+                <td className="px-4 py-3.5 font-mono text-[11px] border-r border-slate-300">
+                  {proposedRthArea ? `${proposedRthArea.toLocaleString('id-ID')} m²` : '-'}
+                  <span className="text-slate-500 block text-[9px] font-sans mt-0.5">({proposedRthArea && proposedLandArea ? `${((proposedRthArea / proposedLandArea) * 100).toFixed(1)}%` : '—'})</span>
+                </td>
+                <td className="px-4 py-3.5 font-semibold text-slate-500 border-r border-slate-300">Min {dynamicMinRth.toLocaleString('id-ID')} m² ({sub?.bylawMinKdh || 10}%)</td>
+                <td className="px-4 py-3.5">
+                  {verifiedRthArea !== '' ? (
+                    <span className={cn(
+                      "font-bold font-mono text-[11px] px-2 py-0.5 border leading-none inline-block",
+                      !isRthViolated ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                    )}>
+                      {Number(verifiedRthArea).toLocaleString('id-ID')} m² ({computedKdh !== null ? `${computedKdh.toFixed(1)}%` : '—'}) {!isRthViolated ? "Memenuhi" : "Kurang Dari Batas"}
+                    </span>
+                  ) : <span className="text-slate-400 italic">Menunggu RTH...</span>}
                 </td>
               </tr>
             </tbody>
@@ -543,6 +812,39 @@ export default function SubmissionVerificationPage() {
 
         {/* KOLOM KIRI: CHECKLIST EVALUASI 13 ASPEK (col-span-7) */}
         <div className="lg:col-span-7 space-y-6">
+          {/* Geotagged Field Inspection Status Check Warning */}
+          {logsCount === 0 ? (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed select-none text-left">
+              <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={16} />
+              <div>
+                <p className="font-bold uppercase tracking-wider text-[10px]">Peringatan Keras: Belum Ada Log Kunjungan Lapangan</p>
+                <p className="mt-1 text-slate-500">
+                  Sistem mendeteksi bahwa berkas ini belum memiliki dokumentasi survei sidak lapangan spasial (PWA). Berdasarkan Perbup Bogor, Tim Teknis <strong>diwajibkan mengunggah sekurangnya 1 bukti foto geotagged</strong> di lokasi proyek sebelum dapat mengesahkan matriks verifikasi dan menerbitkan draf Telaah Staf.
+                </p>
+              </div>
+            </div>
+          ) : !hasVerifiedLog ? (
+            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed select-none text-left animate-pulse">
+              <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={16} />
+              <div>
+                <p className="font-bold uppercase tracking-wider text-[10px]">Peringatan Keamanan: Koordinat Di Luar Lokasi</p>
+                <p className="mt-1 text-slate-500">
+                  Terdapat {logsCount} log kunjungan lapangan yang tercatat, namun seluruh foto dokumentasi terdeteksi diambil di luar batas toleransi lokasi lahan proyek (jarak deviasi &gt; 100m). Mohon pastikan kembali validitas presensi sebelum melanjutkan.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2 rounded-none leading-normal select-none text-left">
+              <CheckCircle2 className="text-emerald-600 shrink-0 mt-0.5" size={16} />
+              <div>
+                <p className="font-bold uppercase tracking-wider text-[10px] text-emerald-900">Kunjungan Lapangan Terverifikasi</p>
+                <p className="text-slate-500 text-[10px] mt-0.5">
+                  Sistem mendeteksi {logsCount} bukti ulasan kunjungan lapangan geotagged yang valid secara spasial. Penilaian siap disahkan.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="border-b border-slate-300 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Checklist Evaluasi Aspek Spasial</h2>

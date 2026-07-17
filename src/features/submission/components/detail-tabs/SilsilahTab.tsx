@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SubmissionService } from '../../services/submission.service';
 import { uploadFileToBackend } from '../../utils/upload';
+import { useAuthStore } from '@/app/store/useAuthStore';
 
 const resolveDocUrl = (url?: string | null) => {
   if (!url) return '';
@@ -37,6 +38,9 @@ interface SilsilahTabProps {
 
 export const SilsilahTab = ({ sub }: SilsilahTabProps) => {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+
   const [baselineSource, setBaselineSource] = useState<'DIGITAL' | 'LEGACY'>('DIGITAL');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   
@@ -45,6 +49,34 @@ export const SilsilahTab = ({ sub }: SilsilahTabProps) => {
   const [legacySkDate, setLegacySkDate] = useState<string>('');
   const [legacySkDocUrl, setLegacySkDocUrl] = useState<string>('');
   const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const [selectedUnlinkId, setSelectedUnlinkId] = useState<number | null>(null);
+
+  // --- MUTATION: UNLINK PARENT LINEAGE ---
+  const unlinkParentMutation = useMutation({
+    mutationFn: async (idSilsilah: number) => {
+      return SubmissionService.unlinkParent(sub.id, idSilsilah);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['submission', sub.id], exact: true }),
+        queryClient.invalidateQueries({ queryKey: ['submissions'] })
+      ]);
+      toast.success('Kaitan silsilah permohonan berhasil diputuskan!');
+      setSelectedUnlinkId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Gagal memutuskan silsilah permohonan');
+      setSelectedUnlinkId(null);
+    }
+  });
+
+  const handleUnlinkParent = (idSilsilah: number, reference: string | null | undefined) => {
+    if (confirm(`Apakah Anda yakin ingin memutuskan kaitan dengan SK "${reference || '-'}"?`)) {
+      setSelectedUnlinkId(idSilsilah);
+      unlinkParentMutation.mutate(idSilsilah);
+    }
+  };
 
   // --- QUERY 1: FETCH SPATIAL OVERLAPS ---
   const { data: overlaps = [], isLoading: isLoadingOverlaps } = useQuery({
@@ -206,208 +238,240 @@ export const SilsilahTab = ({ sub }: SilsilahTabProps) => {
           <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Status Silsilah Hubungan Berkas</h3>
         </div>
 
-        {sub.parent_id_permohonan ? (
-          <div className="p-4 bg-teal-50/50 border border-teal-200 rounded-none space-y-3 font-sans text-xs">
-            <div className="flex items-center gap-2 text-teal-900 font-bold">
-              <FileCheck className="h-5 w-5 text-teal-600" />
-              <span>TERKONEKSI DENGAN BERKAS DIGITAL INTERNAL</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1.5 border-t border-teal-200/50">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">ID Berkas Induk</span>
-                <Link to={`/pengajuan/detail/${sub.parent_id_permohonan}`} className="text-teal-700 font-bold hover:underline">
-                  {sub.parent_id_permohonan}
-                </Link>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Nomor SK Direvisi</span>
-                <span className="font-bold text-slate-700">{sub.replaced_sk_number || '-'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Tanggal Penerbitan SK</span>
-                <span className="font-bold text-slate-700">{sub.replaced_sk_date || '-'}</span>
-              </div>
-            </div>
-          </div>
-        ) : sub.replaced_sk_number ? (
-          <div className="p-4 bg-amber-50/40 border border-amber-200 rounded-none space-y-3 font-sans text-xs">
-            <div className="flex items-center gap-2 text-amber-900 font-bold">
-              <FileCheck className="h-5 w-5 text-amber-600" />
-              <span>TERKONEKSI DENGAN SK FISIK LEGACY (OFFLINE)</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1.5 border-t border-amber-200/50">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Nomor SK Fisik Lama</span>
-                <span className="font-bold text-slate-700">{sub.replaced_sk_number}</span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Tanggal Terbit</span>
-                <span className="font-bold text-slate-700">{sub.replaced_sk_date}</span>
-              </div>
-              <div className="md:col-span-2">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Scan Salinan Dokumen SK</span>
-                {sub.replaced_sk_doc_url ? (
-                  <a href={resolveDocUrl(sub.replaced_sk_doc_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-700 font-bold hover:underline">
-                    <FileText className="h-4.5 w-4.5" /> Buka PDF Scan SK Fisik
-                  </a>
-                ) : (
-                  <span className="text-slate-400 italic">Dokumen belum diunggah</span>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
+        {!sub.parents_lineage || sub.parents_lineage.length === 0 ? (
           <div className="p-4 bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold rounded-none">
             Belum Dikaitkan. Berkas ini saat ini terdaftar sebagai **Site Plan Baru** dan belum ditautkan dengan Surat Keputusan (SK) lama mana pun.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sub.parents_lineage.map((parent: any) => (
+              <div 
+                key={parent.id_silsilah} 
+                className={`p-4 border rounded-none space-y-3 font-sans text-xs relative ${
+                  parent.baseline_source === 'DIGITAL' 
+                    ? 'bg-teal-50/50 border-teal-200' 
+                    : 'bg-amber-50/40 border-amber-200'
+                }`}
+              >
+                {/* Delete button for Admin */}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleUnlinkParent(parent.id_silsilah, parent.baseline_source === 'DIGITAL' ? parent.parent_id : parent.legacy_sk_number)}
+                    disabled={unlinkParentMutation.isPending}
+                    className="absolute top-4 right-4 text-xs font-bold text-rose-600 hover:text-rose-700 transition-colors border-none bg-transparent cursor-pointer disabled:text-slate-400"
+                  >
+                    {unlinkParentMutation.isPending && selectedUnlinkId === parent.id_silsilah ? 'Memutus...' : 'Putus Tautan'}
+                  </button>
+                )}
+
+                <div className="flex items-center gap-2 font-bold">
+                  <FileCheck className={`h-5 w-5 ${parent.baseline_source === 'DIGITAL' ? 'text-teal-600' : 'text-amber-600'}`} />
+                  <span className={parent.baseline_source === 'DIGITAL' ? 'text-teal-900' : 'text-amber-900'}>
+                    {parent.baseline_source === 'DIGITAL' ? 'TERKONEKSI DENGAN BERKAS DIGITAL INTERNAL' : 'TERKONEKSI DENGAN SK FISIK LEGACY (OFFLINE)'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1.5 border-t border-slate-200/50">
+                  {parent.baseline_source === 'DIGITAL' ? (
+                    <>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">ID Berkas Induk</span>
+                        <Link to={`/pengajuan/detail/${parent.parent_id}`} className="text-teal-700 font-bold hover:underline">
+                          {parent.parent_id}
+                        </Link>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Nomor SK Direvisi</span>
+                        <span className="font-bold text-slate-700">{parent.legacy_sk_number || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Perumahan / Pengembang</span>
+                        <span className="font-bold text-slate-700">
+                          {parent.parent_housing_name ? `${parent.parent_housing_name} (${parent.parent_developer_name || '-'})` : '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Tanggal Penerbitan SK</span>
+                        <span className="font-bold text-slate-700">{parent.legacy_sk_date || '-'}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Nomor SK Fisik Lama</span>
+                        <span className="font-bold text-slate-700">{parent.legacy_sk_number}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Tanggal Terbit</span>
+                        <span className="font-bold text-slate-700">{parent.legacy_sk_date}</span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Scan Salinan Dokumen SK</span>
+                        {parent.legacy_sk_doc_url ? (
+                          <a href={resolveDocUrl(parent.legacy_sk_doc_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-teal-700 font-bold hover:underline">
+                            <FileText className="h-4.5 w-4.5" /> Buka PDF Scan SK Fisik
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 italic">Dokumen belum diunggah</span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
       {/* SECTION 3: ADMINISTRATIVE LINKING ACTION PANEL */}
-      <div className="space-y-4">
-        <div className="border-b border-border pb-2 flex items-center gap-2 select-none">
-          <Link2 className="h-4.5 w-4.5 text-primary" />
-          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Tautkan Silsilah Rujukan Manual</h3>
-        </div>
-
-        <form onSubmit={handleLinkParentSubmit} className="bg-white border border-border p-5 md:p-6 space-y-5 rounded-none">
-          <div>
-            <span className={labelClass}>Sumber Rujukan Dokumen Lama</span>
-            <div className="flex items-center space-x-6 mt-2 select-none">
-              <label className="flex items-center space-x-2.5 cursor-pointer">
-                <input
-                  type="radio"
-                  value="DIGITAL"
-                  checked={baselineSource === 'DIGITAL'}
-                  onChange={() => setBaselineSource('DIGITAL')}
-                  className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer"
-                />
-                <span className="text-xs font-bold text-slate-700">Opsi A: SK Terdaftar Digital</span>
-              </label>
-              <label className="flex items-center space-x-2.5 cursor-pointer">
-                <input
-                  type="radio"
-                  value="LEGACY"
-                  checked={baselineSource === 'LEGACY'}
-                  onChange={() => setBaselineSource('LEGACY')}
-                  className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer"
-                />
-                <span className="text-xs font-bold text-slate-700">Opsi B: SK Fisik / Offline (Scan PDF)</span>
-              </label>
-            </div>
+      {isAdmin && (
+        <div className="space-y-4">
+          <div className="border-b border-border pb-2 flex items-center gap-2 select-none">
+            <Link2 className="h-4.5 w-4.5 text-primary" />
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Tautkan Silsilah Rujukan Manual</h3>
           </div>
 
-          {/* OPSI A: DIGITAL SELECT DROPDOWN */}
-          {baselineSource === 'DIGITAL' && (
-            <div className="space-y-1.5 animate-in fade-in duration-300">
-              <label className={labelClass}>Pilih SK Lama Terbitan Digital</label>
-              {isLoadingApproved ? (
-                <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 text-slate-400 text-xs">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-                  <span className="font-bold uppercase tracking-wider">Menghubungkan basis data digital...</span>
-                </div>
-              ) : listApproved.length === 0 ? (
-                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold uppercase tracking-wider rounded-none">
-                  Tidak ada berkas ber-SK disetujui lainnya di database untuk ditautkan.
-                </div>
-              ) : (
-                <select
-                  value={selectedParentId}
-                  onChange={(e) => setSelectedParentId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">-- Pilih Surat Keputusan (SK) Induk --</option>
-                  {listApproved.map((s: any) => (
-                    <option key={s.id} value={s.id}>
-                      {s.skNumber || s.submissionNo} - {s.housingName} ({s.developerName})
-                    </option>
-                  ))}
-                </select>
-              )}
+          <form onSubmit={handleLinkParentSubmit} className="bg-white border border-border p-5 md:p-6 space-y-5 rounded-none">
+            <div>
+              <span className={labelClass}>Sumber Rujukan Dokumen Lama</span>
+              <div className="flex items-center space-x-6 mt-2 select-none">
+                <label className="flex items-center space-x-2.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="DIGITAL"
+                    checked={baselineSource === 'DIGITAL'}
+                    onChange={() => setBaselineSource('DIGITAL')}
+                    className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-700">Opsi A: SK Terdaftar Digital</span>
+                </label>
+                <label className="flex items-center space-x-2.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="LEGACY"
+                    checked={baselineSource === 'LEGACY'}
+                    onChange={() => setBaselineSource('LEGACY')}
+                    className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-700">Opsi B: SK Fisik / Offline (Scan PDF)</span>
+                </label>
+              </div>
             </div>
-          )}
 
-          {/* OPSI B: LEGACY MANUAL METADATA INPUTS */}
-          {baselineSource === 'LEGACY' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-300">
-              <div className="space-y-1.5">
-                <label className={labelClass}>Nomor SK Fisik Lama</label>
-                <input
-                  type="text"
-                  value={legacySkNumber}
-                  onChange={(e) => setLegacySkNumber(e.target.value)}
-                  placeholder="Contoh: 600/120/415.19/2020"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className={labelClass}>Tanggal Penerbitan SK Fisik</label>
-                <input
-                  type="date"
-                  value={legacySkDate}
-                  onChange={(e) => setLegacySkDate(e.target.value)}
-                  className={inputClass}
-                  style={{ colorScheme: 'light' }}
-                />
-              </div>
-
-              <div className="md:col-span-2 space-y-1.5">
-                <label className={labelClass}>Unggah Scan Dokumen SK Lama (PDF)</label>
-                
-                {uploadingDoc ? (
-                  <div className="border border-dashed border-slate-300 p-6 text-center text-xs flex flex-col items-center justify-center space-y-2">
-                    <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                    <span className="font-bold text-primary">Mengunggah file ke disk...</span>
+            {/* OPSI A: DIGITAL SELECT DROPDOWN */}
+            {baselineSource === 'DIGITAL' && (
+              <div className="space-y-1.5 animate-in fade-in duration-300">
+                <label className={labelClass}>Pilih SK Lama Terbitan Digital</label>
+                {isLoadingApproved ? (
+                  <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 text-slate-400 text-xs">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                    <span className="font-bold uppercase tracking-wider">Menghubungkan basis data digital...</span>
                   </div>
-                ) : legacySkDocUrl ? (
-                  <div className="border border-slate-200 p-4 bg-slate-50 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-teal-600" />
-                      <span className="text-xs font-mono truncate max-w-[280px]" title={legacySkDocUrl}>
-                        {legacySkDocUrl.split('/').pop()?.split('?')[0]}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setLegacySkDocUrl('')}
-                      className="text-xs font-bold text-rose-600 hover:text-rose-700 transition-colors border-none bg-transparent cursor-pointer"
-                    >
-                      Hapus
-                    </button>
+                ) : listApproved.length === 0 ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold uppercase tracking-wider rounded-none">
+                    Tidak ada berkas ber-SK disetujui lainnya di database untuk ditautkan.
                   </div>
                 ) : (
-                  <div className="border border-dashed border-slate-300 hover:bg-slate-50/50 p-6 text-center cursor-pointer relative flex flex-col items-center justify-center min-h-[100px] select-none">
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file);
-                      }}
-                    />
-                    <UploadCloud className="h-6 w-6 text-slate-400 mb-1" />
-                    <p className="text-xs font-bold text-slate-700">Pilih berkas PDF Surat Keputusan</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Maks. ukuran file 10MB</p>
-                  </div>
+                  <select
+                    value={selectedParentId}
+                    onChange={(e) => setSelectedParentId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">-- Pilih Surat Keputusan (SK) Induk --</option>
+                    {listApproved.map((s: any) => (
+                      <option key={s.id} value={s.id}>
+                        {s.skNumber || s.submissionNo} - {s.housingName} ({s.developerName})
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="pt-2 flex justify-end">
-            <button
-              type="submit"
-              disabled={linkParentMutation.isPending}
-              className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white font-bold uppercase tracking-wider text-xs rounded-none transition-all gap-2 cursor-pointer outline-none"
-            >
-              {linkParentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              <span>Tautkan Silsilah SK</span>
-            </button>
-          </div>
-        </form>
-      </div>
+            {/* OPSI B: LEGACY MANUAL METADATA INPUTS */}
+            {baselineSource === 'LEGACY' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-300">
+                <div className="space-y-1.5">
+                  <label className={labelClass}>Nomor SK Fisik Lama</label>
+                  <input
+                    type="text"
+                    value={legacySkNumber}
+                    onChange={(e) => setLegacySkNumber(e.target.value)}
+                    placeholder="Contoh: 600/120/415.19/2020"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className={labelClass}>Tanggal Penerbitan SK Fisik</label>
+                  <input
+                    type="date"
+                    value={legacySkDate}
+                    onChange={(e) => setLegacySkDate(e.target.value)}
+                    className={inputClass}
+                    style={{ colorScheme: 'light' }}
+                  />
+                </div>
+
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className={labelClass}>Unggah Scan Dokumen SK Lama (PDF)</label>
+                  
+                  {uploadingDoc ? (
+                    <div className="border border-dashed border-slate-300 p-6 text-center text-xs flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                      <span className="font-bold text-primary">Mengunggah file ke disk...</span>
+                    </div>
+                  ) : legacySkDocUrl ? (
+                    <div className="border border-slate-200 p-4 bg-slate-50 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-teal-600" />
+                        <span className="text-xs font-mono truncate max-w-[280px]" title={legacySkDocUrl}>
+                          {legacySkDocUrl.split('/').pop()?.split('?')[0]}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setLegacySkDocUrl('')}
+                        className="text-xs font-bold text-rose-600 hover:text-rose-700 transition-colors border-none bg-transparent cursor-pointer"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border border-dashed border-slate-300 hover:bg-slate-50/50 p-6 text-center cursor-pointer relative flex flex-col items-center justify-center min-h-[100px] select-none">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file);
+                        }}
+                      />
+                      <UploadCloud className="h-6 w-6 text-slate-400 mb-1" />
+                      <p className="text-xs font-bold text-slate-700">Pilih berkas PDF Surat Keputusan</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Maks. ukuran file 10MB</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="submit"
+                disabled={linkParentMutation.isPending}
+                className="inline-flex items-center justify-center px-5 py-2.5 bg-primary hover:opacity-90 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed border border-primary text-white font-bold uppercase tracking-wider text-xs rounded-none transition-all gap-2 cursor-pointer outline-none"
+              >
+                {linkParentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                <span>Tautkan Silsilah SK</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
     </div>
   );

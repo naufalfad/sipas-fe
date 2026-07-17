@@ -1,15 +1,96 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, Fragment } from 'react';
 import { Landmark, MapPin } from 'lucide-react';
-import { GeoJSON } from 'react-leaflet';
+import { GeoJSON, Marker, Popup, Polyline, CircleMarker } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 import { API_BASE_URL } from '@/config';
 
+const parseUTCDateTime = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const cleanStr = (dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.match(/-\d{2}:\d{2}$/))
+    ? dateStr
+    : `${dateStr}Z`;
+  return new Date(cleanStr);
+};
+
 interface LocationTabProps {
   sub: any;
+  inspectionLogs?: any[];
 }
 
-export const LocationTab = ({ sub }: LocationTabProps) => {
+interface SpiderfiedLog {
+  log: any;
+  renderPos: [number, number];
+  originalPos: [number, number];
+  isSpiderfied: boolean;
+  index: number;
+}
+
+const getSpiderfiedLogs = (logs: any[]): SpiderfiedLog[] => {
+  const groups: any[][] = [];
+  const distanceThreshold = 0.00018; // approx 20 meters
+
+  logs.forEach((log) => {
+    if (log.latitude === null || log.longitude === null) return;
+    const lat = Number(log.latitude);
+    const lng = Number(log.longitude);
+
+    let foundGroup = false;
+    for (const group of groups) {
+      const baseLat = Number(group[0].latitude);
+      const baseLng = Number(group[0].longitude);
+      const distance = Math.sqrt(Math.pow(lat - baseLat, 2) + Math.pow(lng - baseLng, 2));
+      if (distance < distanceThreshold) {
+        group.push(log);
+        foundGroup = true;
+        break;
+      }
+    }
+
+    if (!foundGroup) {
+      groups.push([log]);
+    }
+  });
+
+  const spiderfied: SpiderfiedLog[] = [];
+
+  groups.forEach((group) => {
+    const N = group.length;
+    const centerLat = Number(group[0].latitude);
+    const centerLng = Number(group[0].longitude);
+
+    if (N === 1) {
+      spiderfied.push({
+        log: group[0],
+        renderPos: [centerLat, centerLng],
+        originalPos: [centerLat, centerLng],
+        isSpiderfied: false,
+        index: logs.indexOf(group[0])
+      });
+    } else {
+      const radius = 0.00020; // approx 20m radius offset
+      group.forEach((log, i) => {
+        const theta = (2 * Math.PI * i) / N;
+        const offsetLat = Math.sin(theta) * radius;
+        const offsetLng = Math.cos(theta) * radius;
+        spiderfied.push({
+          log,
+          renderPos: [centerLat + offsetLat, centerLng + offsetLng],
+          originalPos: [centerLat, centerLng],
+          isSpiderfied: true,
+          index: logs.indexOf(log)
+        });
+      });
+    }
+  });
+
+  return spiderfied.sort((a, b) => a.index - b.index);
+};
+
+export const LocationTab = ({ sub, inspectionLogs = [] }: LocationTabProps) => {
+  const spiderfiedLogs = useMemo(() => getSpiderfiedLogs(inspectionLogs), [inspectionLogs]);
   const [cadGeoJson, setCadGeoJson] = useState<any>(null);
 
   useEffect(() => {
@@ -202,7 +283,7 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
                     style={(feature) => {
                       const color = feature?.properties?.color ?? '#14b8a6';
                       return {
-                        color: '#ffffff',
+                        color: color,
                         weight: 1,
                         fillColor: color,
                         fillOpacity: feature?.properties?.layer_name === 'PTSP_PSU_JALAN' ? 0.35 : 0.65
@@ -210,6 +291,129 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
                     }}
                   />
                 )}
+
+                {/* Render Pin-Pin Koordinat Log Hasil Sidak (Spiderfied) */}
+                {(() => {
+                  const renderedCenters = new Set<string>();
+                  return spiderfiedLogs.map(({ log, renderPos, originalPos, isSpiderfied, index }) => {
+                    const logPos = renderPos;
+                    const markerColor = log.isVerified ? '#0d9488' : '#e11d48'; // Teal vs Rose
+                    const shadowColor = log.isVerified ? 'rgba(13,148,136,0.35)' : 'rgba(225,29,72,0.35)';
+
+                    const customIcon = L.divIcon({
+                      className: '',
+                      iconSize: [28, 28],
+                      iconAnchor: [14, 28],
+                      popupAnchor: [0, -28],
+                      html: `
+                        <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+                          <div style="
+                            position: absolute;
+                            bottom: 0;
+                            left: 50%;
+                            transform: translateX(-50%) rotate(45deg);
+                            width: 12px;
+                            height: 12px;
+                            background-color: ${markerColor};
+                            box-shadow: 2px 2px 4px rgba(0,0,0,0.15);
+                          "></div>
+                          <div style="
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 50%;
+                            border: 2.5px solid #ffffff;
+                            background-color: ${markerColor};
+                            color: #ffffff;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-family: sans-serif;
+                            font-size: 10px;
+                            font-weight: 900;
+                            box-shadow: 0 4px 10px ${shadowColor};
+                          ">
+                            ${index + 1}
+                          </div>
+                        </div>
+                      `
+                    });
+
+                    const centerKey = `${originalPos[0]},${originalPos[1]}`;
+                    const shouldRenderCenter = isSpiderfied && !renderedCenters.has(centerKey);
+                    if (shouldRenderCenter) {
+                      renderedCenters.add(centerKey);
+                    }
+
+                    return (
+                      <Fragment key={log.id ?? index}>
+                        {isSpiderfied && (
+                          <Polyline
+                            positions={[originalPos, renderPos]}
+                            pathOptions={{
+                              color: '#64748b',
+                              weight: 1.5,
+                              dashArray: '4, 4',
+                              opacity: 0.7
+                            }}
+                          />
+                        )}
+                        {shouldRenderCenter && (
+                          <CircleMarker
+                            center={originalPos}
+                            radius={4}
+                            pathOptions={{
+                              color: '#475569',
+                              fillColor: '#94a3b8',
+                              fillOpacity: 0.9,
+                              weight: 1.5
+                            }}
+                          />
+                        )}
+                        <Marker
+                          position={logPos}
+                          icon={customIcon}
+                        >
+                          <Popup>
+                            <div className="p-1 space-y-1.5 text-xs text-slate-800 text-left" style={{ fontFamily: 'sans-serif', minWidth: '160px' }}>
+                              <div className="flex justify-between items-center gap-2">
+                                <span className="font-extrabold text-[11px] text-slate-900 uppercase">Sidak #{index + 1}</span>
+                                <span
+                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider border leading-none"
+                                  style={{
+                                    color: log.isVerified ? '#0f766e' : '#be123c',
+                                    backgroundColor: log.isVerified ? '#f0fdfa' : '#fff1f2',
+                                    borderColor: log.isVerified ? '#ccfbf1' : '#ffe4e6',
+                                  }}
+                                >
+                                  {log.isVerified ? 'Sesuai' : 'Luar Lokasi'}
+                                </span>
+                              </div>
+
+                              {log.photoUrl && (
+                                <div className="w-full aspect-video overflow-hidden border border-slate-100 bg-slate-50">
+                                  <img src={log.photoUrl} alt={`Foto Sidak #${index + 1}`} className="w-full h-full object-cover" />
+                                </div>
+                              )}
+
+                              <div className="space-y-0.5 text-[9px] text-slate-500 font-medium">
+                                <p className="font-bold text-slate-700">Verifikator: {log.inspectorName || '—'}</p>
+                                <p>Waktu: {log.timestamp ? parseUTCDateTime(log.timestamp).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) : '—'}</p>
+                                {log.distanceMeters !== null && log.distanceMeters !== undefined && (
+                                  <p className="font-bold font-mono" style={{ color: log.isVerified ? '#0d9488' : '#e11d48' }}>
+                                    Deviasi: {Number(log.distanceMeters).toFixed(1)}m dari batas
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      </Fragment>
+                    );
+                  });
+                })()}
               </GISMapContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400 text-xs">
@@ -242,6 +446,14 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
             <div className="flex items-center gap-2">
               <span className="h-3 w-4 bg-[#14b8a6] block shrink-0"></span>
               PSU / Sarana Utilitas
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 bg-[#0d9488] border border-white rounded-full block shrink-0 shadow-sm"></span>
+              Sidak Lapangan (Sesuai)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 bg-[#e11d48] border border-white rounded-full block shrink-0 shadow-sm"></span>
+              Sidak Lapangan (Luar Lokasi)
             </div>
           </div>
         </div>

@@ -1,11 +1,12 @@
 /**
  * ============================================================================
- * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts] (REVISED v5.1)
+ * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts] (REVISED v5.2)
  * ============================================================================
  * Peran: Menangani seluruh komunikasi HTTP REST API dengan server backend.
  *        Diperbarui penuh untuk mendukung pengiriman silsilah permohonan lama (Revisi),
  *        payload metrik usulan pemohon (proposed), serta pengiriman hasil audit
- *        dinas beserta data verifikator per aspek (verified_by_id, verified_at).
+ *        dinas berbasis dimensi fisik absolut terverifikasi (m² / meter) sesuai
+ *        dengan kontrak Pydantic VerifyRequest di Backend yang baru.
  * ============================================================================
  */
 
@@ -126,8 +127,8 @@ export const SubmissionService = {
   },
 
   /**
-   * ─── REVISI: UPDATE STATUS & KIRIM HASIL AUDIT TEKNIS SPASIAL MANUAL ───
-   * Mengirimkan keputusan verifikasi, angka hitung ulang dinas (KDB/GSB),
+   * ─── REVISI v5.2: UPDATE STATUS & KIRIM HASIL AUDIT DIMENSI FISIK ABSOLUT (m²) ───
+   * Mengirimkan keputusan verifikasi, angka hitung ulang fisik terverifikasi,
    * serta dynamic checklist ke API `/verify` di backend dengan audit verifikator lengkap.
    */
   updateStatus: async (
@@ -138,15 +139,15 @@ export const SubmissionService = {
     passphrase?: string,
     signatureBase64?: string,
     // Override jenis keputusan pengembalian berkas internal
-    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE' | 'OVERRIDE_VERDICT' | 'SAVE_TECHNICAL_MATRIX',
+    actionTypeOverride?: 'APPROVE' | 'REJECT' | 'REVERT_TO_TECHNICAL' | 'REVERT_TO_ADMINISTRATIVE' | 'OVERRIDE_VERDICT' | 'SAVE_TECHNICAL_MATRIX' | 'REVERT_TO_PEMOHON',
 
-    // Parameter Teknis Verifikasi Lapisan Dinas (Verified)
+    // Parameter Teknis Verifikasi Lapisan Dinas (Verified Physical Raw Metrics)
     kkpr_verdict?: string,
-    verified_kdb?: number,
-    verified_klb?: number,
-    verified_kdh?: number,
-    verified_gsb?: number,
+    verified_land_area?: number,
+    verified_building_area?: number,
+    verified_total_floor_area?: number,
     verified_rth_area?: number,
+    verified_gsb?: number,
     checklist_items?: EvaluationChecklistItem[]
   ): Promise<Submission | undefined> => {
 
@@ -196,13 +197,13 @@ export const SubmissionService = {
       notes,
       is_spatially_compliant: true,
 
-      // Injeksi parameter komparasi teknis revisi
+      // Injeksi parameter komparasi teknis berdasarkan dimensi fisik absolut terverifikasi (m² / meter)
       kkpr_verdict: kkpr_verdict || undefined,
-      verified_kdb: verified_kdb ?? undefined,
-      verified_klb: verified_klb ?? undefined,
-      verified_kdh: verified_kdh ?? undefined,
-      verified_gsb: verified_gsb ?? undefined,
+      verified_land_area: verified_land_area ?? undefined,
+      verified_building_area: verified_building_area ?? undefined,
+      verified_total_floor_area: verified_total_floor_area ?? undefined,
       verified_rth_area: verified_rth_area ?? undefined,
+      verified_gsb: verified_gsb ?? undefined,
       checklist_items: formattedChecklist.length > 0 ? formattedChecklist : undefined
     };
 
@@ -344,6 +345,55 @@ export const SubmissionService = {
     if (!response.ok) {
       const errText = await response.text();
       throw new Error(errText || `Gagal menautkan silsilah berkas permohonan (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Memutuskan silsilah permohonan tertentu berdasarkan ID Silsilah.
+   */
+  unlinkParent: async (id: string, idSilsilah: number): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/unlink-parent/${idSilsilah}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memutuskan silsilah berkas permohonan (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Mencatat hasil kunjungan/inspeksi lapangan tim verifikator teknis (PWA).
+   */
+  createInspectionLog: async (id: string, formData: FormData): Promise<any> => {
+    const headers = { ...getAuthHeaders() };
+    // Catatan: jangan set 'Content-Type': 'application/json' karena ini multi-part form data
+    delete (headers as any)['Content-Type'];
+
+    const response = await fetch(`${API_BASE_URL}/${id}/inspection-logs`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal mencatat log inspeksi lapangan (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Mengambil riwayat log kunjungan/inspeksi lapangan.
+   */
+  getInspectionLogs: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/inspection-logs`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat log inspeksi lapangan (HTTP ${response.status})`);
     }
     return await response.json();
   }

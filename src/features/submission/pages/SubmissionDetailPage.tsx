@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * GEOSIPAS HTTP CONTROLLER — SubmissionDetailPage [SubmissionDetailPage.tsx] (REVISED v8.2)
+ * GEOSIPAS HTTP CONTROLLER — SubmissionDetailPage [SubmissionDetailPage.tsx] (REVISED v8.3)
  * ============================================================================
  * Peran: Halaman detail berkas pengajuan bagi pemohon dan dinas.
  *        Mendukung peninjauan data administratif, rincian teknis 13-aspek,
@@ -22,7 +22,7 @@ import type { Submission } from '../types';
 import {
   ArrowLeft, Clock, CheckCircle2, Download,
   XCircle, CheckCircle, FileSignature, AlertTriangle, Loader2,
-  Info, ShieldCheck
+  Info, ShieldCheck, Camera, Lock, Unlock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -31,7 +31,8 @@ import {
   SummaryTab, ApplicantTab, LocationTab,
   TechnicalTab, CompensationTab, PhotosTab, SilsilahTab
 } from '../components/detail-tabs';
-
+import { InspectionLogForm } from '../components/InspectionLogForm';
+import { InspectionLogsGallery } from '../components/InspectionLogsGallery';
 
 const getStatusBadgeClassLocal = (status: string) => {
   switch (status) {
@@ -77,10 +78,8 @@ export default function SubmissionDetailPage() {
   const setActiveKompensasi = useGisUIStore((s) => s.setActiveKompensasi);
   const flyTo = useGisUIStore((s) => s.flyTo);
 
-
   // State untuk Tab Aktif
-  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'silsilah' | 'audit'>('ringkasan');
-
+  const [activeTab, setActiveTab] = useState<'ringkasan' | 'pemohon' | 'lokasi' | 'teknis' | 'kompensasi' | 'foto' | 'silsilah' | 'audit' | 'inspeksi' | 'dokumen-sidak'>('ringkasan');
 
   // State dictionary kelayakan teknis
   const [checklistStates, setChecklistStates] = useState<Record<string, {
@@ -111,6 +110,13 @@ export default function SubmissionDetailPage() {
     enabled: !!id,
   });
 
+  const { data: inspectionLogsRes } = useQuery({
+    queryKey: ['submission-logs', id],
+    queryFn: () => SubmissionService.getInspectionLogs(id || ''),
+    enabled: !!id,
+  });
+  const logsCount = inspectionLogsRes?.data?.length || 0;
+
   // Pre-populate evaluasi checklist jika sudah ada di DB
   useEffect(() => {
     if (sub) {
@@ -127,8 +133,6 @@ export default function SubmissionDetailPage() {
       }
     }
   }, [sub]);
-
-
 
   // Mutation untuk Kunci Berkas (Claim Lock)
   const claimMutation = useMutation({
@@ -197,8 +201,6 @@ export default function SubmissionDetailPage() {
   const isLockedByMe = subData.adminLockId === user?.id || (!!user?.full_name && subData.adminLockName === user.full_name);
   const isTeknisiLockedByMe = subData.teknisiLockId === user?.id || (!!user?.full_name && subData.teknisiLockName === user.full_name);
 
-
-
   // ─── SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ───
   const renderTelaahStafSection = (data: Submission) => {
     const hasTechnicalResult = data.kkprVerdict || data.telaahStaf;
@@ -257,42 +259,44 @@ export default function SubmissionDetailPage() {
     <div className="space-y-6 font-sans text-slate-700">
 
       {/* ─── SEKSI 1: HEADER SUMMARY BLOCK ─── */}
-      <div className="flex items-center gap-4 select-none">
-        <button
-          onClick={() => navigate('/pengajuan/daftar')}
-          className="p-2 bg-white hover:bg-slate-50 border border-border text-slate-500 hover:text-slate-800 transition-colors rounded-none cursor-pointer outline-none"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="text-left flex-1">
-          <h1 className="text-2xl font-bold text-[#111D13] leading-none">
-            Rincian Berkas Pengajuan
-          </h1>
-          <p className="text-xs text-slate-500 mt-2">
-            Informasi administrasi, penelusuran riwayat evaluasi, dan lampiran berkas teknis {subData.submissionNo}.
-          </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none border-b border-slate-200 pb-4">
+        <div className="flex items-center gap-4 text-left">
+          <button
+            onClick={() => navigate('/pengajuan/daftar')}
+            className="p-2 bg-white hover:bg-slate-50 border border-border text-slate-500 hover:text-slate-800 transition-colors rounded-none cursor-pointer outline-none shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-[#111D13] leading-tight">
+              Rincian Berkas Pengajuan
+            </h1>
+            <p className="text-[11px] text-slate-500 mt-1 leading-normal">
+              Informasi administrasi, penelusuran riwayat, dan lampiran berkas teknis {subData.submissionNo}.
+            </p>
+          </div>
         </div>
 
         {/* DYNAMIC SLA TRACKER HUD */}
-        <div className="shrink-0 select-none flex items-center gap-3">
+        <div className="flex items-center gap-3 self-start md:self-auto select-none shrink-0">
           {isSlaPaused ? (
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 animate-pulse text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
-              <Clock className="h-4 w-4 text-rose-600" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 animate-pulse text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
+              <Clock className="h-3.5 w-3.5 text-rose-600" />
               SLA: DI-PAUSE (Revisi)
             </div>
           ) : subData.status === 'Disetujui' ? (
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
-              <CheckCircle className="h-4 w-4 text-emerald-600" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
               SLA: BERHASIL ({slaDaysRemaining} Hari)
             </div>
           ) : slaDaysRemaining < 0 ? (
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none animate-pulse">
-              <AlertTriangle className="h-4 w-4 text-rose-600" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none animate-pulse">
+              <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
               SLA: TERLEWATI {Math.abs(slaDaysRemaining)} HARI
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
-              <Clock className="h-4 w-4 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
+              <Clock className="h-3.5 w-3.5 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
               SLA: {slaDaysRemaining} Hari Tersisa
             </div>
           )}
@@ -381,7 +385,7 @@ export default function SubmissionDetailPage() {
 
           {/* Tab Navigation Menu */}
           <div className="flex border-b border-border overflow-x-auto select-none bg-slate-50 p-1 gap-1">
-            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit'] as const).map((tab) => {
+            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit', ...((activeRole && activeRole !== 'Pemohon') ? ['dokumen-sidak'] : []), ...((activeRole && activeRole !== 'Pemohon' && activeRole !== 'Kepala Bidang' && activeRole !== 'Kepala Dinas') ? ['inspeksi'] : [])] as const).map((tab) => {
               const isActive = activeTab === tab;
               const labels: Record<string, string> = {
                 ringkasan: 'Ringkasan',
@@ -391,7 +395,9 @@ export default function SubmissionDetailPage() {
                 kompensasi: 'Kompensasi Lahan',
                 foto: 'Foto Lapangan',
                 silsilah: 'Pemeriksaan Silsilah',
-                audit: 'Audit Trail'
+                audit: 'Audit Trail',
+                'dokumen-sidak': 'Dokumentasi Sidak',
+                inspeksi: 'Input Sidak Lapangan'
               };
               return (
                 <button
@@ -420,7 +426,7 @@ export default function SubmissionDetailPage() {
               </div>
             )}
             {activeTab === 'pemohon' && <ApplicantTab sub={subData} />}
-            {activeTab === 'lokasi' && <LocationTab sub={subData} />}
+            {activeTab === 'lokasi' && <LocationTab sub={subData} inspectionLogs={inspectionLogsRes?.data || []} />}
             {activeTab === 'teknis' && <TechnicalTab sub={subData} />}
             {activeTab === 'kompensasi' && (
               <CompensationTab sub={subData} onShowOnMap={handleShowCompensationOnMap} />
@@ -428,9 +434,18 @@ export default function SubmissionDetailPage() {
             {activeTab === 'foto' && <PhotosTab sub={subData} />}
             {activeTab === 'silsilah' && <SilsilahTab sub={subData} />}
             {activeTab === 'audit' && <AuditTrailViewer submissionId={subData.id} />}
+            {activeTab === 'dokumen-sidak' && (
+              <InspectionLogsGallery submissionId={subData.id} polygon={subData.location?.polygon} />
+            )}
+            {activeTab === 'inspeksi' && (
+              <InspectionLogForm
+                submissionId={subData.id}
+                onSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true });
+                }}
+              />
+            )}
           </div>
-
-
 
         </div>
 
@@ -577,7 +592,7 @@ export default function SubmissionDetailPage() {
               </div>
             ) : !isLockedByMe ? (
               <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
-                <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold">Berkas Sedang Terkunci</p>
                   <p className="mt-1 text-slate-600">
@@ -648,7 +663,7 @@ export default function SubmissionDetailPage() {
               </div>
             ) : !isTeknisiLockedByMe ? (
               <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
-                <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold">Berkas Sedang Terkunci</p>
                   <p className="mt-1 text-slate-600">
@@ -657,22 +672,75 @@ export default function SubmissionDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button
-                  type="button"
-                  disabled={unclaimMutation.isPending}
-                  onClick={() => unclaimMutation.mutate()}
-                  className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
-                >
-                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
-                </button>
-                <Link
-                  to={`/pengajuan/verifikasi/${subData.id}`}
-                  className="flex-1 py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  <span>Mulai Verifikasi Teknis</span>
-                </Link>
+              <div className="space-y-2.5 w-full pt-2">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    disabled={unclaimMutation.isPending}
+                    onClick={() => unclaimMutation.mutate()}
+                    className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white flex items-center justify-center"
+                  >
+                    {unclaimMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <Unlock size={13} className="mr-1.5 text-slate-400" />
+                    )}
+                    <span>Lepas Kunci</span>
+                  </button>
+
+                  {logsCount > 0 ? (
+                    <Link
+                      to={`/pengajuan/verifikasi/${subData.id}`}
+                      className="flex-1 py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>Mulai Verifikasi Teknis</span>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      title="Matriks Penilaian Teknis Terkunci: Wajib mengunggah log inspeksi lapangan terlebih dahulu."
+                      className="flex-1 py-2.5 bg-slate-100 text-slate-400 font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-slate-200 cursor-not-allowed shadow-none"
+                    >
+                      <Lock size={13} className="text-slate-400" />
+                      <span>Verifikasi Terkunci</span>
+                    </button>
+                  )}
+                </div>
+
+                {logsCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('inspeksi');
+                      document.getElementById('root')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="w-full py-2.5 bg-slate-100 border border-slate-350 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-widest rounded-none flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm text-center"
+                  >
+                    <Camera size={13} className="text-slate-500" />
+                    <span>Ambil Foto Lapangan Tambahan</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('inspeksi');
+                      document.getElementById('root')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer shadow-md text-center"
+                  >
+                    <Camera size={14} className="text-teal-400" />
+                    <span>Ambil Foto Sidak Lapangan</span>
+                  </button>
+                )}
+
+                {logsCount === 0 && (
+                  <div className="flex items-center gap-1.5 justify-center text-[9.5px] text-rose-600 font-semibold mt-1">
+                    <AlertTriangle size={11} className="shrink-0" />
+                    <span>Ulasan kunjungan lapangan wajib dikirim terlebih dahulu untuk membuka kunci penilaian.</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

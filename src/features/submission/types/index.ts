@@ -1,13 +1,13 @@
 /**
  * ============================================================================
- * GEOSIPAS SYSTEM CONTRACTS — [src/features/submission/types/index.ts] (REVISED v5.3)
+ * GEOSIPAS SYSTEM CONTRACTS — [src/features/submission/types/index.ts] (REVISED v5.4)
  * ============================================================================
  * Peran: Kontrak tipe data (Single Source of Truth) untuk permohonan site plan.
  *        Diperbarui penuh untuk mendukung perbandingan metrik tiga sisi,
  *        dynamic checklist evaluasi dinas, metadata verifikasi KKPR, peran baru,
  *        riwayat silsilah permohonan (Revisi) baik di tingkat root objek (GET) 
  *        maupun tingkat skema biner (POST), snapshot dokumen Telaah Staf, 
- *        serta draf Surat Keputusan (SK) resmi.
+ *        serta draf Surat Keputusan (SK) resmi berbasis dimensi fisik absolut (m²).
  * ============================================================================
  */
 
@@ -302,24 +302,46 @@ export interface Submission {
   photos?: PhotoDetails;
   statement?: StatementDetails;
 
-  // ─── REVISI: PROPOSED METRICS (DEKLARASI MANDIRI PEMOHON) ───
+  // ─── Proposed Metrics (Deklarasi Mandiri Pemohon) ───
   applicantBuildingArea?: number; // Luas bangunan total (KDB m2)
   applicantGsb?: number;          // GSB usulan (m)
   applicantRthArea?: number;      // Luas RTH usulan (m2)
 
-  // ─── REVISI: BYLAW METRICS (BATAS RDTR DINAMIS DARI SYSTEM) ───
+  // ─── Bylaw Metrics (Batas RDTR Dinamis dari System) ───
   bylawMaxKdb?: number;
   bylawMaxKlb?: number;
   bylawMinKdh?: number;
   bylawMinGsb?: number;
   bylawMinRthArea?: number;
 
-  // ─── REVISI: VERIFIED METRICS (HITUNG MANUAL OLEH VERIFIKATOR) ───
+  // ─── Verified Fallbacks & Ratios (Hasil Evaluasi Diterima) ───
   verifiedKdb?: number;
   verifiedKlb?: number;
   verifiedKdh?: number;
   verifiedGsb?: number;
   verifiedRthArea?: number;
+
+  // ─── BARU: RAW DIMENSION METRICS TERVERIFIKASI TIM TEKNIS (m² / meter) ───
+  verifiedLandArea?: number;         // Luas Lahan Terverifikasi Fisik (m²)
+  verifiedBuildingArea?: number;     // Luas Tapak/Dasar Bangunan Terverifikasi (m²)
+  verifiedTotalFloorArea?: number;   // Luas Total Lantai Terverifikasi (m²)
+
+  // ─── BARU: SPATIAL ERROR / GALAT SPASIAL DARI BACKEND (m² & %) ───
+  landAreaErrorSqm?: number;
+  landAreaErrorPercent?: number;
+  buildingAreaErrorSqm?: number;
+  buildingAreaErrorPercent?: number;
+  totalFloorAreaErrorSqm?: number;
+  totalFloorAreaErrorPercent?: number;
+  rthAreaErrorSqm?: number;
+  rthAreaErrorPercent?: number;
+
+  // ─── BARU: AUTOMATED BYLAWS AUDIT (COMPLIANCE FLAGS) ───
+  isKdbCompliant?: boolean | null;
+  isKlbCompliant?: boolean | null;
+  isKdhCompliant?: boolean | null;
+  isGsbCompliant?: boolean | null;
+  isRthAreaCompliant?: boolean | null;
 
   // ─── REVISI: METADATA HASIL EVALUASI KKPR AKHIR ───
   kkprVerdict?: KKPRVerdict;       // Sesuai | Sesuai Bersyarat | Perlu Perbaikan / Revisi | Tidak Sesuai / Ditolak
@@ -329,7 +351,7 @@ export interface Submission {
   // ─── REVISI: DYNAMIC CHECKLIST EVALUASI MANDIRI DINAS ───
   evaluationChecklist?: EvaluationChecklistItem[];
 
-  // ─── AMANDEMEN: SNAPSHOT METADATA DOKUMEN TELAAH STAF (Fase 2) ───
+  // ─── SNAPSHOT METADATA DOKUMEN TELAAH STAF (Fase 2) ───
   telaahStaf?: {
     idTelaah: string;
     verdict: string;
@@ -339,10 +361,10 @@ export interface Submission {
     payload: any;
   };
 
-  // ─── BARU TAHAP 1: SNAPSHOT METADATA KEPUTUSAN DRAF SK (TAHAP 5 INTEGRASI) ───
+  // ─── SNAPSHOT METADATA KEPUTUSAN DRAF SK (TAHAP 5 INTEGRASI) ───
   skDraft?: SkDraft | null;
 
-  // ─── UPDATE FASE 5 (REVISI): SILSILAH PERMOHONAN SELF-REFERENTIAL ────────
+  // ─── SILSILAH PERMOHONAN SELF-REFERENTIAL ───
   baseline_source?: 'DIGITAL' | 'LEGACY' | null;
   parent_id_permohonan?: string | null;
   legacy_metadata?: LegacyMetadata | null;
@@ -352,7 +374,7 @@ export interface Submission {
   replaced_sk_date?: string | null;
   replaced_sk_doc_url?: string | null;
 
-  // ─── BARU FASE 2: DETAIL TPU & KOMPENSASI DEKLARASI MANDIRI ───
+  // ─── DETAIL TPU & KOMPENSASI DEKLARASI MANDIRI ───
   tpu?: {
     method: 'MANDIRI' | 'EKSISTING' | 'KERJASAMA' | 'KOMPENSASI_UANG' | 'INTEGRASI_WARGA';
     area?: number;

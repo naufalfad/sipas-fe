@@ -94,47 +94,58 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
       </div>
 
       {/* ─── BARU: SEKSI 1.5: RUJUKAN DOKUMEN TERDAHULU (SILSILAH) ─── */}
-      {sub.submissionDetails?.submissionType === 'REVISI' && (
-        <div>
-          <div className="flex items-center justify-between border-b border-border pb-2 mb-4 select-none">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Rujukan Dokumen Terdahulu (Silsilah)</h3>
-            <button type="button" onClick={() => setOpenSilsilah((v) => !v)} className="text-slate-500 cursor-pointer outline-none border-none bg-transparent">
-              {openSilsilah ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          </div>
-          {openSilsilah && (
-            <div className="p-4 border-l-2 border-amber-500 bg-[#fdfbf7] grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-left animate-in fade-in duration-200">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nomor SK Terdahulu</span>
-                <span className="text-xs font-mono font-bold text-slate-800 block">
-                  {sub.replaced_sk_number || '-'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Tanggal Terbit</span>
-                <span className="text-xs font-bold text-slate-800 block">
-                  {sub.replaced_sk_date || '-'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Salinan SK Lama</span>
-                {sub.replaced_sk_doc_url ? (
-                  <a
-                    href={resolveDocUrl(sub.replaced_sk_doc_url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline mt-1 leading-none decoration-none"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Buka Salinan SK Lama
-                  </a>
-                ) : (
-                  <span className="text-xs text-slate-400 block mt-1 font-semibold">Tidak ada lampiran berkas</span>
-                )}
-              </div>
+      {sub.submissionDetails?.submissionType === 'REVISI' && (() => {
+        const firstLineage = sub.parents_lineage && sub.parents_lineage.length > 0 ? sub.parents_lineage[0] : null;
+        const replacedSkNumber = firstLineage 
+          ? (firstLineage.baseline_source === 'DIGITAL' 
+              ? (firstLineage.parent_sk_number || firstLineage.parent_id) 
+              : firstLineage.legacy_sk_number)
+          : null;
+        const replacedSkDate = firstLineage ? firstLineage.legacy_sk_date : null;
+        const replacedSkDocUrl = firstLineage ? firstLineage.legacy_sk_doc_url : null;
+
+        return (
+          <div>
+            <div className="flex items-center justify-between border-b border-border pb-2 mb-4 select-none">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Rujukan Dokumen Terdahulu (Silsilah)</h3>
+              <button type="button" onClick={() => setOpenSilsilah((v) => !v)} className="text-slate-500 cursor-pointer outline-none border-none bg-transparent">
+                {openSilsilah ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
             </div>
-          )}
-        </div>
-      )}
+            {openSilsilah && (
+              <div className="p-4 border-l-2 border-amber-500 bg-[#fdfbf7] grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-left animate-in fade-in duration-200">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nomor SK Terdahulu</span>
+                  <span className="text-xs font-mono font-bold text-slate-800 block">
+                    {replacedSkNumber || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Tanggal Terbit</span>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    {replacedSkDate || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Salinan SK Lama</span>
+                  {replacedSkDocUrl ? (
+                    <a
+                      href={resolveDocUrl(replacedSkDocUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline mt-1 leading-none decoration-none"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Buka Salinan SK Lama
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-400 block mt-1 font-semibold">Tidak ada lampiran berkas</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── SEKSI 2: BERKAS LAMPIRAN PENGAJUAN ─── */}
       <div>

@@ -104,7 +104,7 @@ export const SubmissionSection = () => {
           <select {...register('submission.submissionType')} className={inputClass}>
             <option value="BARU">Site Plan Baru (Lahan Bersih)</option>
             <option value="REVISI">Revisi Pengesahan Site Plan</option>
-            <option value="PERPANJANGAN">Perpanjangan Masa Berlaku</option>
+            
           </select>
         </div>
 
