@@ -40,19 +40,7 @@ const BOGOR_KAB_BOUNDARY: [number, number][] = [
     [-6.3470, 106.5298]  // Tutup
 ];
 
-// Donut Polygon Mask: Luar wilayah Kabupaten Bogor akan ditutup mask redup
-const BOGOR_KAB_MASK: [number, number][][] = [
-    // Outer ring covering the globe
-    [
-        [-90, -180],
-        [-90, 180],
-        [90, 180],
-        [90, -180],
-        [-90, -180]
-    ],
-    // Inner ring (hole) representing Kabupaten Bogor
-    BOGOR_KAB_BOUNDARY
-];
+
 
 const BASEMAPS = {
     osm: {
@@ -214,6 +202,8 @@ interface MapControlsProps {
     setActiveBaseMap: (v: keyof typeof BASEMAPS) => void;
     isMaskActive: boolean;
     setIsMaskActive: (v: boolean) => void;
+    maskOpacity: number;
+    setMaskOpacity: (v: number) => void;
     showDesaBorders: boolean;
     setShowDesaBorders: (v: boolean) => void;
 }
@@ -225,6 +215,8 @@ function MapControls({
     setActiveBaseMap,
     isMaskActive,
     setIsMaskActive,
+    maskOpacity,
+    setMaskOpacity,
     showDesaBorders,
     setShowDesaBorders,
 }: MapControlsProps) {
@@ -268,17 +260,35 @@ function MapControls({
                 </button>
 
                 {/* Tombol Mask / Fokus Wilayah */}
-                <button
-                    type="button"
-                    onClick={() => setIsMaskActive(!isMaskActive)}
-                    className={cn(
-                        "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer",
-                        isMaskActive ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setIsMaskActive(!isMaskActive)}
+                        className={cn(
+                            "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer w-full",
+                            isMaskActive ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        )}
+                        title={isMaskActive ? 'Hilangkan Redup Wilayah' : 'Redupkan Luar Wilayah'}
+                    >
+                        <Globe className="w-4.5 h-4.5" />
+                    </button>
+                    {isMaskActive && (
+                        <div className="absolute right-11 top-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 w-44 flex flex-col gap-1 z-[1010] text-left">
+                            <div className="flex justify-between items-center text-[10px] select-none">
+                                <span className="font-bold text-slate-500 uppercase">Keredupan:</span>
+                                <span className="font-mono font-bold text-teal-600">{maskOpacity}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="90"
+                                value={maskOpacity}
+                                onChange={(e) => setMaskOpacity(parseInt(e.target.value))}
+                                className="w-full h-1 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-teal-600 focus:outline-none"
+                            />
+                        </div>
                     )}
-                    title={isMaskActive ? 'Hilangkan Redup Wilayah' : 'Redupkan Luar Wilayah'}
-                >
-                    <Globe className="w-4.5 h-4.5" />
-                </button>
+                </div>
 
                 {/* Tombol Batas Desa */}
                 <button
@@ -368,25 +378,62 @@ export default function GISMapContainer({
     const [activeBaseMap, setActiveBaseMap] = useState<keyof typeof BASEMAPS>('osm');
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
     const [isMaskActive, setIsMaskActive] = useState(true);
+    const [maskOpacity, setMaskOpacity] = useState(45); // Keredupan default 45%
     const [showDesaBorders, setShowDesaBorders] = useState(false);
-    const [desaGeoJson, setDesaGeoJson] = useState<any>(null);
+    const [bogorGeoJson, setBogorGeoJson] = useState<any>(null);
 
-    // Fetch batas desa secara dinamis saat diaktifkan
+    // Fetch batas administrasi desa resmi Kabupaten Bogor (simplified) saat mount
     useEffect(() => {
-        if (showDesaBorders && !desaGeoJson) {
-            fetch('/geojson/kab%20bogor/ADMINISTRASIDESA_AR_25K.json')
-                .then((res) => {
-                    if (!res.ok) throw new Error('File not found');
-                    return res.json();
-                })
-                .then((data) => {
-                    setDesaGeoJson(data);
-                })
-                .catch((err) => {
-                    console.error('[GISMapContainer] Gagal memuat batas desa:', err);
+        let active = true;
+        fetch('/geojson/kab%20bogor/KAB_BOGOR_KECAMATAN.json')
+            .then((res) => {
+                if (!res.ok) throw new Error('File outline not found');
+                return res.json();
+            })
+            .then((data) => {
+                if (active) setBogorGeoJson(data);
+            })
+            .catch((err) => {
+                console.error('[GISMapContainer] Gagal memuat batas wilayah administrasi:', err);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    // Ekstraksi ring poligon dinamis dari GeoJSON untuk di-cutout sebagai lubang di mask redup
+    const maskRings = React.useMemo(() => {
+        if (!bogorGeoJson) return [];
+        const rings: [number, number][][] = [
+            // Ring luar menutupi seluruh bola dunia
+            [
+                [-90, -180],
+                [-90, 180],
+                [90, 180],
+                [90, -180],
+                [-90, -180]
+            ]
+        ];
+
+        bogorGeoJson.features.forEach((feature: any) => {
+            const geom = feature.geometry;
+            if (!geom) return;
+
+            if (geom.type === 'Polygon') {
+                geom.coordinates.forEach((ring: any[]) => {
+                    rings.push(ring.map((p) => [p[1], p[0]])); // Konversi Leaflet format [lat, lng]
                 });
-        }
-    }, [showDesaBorders, desaGeoJson]);
+            } else if (geom.type === 'MultiPolygon') {
+                geom.coordinates.forEach((poly: any[][]) => {
+                    poly.forEach((ring: any[]) => {
+                        rings.push(ring.map((p) => [p[1], p[0]]));
+                    });
+                });
+            }
+        });
+
+        return rings;
+    }, [bogorGeoJson]);
 
     // Zoom state untuk sidebar eksternal (saat fullscreen)
     const [zoomInTrigger, setZoomInTrigger] = useState(0);
@@ -482,22 +529,41 @@ export default function GISMapContainer({
                         <div className="w-full h-px bg-slate-150" />
 
                         {/* Toggle Mask Wilayah */}
-                        <button
-                            type="button"
-                            onClick={() => setIsMaskActive(!isMaskActive)}
-                            className={cn(
-                                "w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
-                                isMaskActive
-                                    ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
-                                    : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                        <div className="relative w-full flex justify-center h-16">
+                            <button
+                                type="button"
+                                onClick={() => setIsMaskActive(!isMaskActive)}
+                                className={cn(
+                                    "w-full h-full flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
+                                    isMaskActive
+                                        ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
+                                        : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                                )}
+                                title="Redupkan Wilayah Luar Kabupaten Bogor"
+                            >
+                                <Globe size={18} />
+                                <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                    Fokus
+                                </span>
+                            </button>
+
+                            {isMaskActive && (
+                                <div className="absolute left-16 top-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 w-44 flex flex-col gap-1 z-[1010] text-left">
+                                    <div className="flex justify-between items-center text-[10px] select-none">
+                                        <span className="font-bold text-slate-500 uppercase">Keredupan:</span>
+                                        <span className="font-mono font-bold text-teal-600">{maskOpacity}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="90"
+                                        value={maskOpacity}
+                                        onChange={(e) => setMaskOpacity(parseInt(e.target.value))}
+                                        className="w-full h-1 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-teal-600 focus:outline-none"
+                                    />
+                                </div>
                             )}
-                            title="Redupkan Wilayah Luar Kabupaten Bogor"
-                        >
-                            <Globe size={18} />
-                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
-                                Fokus
-                            </span>
-                        </button>
+                        </div>
 
                         <div className="w-full h-px bg-slate-150" />
 
@@ -570,34 +636,33 @@ export default function GISMapContainer({
                                 maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
                             />
                             {/* Batas Administrasi Wilayah Kabupaten Bogor (dengan Mask Redup / Fokus Wilayah) */}
-                            {isMaskActive ? (
+                            {isMaskActive && maskRings.length > 0 && (
                                 <Polygon
-                                    positions={BOGOR_KAB_MASK}
+                                    positions={maskRings}
                                     pathOptions={{
-                                        color: '#0f766e',
-                                        weight: 2,
-                                        dashArray: '8, 8',
+                                        color: 'transparent',
+                                        weight: 0,
                                         fillColor: '#090d16',
-                                        fillOpacity: 0.45,
-                                        interactive: false
-                                    }}
-                                />
-                            ) : (
-                                <Polygon
-                                    positions={BOGOR_KAB_BOUNDARY}
-                                    pathOptions={{
-                                        color: '#0f766e',
-                                        weight: 2,
-                                        dashArray: '8, 8',
-                                        fill: false,
+                                        fillOpacity: maskOpacity / 100,
                                         interactive: false
                                     }}
                                 />
                             )}
-                            {/* Render Batas Desa Resmi Kabupaten Bogor */}
-                            {showDesaBorders && desaGeoJson && (
+                            {/* Garis Batas Administrasi Terluar */}
+                            <Polygon
+                                positions={BOGOR_KAB_BOUNDARY}
+                                pathOptions={{
+                                    color: '#0f766e',
+                                    weight: 2,
+                                    dashArray: '8, 8',
+                                    fill: false,
+                                    interactive: false
+                                }}
+                            />
+                            {/* Render Batas Kecamatan/Desa Resmi Kabupaten Bogor dari GeoJSON */}
+                            {showDesaBorders && bogorGeoJson && (
                                 <GeoJSON
-                                    data={desaGeoJson}
+                                    data={bogorGeoJson}
                                     style={{
                                         color: '#0d9488',
                                         weight: 1.0,
@@ -695,34 +760,33 @@ export default function GISMapContainer({
                     maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
                 />
                 {/* Batas Administrasi Wilayah Kabupaten Bogor (dengan Mask Redup / Fokus Wilayah) */}
-                {isMaskActive ? (
+                {isMaskActive && maskRings.length > 0 && (
                     <Polygon
-                        positions={BOGOR_KAB_MASK}
+                        positions={maskRings}
                         pathOptions={{
-                            color: '#0f766e',
-                            weight: 2,
-                            dashArray: '8, 8',
+                            color: 'transparent',
+                            weight: 0,
                             fillColor: '#090d16',
-                            fillOpacity: 0.45,
-                            interactive: false
-                        }}
-                    />
-                ) : (
-                    <Polygon
-                        positions={BOGOR_KAB_BOUNDARY}
-                        pathOptions={{
-                            color: '#0f766e',
-                            weight: 2,
-                            dashArray: '8, 8',
-                            fill: false,
+                            fillOpacity: maskOpacity / 100,
                             interactive: false
                         }}
                     />
                 )}
-                {/* Render Batas Desa Resmi Kabupaten Bogor */}
-                {showDesaBorders && desaGeoJson && (
+                {/* Garis Batas Administrasi Terluar */}
+                <Polygon
+                    positions={BOGOR_KAB_BOUNDARY}
+                    pathOptions={{
+                        color: '#0f766e',
+                        weight: 2,
+                        dashArray: '8, 8',
+                        fill: false,
+                        interactive: false
+                    }}
+                />
+                {/* Render Batas Kecamatan/Desa Resmi Kabupaten Bogor dari GeoJSON */}
+                {showDesaBorders && bogorGeoJson && (
                     <GeoJSON
-                        data={desaGeoJson}
+                        data={bogorGeoJson}
                         style={{
                             color: '#0d9488',
                             weight: 1.0,
@@ -749,6 +813,10 @@ export default function GISMapContainer({
                     setActiveBaseMap={setActiveBaseMap}
                     isMaskActive={isMaskActive}
                     setIsMaskActive={setIsMaskActive}
+                    maskOpacity={maskOpacity}
+                    setMaskOpacity={setMaskOpacity}
+                    showDesaBorders={showDesaBorders}
+                    setShowDesaBorders={setShowDesaBorders}
                 />
                 {children}
             </MapContainer>
