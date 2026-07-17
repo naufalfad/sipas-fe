@@ -592,7 +592,7 @@ export default function SubmissionDetailPage() {
               </div>
             ) : !isLockedByMe ? (
               <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
-                <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" />
+                <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold">Berkas Sedang Terkunci</p>
                   <p className="mt-1 text-slate-600">
@@ -608,7 +608,7 @@ export default function SubmissionDetailPage() {
                   onClick={() => unclaimMutation.mutate()}
                   className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
                 >
-                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "Lepas Kunci (Batal)"}
                 </button>
                 <Link
                   to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
@@ -663,7 +663,7 @@ export default function SubmissionDetailPage() {
               </div>
             ) : !isTeknisiLockedByMe ? (
               <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed">
-                <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" />
+                <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold">Berkas Sedang Terkunci</p>
                   <p className="mt-1 text-slate-600">
@@ -716,7 +716,7 @@ export default function SubmissionDetailPage() {
                       setActiveTab('inspeksi');
                       document.getElementById('root')?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="w-full py-2.5 bg-slate-100 border border-slate-350 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-widest rounded-none flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm text-center"
+                    className="w-full py-2.5 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-widest rounded-none flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm text-center"
                   >
                     <Camera size={13} className="text-slate-500" />
                     <span>Ambil Foto Lapangan Tambahan</span>
