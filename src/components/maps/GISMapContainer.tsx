@@ -12,6 +12,8 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as turf from '@turf/turf';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 interface GISMapContainerProps {
@@ -51,21 +53,27 @@ const BASEMAPS = {
 
 /**
  * Listener internal untuk menjembatani event eksternal (dari sidebar)
- * ke fungsi Leaflet (zoomIn, zoomOut, invalidateSize).
+ * ke fungsi Leaflet (zoomIn, zoomOut, invalidateSize) serta kalkulasi real-time.
  */
-interface ZoomListenerProps {
+interface MapSyncListenerProps {
     zoomInTrigger: number;
     zoomOutTrigger: number;
     onZoomChange: (zoom: number) => void;
     isFullscreen: boolean;
+    onMouseMove: (coords: { lat: number; lng: number } | null) => void;
+    onAreaChange: (area: number) => void;
+    onCenterChange: (centerStr: string) => void;
 }
 
-function ZoomListener({
+function MapSyncListener({
     zoomInTrigger,
     zoomOutTrigger,
     onZoomChange,
     isFullscreen,
-}: ZoomListenerProps) {
+    onMouseMove,
+    onAreaChange,
+    onCenterChange,
+}: MapSyncListenerProps) {
     const map = useMap();
 
     // Sinkronisasi status zoom ke state luar
@@ -100,6 +108,68 @@ function ZoomListener({
         }, 150);
         return () => clearTimeout(timer);
     }, [map, isFullscreen]);
+
+    // Handle Live Cursor Tracker
+    useEffect(() => {
+        const handleMouseMove = (e: any) => {
+            onMouseMove({ lat: e.latlng.lat, lng: e.latlng.lng });
+        };
+        const handleMouseOut = () => {
+            onMouseMove(null);
+        };
+        map.on('mousemove', handleMouseMove);
+        map.on('mouseout', handleMouseOut);
+        return () => {
+            map.off('mousemove', handleMouseMove);
+            map.off('mouseout', handleMouseOut);
+        };
+    }, [map, onMouseMove]);
+
+    // Kalkulasi Luas Lahan & Centroid secara Dinamis berbasis Turf.js
+    useEffect(() => {
+        const calculateStats = () => {
+            let totalArea = 0;
+            let centerStr = '-';
+
+            map.eachLayer((layer) => {
+                // Cari polygon layer yang valid
+                if (layer instanceof L.Polygon && !(layer instanceof L.Rectangle)) {
+                    try {
+                        const geojson = layer.toGeoJSON();
+                        totalArea += turf.area(geojson);
+
+                        const bounds = layer.getBounds();
+                        const center = bounds.getCenter();
+                        centerStr = `Lat: ${center.lat.toFixed(6)}, Lng: ${center.lng.toFixed(6)}`;
+                    } catch (e) {
+                        console.error('[GISMapContainer] Gagal kalkulasi bidang:', e);
+                    }
+                }
+            });
+
+            onAreaChange(totalArea);
+            onCenterChange(centerStr);
+        };
+
+        // Pasang event listener pada setiap perubahan objek geoman maupun upload eksternal
+        map.on('pm:create', calculateStats);
+        map.on('pm:edit', calculateStats);
+        map.on('pm:remove', calculateStats);
+        map.on('layeradd', calculateStats);
+        map.on('layerremove', calculateStats);
+
+        // Jalankan sekali di awal
+        const timer = setTimeout(calculateStats, 500);
+
+        return () => {
+            map.off('pm:create', calculateStats);
+            map.off('pm:edit', calculateStats);
+            map.off('pm:remove', calculateStats);
+            map.off('layeradd', calculateStats);
+            map.off('layerremove', calculateStats);
+            clearTimeout(timer);
+        };
+    }, [map, onAreaChange, onCenterChange]);
 
     return null;
 }
@@ -239,10 +309,15 @@ export default function GISMapContainer({
     const [zoomOutTrigger, setZoomOutTrigger] = useState(0);
     const [currentZoom, setCurrentZoom] = useState(zoom);
 
+    // HUD Stats Dinamis
+    const [calculatedArea, setCalculatedArea] = useState<number>(0);
+    const [centerPoint, setCenterPoint] = useState<string>('-');
+    const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
+
     // Mode Fullscreen dengan struktur navbar & sidebar terintegrasi
     if (isFullscreen) {
         return (
-            <div className="fixed inset-0 z-[9999] bg-slate-50 w-screen h-screen flex flex-col font-sans select-none antialiased">
+            <div className="fixed inset-0 z-[9999] bg-slate-50 w-screen h-screen flex flex-col font-sans select-none antialiased text-slate-800">
                 {/* 1. NAVBAR ATAS TEMA GIS VIEWERS */}
                 <header className="h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 shadow-sm shrink-0">
                     <div className="flex items-center gap-3 text-left">
@@ -370,14 +445,66 @@ export default function GISMapContainer({
                                 maxZoom={20}
                                 maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
                             />
-                            <ZoomListener
+                            <MapSyncListener
                                 zoomInTrigger={zoomInTrigger}
                                 zoomOutTrigger={zoomOutTrigger}
                                 onZoomChange={setCurrentZoom}
                                 isFullscreen={isFullscreen}
+                                onMouseMove={setCursorCoords}
+                                onAreaChange={setCalculatedArea}
+                                onCenterChange={setCenterPoint}
                             />
                             {children}
                         </MapContainer>
+
+                        {/* FLOATING MAP HUD / CARD INFORMASI SPASIAL DI KANAN BAWAH */}
+                        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm border border-slate-200 shadow-lg p-4 w-72 text-left text-xs z-[1000] flex flex-col gap-3 rounded-none">
+                            <div className="border-b border-slate-100 pb-2">
+                                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                                    <Globe className="w-3.5 h-3.5 text-teal-600" />
+                                    <span>Informasi Spasial Lahan</span>
+                                </h4>
+                            </div>
+                            <div className="space-y-1.5 text-slate-600">
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-slate-400">Luas Lahan:</span>
+                                    <span className="font-bold text-slate-800">
+                                        {calculatedArea > 0 
+                                            ? `${calculatedArea.toLocaleString('id-ID', { maximumFractionDigits: 2 })} m²` 
+                                            : '-'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-slate-400">Luas Hektar:</span>
+                                    <span className="font-bold text-slate-800">
+                                        {calculatedArea > 0 
+                                            ? `${(calculatedArea / 10000).toLocaleString('id-ID', { maximumFractionDigits: 4 })} Ha` 
+                                            : '-'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-slate-400">Pusat Bidang:</span>
+                                    <span className="font-mono text-[10px] text-slate-800">{centerPoint}</span>
+                                </div>
+                                <div className="flex justify-between border-t border-slate-100 pt-1.5 mt-1.5">
+                                    <span className="font-medium text-slate-400">Kursor (GPS Live):</span>
+                                    <span className="font-mono text-[10px] text-slate-800">
+                                        {cursorCoords 
+                                            ? `Lat: ${cursorCoords.lat.toFixed(6)}, Lng: ${cursorCoords.lng.toFixed(6)}` 
+                                            : '-'}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div className="border-t border-slate-100 pt-2 text-[9.5px] leading-relaxed text-slate-400">
+                                <span className="font-bold text-slate-500 uppercase block mb-1">Bantuan Menggambar:</span>
+                                <ul className="list-disc pl-3.5 space-y-0.5">
+                                    <li>Pilih alat gambar poligon di sudut kiri atas peta.</li>
+                                    <li>Klik peta untuk membuat batas bidang tanah baru.</li>
+                                    <li>Gunakan tombol **Base Map** di sidebar untuk mengganti visualisasi satelit.</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -403,6 +530,15 @@ export default function GISMapContainer({
                     attribution={BASEMAPS[activeBaseMap].attribution}
                     maxZoom={20}
                     maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
+                />
+                <MapSyncListener
+                    zoomInTrigger={zoomInTrigger}
+                    zoomOutTrigger={zoomOutTrigger}
+                    onZoomChange={setCurrentZoom}
+                    isFullscreen={isFullscreen}
+                    onMouseMove={setCursorCoords}
+                    onAreaChange={setCalculatedArea}
+                    onCenterChange={setCenterPoint}
                 />
                 <MapControls
                     isFullscreen={isFullscreen}
