@@ -40,6 +40,20 @@ const BOGOR_KAB_BOUNDARY: [number, number][] = [
     [-6.3470, 106.5298]  // Tutup
 ];
 
+// Donut Polygon Mask: Luar wilayah Kabupaten Bogor akan ditutup mask redup
+const BOGOR_KAB_MASK: [number, number][][] = [
+    // Outer ring covering the globe
+    [
+        [-90, -180],
+        [-90, 180],
+        [90, 180],
+        [90, -180],
+        [-90, -180]
+    ],
+    // Inner ring (hole) representing Kabupaten Bogor
+    BOGOR_KAB_BOUNDARY
+];
+
 const BASEMAPS = {
     osm: {
         name: 'OpenStreetMap',
@@ -198,6 +212,8 @@ interface MapControlsProps {
     setIsFullscreen: (v: boolean) => void;
     activeBaseMap: keyof typeof BASEMAPS;
     setActiveBaseMap: (v: keyof typeof BASEMAPS) => void;
+    isMaskActive: boolean;
+    setIsMaskActive: (v: boolean) => void;
 }
 
 function MapControls({
@@ -205,6 +221,8 @@ function MapControls({
     setIsFullscreen,
     activeBaseMap,
     setActiveBaseMap,
+    isMaskActive,
+    setIsMaskActive,
 }: MapControlsProps) {
     const map = useMap();
     const [currentZoom, setCurrentZoom] = useState(map.getZoom());
@@ -243,6 +261,19 @@ function MapControls({
                     title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh'}
                 >
                     {isFullscreen ? <Minimize2 className="w-4.5 h-4.5 text-slate-600" /> : <Maximize2 className="w-4.5 h-4.5 text-slate-600" />}
+                </button>
+
+                {/* Tombol Mask / Fokus Wilayah */}
+                <button
+                    type="button"
+                    onClick={() => setIsMaskActive(!isMaskActive)}
+                    className={cn(
+                        "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer",
+                        isMaskActive ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    )}
+                    title={isMaskActive ? 'Hilangkan Redup Wilayah' : 'Redupkan Luar Wilayah'}
+                >
+                    <Globe className="w-4.5 h-4.5" />
                 </button>
 
                 {/* Tombol Zoom */}
@@ -319,6 +350,7 @@ export default function GISMapContainer({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [activeBaseMap, setActiveBaseMap] = useState<keyof typeof BASEMAPS>('osm');
     const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
+    const [isMaskActive, setIsMaskActive] = useState(true);
 
     // Zoom state untuk sidebar eksternal (saat fullscreen)
     const [zoomInTrigger, setZoomInTrigger] = useState(0);
@@ -461,17 +493,31 @@ export default function GISMapContainer({
                                 maxZoom={20}
                                 maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
                             />
-                            {/* Batas Administrasi Wilayah Kabupaten Bogor */}
-                            <Polygon
-                                positions={BOGOR_KAB_BOUNDARY}
-                                pathOptions={{
-                                    color: '#0f766e',
-                                    weight: 2,
-                                    dashArray: '8, 8',
-                                    fill: false,
-                                    interactive: false
-                                }}
-                            />
+                            {/* Batas Administrasi Wilayah Kabupaten Bogor (dengan Mask Redup / Fokus Wilayah) */}
+                            {isMaskActive ? (
+                                <Polygon
+                                    positions={BOGOR_KAB_MASK}
+                                    pathOptions={{
+                                        color: '#0f766e',
+                                        weight: 2,
+                                        dashArray: '8, 8',
+                                        fillColor: '#090d16',
+                                        fillOpacity: 0.45,
+                                        interactive: false
+                                    }}
+                                />
+                            ) : (
+                                <Polygon
+                                    positions={BOGOR_KAB_BOUNDARY}
+                                    pathOptions={{
+                                        color: '#0f766e',
+                                        weight: 2,
+                                        dashArray: '8, 8',
+                                        fill: false,
+                                        interactive: false
+                                    }}
+                                />
+                            )}
                             <MapSyncListener
                                 zoomInTrigger={zoomInTrigger}
                                 zoomOutTrigger={zoomOutTrigger}
@@ -558,17 +604,31 @@ export default function GISMapContainer({
                     maxZoom={20}
                     maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
                 />
-                {/* Batas Administrasi Wilayah Kabupaten Bogor */}
-                <Polygon
-                    positions={BOGOR_KAB_BOUNDARY}
-                    pathOptions={{
-                        color: '#0f766e',
-                        weight: 2,
-                        dashArray: '8, 8',
-                        fill: false,
-                        interactive: false
-                    }}
-                />
+                {/* Batas Administrasi Wilayah Kabupaten Bogor (dengan Mask Redup / Fokus Wilayah) */}
+                {isMaskActive ? (
+                    <Polygon
+                        positions={BOGOR_KAB_MASK}
+                        pathOptions={{
+                            color: '#0f766e',
+                            weight: 2,
+                            dashArray: '8, 8',
+                            fillColor: '#090d16',
+                            fillOpacity: 0.45,
+                            interactive: false
+                        }}
+                    />
+                ) : (
+                    <Polygon
+                        positions={BOGOR_KAB_BOUNDARY}
+                        pathOptions={{
+                            color: '#0f766e',
+                            weight: 2,
+                            dashArray: '8, 8',
+                            fill: false,
+                            interactive: false
+                        }}
+                    />
+                )}
                 <MapSyncListener
                     zoomInTrigger={zoomInTrigger}
                     zoomOutTrigger={zoomOutTrigger}
@@ -583,6 +643,8 @@ export default function GISMapContainer({
                     setIsFullscreen={setIsFullscreen}
                     activeBaseMap={activeBaseMap}
                     setActiveBaseMap={setActiveBaseMap}
+                    isMaskActive={isMaskActive}
+                    setIsMaskActive={setIsMaskActive}
                 />
                 {children}
             </MapContainer>
