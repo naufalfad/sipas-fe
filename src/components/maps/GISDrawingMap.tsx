@@ -93,7 +93,7 @@ export default function GISDrawingMap({
 
         // Konfigurasi geoman
         map.pm.addControls({
-            position: 'topleft',
+            position: 'topright',
             drawCircle: false,
             drawCircleMarker: false,
             drawPolyline: false,
