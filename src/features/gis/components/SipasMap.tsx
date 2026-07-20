@@ -387,7 +387,7 @@ export default function SipasMap() {
   return (
     <div className="absolute inset-0 z-0">
       <MapContainer
-        key={`${mapCenterLat}-${mapCenterLng}-${mapZoom}`}
+        key="sipas-leaflet-map"
         center={[mapCenterLat, mapCenterLng]}
         zoom={mapZoom}
         minZoom={4}

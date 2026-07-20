@@ -15,6 +15,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [droneVideo, setDroneVideo] = useState<File | null>(null);
 
   // GPS States
   const [lat, setLat] = useState<number | null>(null);
@@ -241,6 +242,9 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       formData.append('longitude', String(lng));
       formData.append('notes', notes);
       formData.append('photo', photo);
+      if (droneVideo) {
+        formData.append('drone_video', droneVideo);
+      }
 
       await SubmissionService.createInspectionLog(submissionId, formData);
       toast.success('Log kunjungan lapangan berhasil diunggah!', {
@@ -260,6 +264,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
     setNotes('');
     setPhoto(null);
     setPhotoPreview(null);
+    setDroneVideo(null);
     setLat(null);
     setLng(null);
   };
@@ -386,6 +391,51 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           )}
         </div>
 
+        {/* VIDEO DRONE CAPTURE */}
+        <div className="space-y-1.5">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unggah Video Drone (Opsional)</label>
+          <div className="border border-slate-350 p-3 bg-white">
+            {droneVideo ? (
+              <div className="flex items-center justify-between gap-3 text-xs text-slate-750 bg-slate-50 p-2 border border-slate-200">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-teal-600 shrink-0">🎥</span>
+                  <span className="font-semibold truncate">{droneVideo.name}</span>
+                  <span className="text-[9px] text-slate-400 font-mono">({(droneVideo.size / (1024 * 1024)).toFixed(1)} MB)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDroneVideo(null);
+                  }}
+                  className="px-2 py-1 bg-rose-600 text-white font-bold text-[9px] uppercase tracking-wider rounded-none border-none cursor-pointer hover:bg-rose-700 shrink-0"
+                >
+                  Hapus
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 bg-white hover:bg-slate-50 transition-colors cursor-pointer text-slate-500 text-xs">
+                <span>📹</span>
+                <span className="font-bold text-[9.5px] uppercase tracking-wider text-slate-600">Pilih File Video Drone (.mp4/.mov)</span>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 100 * 1024 * 1024) {
+                        toast.error('Ukuran video melebihi batas 100MB.');
+                        return;
+                      }
+                      setDroneVideo(file);
+                    }
+                  }}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
+        </div>
+
         {/* GPS CAPTURE */}
         <div className="space-y-1.5">
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Deteksi Koordinat GPS Lapangan</label>
@@ -462,6 +512,16 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
                   <span className="text-[8.5px] text-slate-450 block mt-0.5 font-mono">
                     {new Date(log.timestamp).toLocaleTimeString('id-ID')} • Dev: {log.distanceMeters !== null ? `${log.distanceMeters.toFixed(1)}m` : '—'}
                   </span>
+                  {log.droneVideoUrl && (
+                    <a
+                      href={log.droneVideoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[8.5px] font-bold text-teal-600 hover:text-teal-700 mt-1 cursor-pointer decoration-none"
+                    >
+                      <span>🎥</span> Lihat Video Drone
+                    </a>
+                  )}
                 </div>
                 <div>
                   {log.isVerified ? (
