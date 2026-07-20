@@ -15,7 +15,6 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [droneVideo, setDroneVideo] = useState<File | null>(null);
 
   // GPS States
   const [lat, setLat] = useState<number | null>(null);
@@ -54,7 +53,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
     };
   }, []);
 
-  // Cleanup webcam stream when component unmounts
+  // Membersihkan webcam stream saat komponen unmount
   useEffect(() => {
     return () => {
       if (mediaStream) {
@@ -65,14 +64,14 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
   const fetchLogs = () => {
     setLoadingLogs(true);
-    SubmissionService.getInspectionLogs(submissionId)
+    SubmissionService.getGroundInspections(submissionId)
       .then((res) => {
         if (res && res.data) {
           setLogsList(res.data);
         }
       })
       .catch((err) => {
-        console.error('Gagal memuat log:', err);
+        console.error('Gagal memuat log inspeksi darat:', err);
       })
       .finally(() => {
         setLoadingLogs(false);
@@ -91,17 +90,17 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       setMediaStream(stream);
       setIsWebcamActive(true);
 
-      // Delay slightly to ensure video ref is mounted
+      // Delay sesaat untuk memastikan video ref terpasang
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(err => {
-            console.error('Play error:', err);
+            console.error('Webcam Play error:', err);
           });
         }
       }, 100);
     } catch (err: any) {
-      console.error('Error starting webcam:', err);
+      console.error('Gagal menyalakan webcam:', err);
       toast.error(`Gagal mengaktifkan kamera laptop/webcam: ${err.message}`);
     }
   };
@@ -124,7 +123,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Un-mirror the captured frame (browser mirrors webcam by default)
+      // Hilangkan pencerminan (mirroring) default browser
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -139,7 +138,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           toast.success('Foto webcam berhasil ditangkap!');
         })
         .catch((err) => {
-          console.error('Failed to create file from webcam:', err);
+          console.error('Gagal memproses berkas biner dari webcam:', err);
           toast.error('Gagal memproses tangkapan gambar.');
         });
     }
@@ -165,7 +164,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       },
       (error) => {
         setGpsLoading(false);
-        console.error('Error getting location:', error);
+        console.error('Gagal mendeteksi lokasi GPS:', error);
         toast.error(`Gagal mendeteksi lokasi GPS: ${error.message}`);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -204,7 +203,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       return;
     }
 
-    // Jika offline, simpan ke local storage
+    // Jika offline, simpan data ke local storage
     if (isOffline) {
       const offlineLog = {
         submissionId,
@@ -223,7 +222,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
         existingLogs.push(offlineLog);
         localStorage.setItem('offline_inspection_logs', JSON.stringify(existingLogs));
         toast.success('Penyimpanan Lokal Offline Berhasil!', {
-          description: 'Aplikasi sedang offline. Data kunjungan disimpan di HP Anda, silakan upload saat mendapat sinyal.',
+          description: 'Aplikasi sedang offline. Data kunjungan disimpan di HP Anda, silakan unggah saat mendapat sinyal.',
         });
         resetForm();
         if (onSuccess) onSuccess();
@@ -242,19 +241,16 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       formData.append('longitude', String(lng));
       formData.append('notes', notes);
       formData.append('photo', photo);
-      if (droneVideo) {
-        formData.append('drone_video', droneVideo);
-      }
 
-      await SubmissionService.createInspectionLog(submissionId, formData);
-      toast.success('Log kunjungan lapangan berhasil diunggah!', {
+      await SubmissionService.createGroundInspection(submissionId, formData);
+      toast.success('Log kunjungan lapangan darat berhasil diunggah!', {
         description: 'TTE presensi terekam secara geospasial di database.',
       });
       resetForm();
       fetchLogs();
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      toast.error(`Gagal mengunggah laporan kunjungan: ${err.message}`);
+      toast.error(`Gagal mengunggah laporan kunjungan darat: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -264,7 +260,6 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
     setNotes('');
     setPhoto(null);
     setPhotoPreview(null);
-    setDroneVideo(null);
     setLat(null);
     setLng(null);
   };
@@ -275,25 +270,25 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       <div className="border-b border-slate-200 pb-2.5">
         <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
           <Camera size={15} className="text-primary" />
-          Input Bukti Kunjungan Lapangan
+          Input Bukti Kunjungan Lapangan Darat (Ground Inspection)
         </h4>
         <span className="text-[10px] text-slate-450 block mt-1">
-          Verifikasi kehadiran fisik petugas di area plot poligon SHP batas lahan
+          Verifikasi kehadiran fisik petugas di area koordinat tapak secara presisi
         </span>
       </div>
 
-      {/* PANDUAN INSPEKSI (Flat Panel) */}
+      {/* PANDUAN INSPEKSI DARAT (Flat Panel) */}
       <div className="p-3.5 bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-[10px] space-y-1.5 leading-relaxed">
         <span className="font-bold uppercase text-slate-800 flex items-center gap-1.5">
           <HelpCircle size={13} className="text-slate-500" />
-          Langkah Kerja Tim Inspeksi:
+          Langkah Kerja Tim Inspeksi Darat:
         </span>
         <ol className="list-decimal pl-4 space-y-1 text-slate-500">
           <li>Kunci berkas pengajuan di kantor (Portal Desktop) sebelum berangkat ke lapangan.</li>
-          <li>Kunjungi titik fisik lahan proyek (seperti patok batas, area RTH, atau lebar PSU jalan).</li>
-          <li>Ambil foto objek tersebut di tempat. <strong>Hanya kamera aktif perangkat HP atau Webcam Laptop yang diperbolehkan</strong> (untuk mencegah kecurangan).</li>
-          <li>Klik tombol <strong>Dapatkan Lokasi GPS</strong> untuk merekam titik koordinat eksak Anda berdiri.</li>
-          <li>Klik <strong>Unggah Bukti Kunjungan</strong>. Silakan ambil beberapa foto di titik koordinat berbeda sepanjang lahan.</li>
+          <li>Kunjungi titik fisik lahan proyek (seperti patok batas BPN, area RTH, atau lebar PSU jalan).</li>
+          <li>Ambil foto objek tersebut di tempat. <strong>Hanya kamera aktif perangkat HP atau Webcam Laptop yang diperbolehkan</strong> (mencegah manipulasi foto).</li>
+          <li>Klik tombol <strong>Dapatkan Lokasi GPS</strong> untuk merekam titik koordinat eksak tempat Anda berdiri.</li>
+          <li>Klik <strong>Unggah Bukti Kunjungan</strong>. Silakan ambil beberapa foto di titik koordinat berbeda sepanjang bidang lahan.</li>
         </ol>
       </div>
 
@@ -321,7 +316,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
         {/* KAMERA DIRECT CAPTURE & WEBCAM */}
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dokumentasi Foto Lapangan</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dokumentasi Foto Lapangan (Geotagged)</label>
 
           {isWebcamActive ? (
             <div className="space-y-2 border border-slate-300 p-2.5 bg-black">
@@ -391,51 +386,6 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           )}
         </div>
 
-        {/* VIDEO DRONE CAPTURE */}
-        <div className="space-y-1.5">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unggah Video Drone (Opsional)</label>
-          <div className="border border-slate-350 p-3 bg-white">
-            {droneVideo ? (
-              <div className="flex items-center justify-between gap-3 text-xs text-slate-750 bg-slate-50 p-2 border border-slate-200">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-teal-600 shrink-0">🎥</span>
-                  <span className="font-semibold truncate">{droneVideo.name}</span>
-                  <span className="text-[9px] text-slate-400 font-mono">({(droneVideo.size / (1024 * 1024)).toFixed(1)} MB)</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDroneVideo(null);
-                  }}
-                  className="px-2 py-1 bg-rose-600 text-white font-bold text-[9px] uppercase tracking-wider rounded-none border-none cursor-pointer hover:bg-rose-700 shrink-0"
-                >
-                  Hapus
-                </button>
-              </div>
-            ) : (
-              <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 bg-white hover:bg-slate-50 transition-colors cursor-pointer text-slate-500 text-xs">
-                <span>📹</span>
-                <span className="font-bold text-[9.5px] uppercase tracking-wider text-slate-600">Pilih File Video Drone (.mp4/.mov)</span>
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      if (file.size > 100 * 1024 * 1024) {
-                        toast.error('Ukuran video melebihi batas 100MB.');
-                        return;
-                      }
-                      setDroneVideo(file);
-                    }
-                  }}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-        </div>
-
         {/* GPS CAPTURE */}
         <div className="space-y-1.5">
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Deteksi Koordinat GPS Lapangan</label>
@@ -467,12 +417,12 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
         {/* CATATAN SURVEI */}
         <div className="space-y-1">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Catatan Tambahan / Hasil Lapangan</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Catatan Tambahan / Temuan Lapangan</label>
           <textarea
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Tuliskan keterangan detail kondisi lapangan (contoh: patok batas barat, patok batas utara, lebar jalan, dll)..."
+            placeholder="Tuliskan keterangan detail kondisi rona fisik lapangan (contoh: patok batas barat, kondisi RTH, ROW lebar jalan rencana, dll)..."
             className="w-full px-3 py-2 text-xs bg-white border border-slate-300 text-slate-800 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-sans"
           />
         </div>
@@ -484,14 +434,14 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           className="w-full py-2.5 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-none border-none transition-colors cursor-pointer hover:bg-primary/95 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
         >
           {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          <span>{isOffline ? 'Simpan Offline' : 'Unggah Bukti Kunjungan'}</span>
+          <span>{isOffline ? 'Simpan Offline' : 'Unggah Bukti Kunjungan Darat'}</span>
         </button>
       </form>
 
       {/* RIWAYAT UNGGAHAN SESI INI (Divider-separated List) */}
       <div className="border-t border-slate-200 pt-4 space-y-2 select-none">
         <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-widest block text-left">
-          Daftar Bukti Kunjungan Terunggah ({logsList.length})
+          Daftar Bukti Kunjungan Darat Terunggah ({logsList.length})
         </h5>
 
         {loadingLogs ? (
@@ -500,7 +450,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           </div>
         ) : logsList.length === 0 ? (
           <div className="p-2 text-[9px] text-slate-400 text-center italic">
-            Belum ada dokumentasi foto yang diunggah untuk berkas ini.
+            Belum ada dokumentasi foto darat yang diunggah untuk berkas ini.
           </div>
         ) : (
           <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto max-w-xl">
@@ -510,18 +460,8 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
                 <div className="flex-1 text-left min-w-0">
                   <span className="font-bold text-slate-700 block truncate">{log.notes || 'Foto Bukti Kunjungan'}</span>
                   <span className="text-[8.5px] text-slate-450 block mt-0.5 font-mono">
-                    {new Date(log.timestamp).toLocaleTimeString('id-ID')} • Dev: {log.distanceMeters !== null ? `${log.distanceMeters.toFixed(1)}m` : '—'}
+                    {new Date(log.timestamp).toLocaleTimeString('id-ID')} • Dev: {log.distanceMeters !== null && log.distanceMeters !== undefined ? `${log.distanceMeters.toFixed(1)}m` : '—'}
                   </span>
-                  {log.droneVideoUrl && (
-                    <a
-                      href={log.droneVideoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[8.5px] font-bold text-teal-600 hover:text-teal-700 mt-1 cursor-pointer decoration-none"
-                    >
-                      <span>🎥</span> Lihat Video Drone
-                    </a>
-                  )}
                 </div>
                 <div>
                   {log.isVerified ? (
@@ -541,10 +481,10 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
         <div className="p-3.5 bg-slate-50 border-l-2 border-teal-600 text-slate-700 text-[10px] space-y-1.5 text-left select-none max-w-xl">
           <span className="font-bold uppercase flex items-center gap-1.5 text-teal-800">
             <CheckCircle2 size={13} className="text-teal-600" />
-            Tugas Lapangan Selesai?
+            Bukti Darat Dikunci
           </span>
           <p className="leading-relaxed text-slate-500 text-[9.5px]">
-            Semua bukti ulasan kunjungan geotagged telah terunggah dengan aman ke server. Silakan kembali ke kantor untuk melanjutkan komparasi dimensi fisik, menjalankan audit tata ruang, dan merakit ulasan Telaah Staf melalui Web Desktop.
+            Dokumentasi rona darat lapangan geotagged telah terunggah dengan aman ke server. Silakan lengkapi juga ulasan **Sidak Udara Drone** (jika diwajibkan untuk kategori perumahan/industri) sebelum mengajukan draf ulasan Telaah Staf ke Kepala Bidang.
           </p>
         </div>
       )}

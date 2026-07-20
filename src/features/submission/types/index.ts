@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * GEOSIPAS SYSTEM CONTRACTS — [src/features/submission/types/index.ts] (REVISED v5.4)
+ * GEOSIPAS SYSTEM CONTRACTS — [src/features/submission/types/index.ts] (REVISED v5.5)
  * ============================================================================
  * Peran: Kontrak tipe data (Single Source of Truth) untuk permohonan site plan.
  *        Diperbarui penuh untuk mendukung perbandingan metrik tiga sisi,
@@ -8,6 +8,9 @@
  *        riwayat silsilah permohonan (Revisi) baik di tingkat root objek (GET) 
  *        maupun tingkat skema biner (POST), snapshot dokumen Telaah Staf, 
  *        serta draf Surat Keputusan (SK) resmi berbasis dimensi fisik absolut (m²).
+ * 
+ * Pembaruan v5.5: Pemisahan tipe data FieldInspectionLog (Darat) dan
+ *                AerialInspectionLog (Drone) untuk kepatuhan GRASP.
  * ============================================================================
  */
 
@@ -250,6 +253,31 @@ export interface LegacyMetadata {
   replaced_sk_doc_url: string;
 }
 
+// ─── PEMBARUAN v5.5: ONTOLOGY INTERFACES INSPEKSI FISIK LAPANGAN ──────────────
+
+export interface FieldInspectionLog {
+  id: number;
+  idPermohonan: string;
+  inspectorName: string;
+  timestamp: string;
+  latitude: number;
+  longitude: number;
+  distanceMeters?: number | null;
+  isVerified: boolean;
+  photoUrl: string;
+  notes?: string | null;
+}
+
+export interface AerialInspectionLog {
+  id: number;
+  idPermohonan: string;
+  pilotName: string;
+  timestamp: string;
+  droneVideoUrl: string;
+  flightMetadata?: Record<string, any> | null;
+  notes?: string | null;
+}
+
 // ─── UTAMA: INTERFACE PERMOHONAN SINKRON (SOT) ───────────────────────────────
 
 export interface Submission {
@@ -400,4 +428,8 @@ export interface Submission {
     documentUrl?: string;
     status: 'BELUM_TERPENUHI' | 'PROSES_VERIFIKASI' | 'TERPENUHI';
   }[];
+
+  // ─── PEMBARUAN v5.5: PEMETAAN RELASI SPASIAL INSPEKSI ───
+  inspection_logs?: FieldInspectionLog[];
+  aerial_inspection?: AerialInspectionLog | null;
 }

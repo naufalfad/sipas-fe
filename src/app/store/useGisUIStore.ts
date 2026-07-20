@@ -30,6 +30,8 @@ export interface FlyToTarget {
     longitude: number;
     latitude: number;
     zoom?: number;
+    pitch?: number;
+    bearing?: number;
 }
 
 /** Representasi Data Konflik Spasial hasil Sidak Lapangan & Drone Mapping [Bogor 8] */
@@ -118,6 +120,10 @@ interface GisUIState {
     // ── Actions: Kamera ──────────────────────────────────────────────────────
     setMapZoom: (zoom: number) => void;
     setMapCenter: (center: [number, number]) => void;
+    pitch: number;
+    bearing: number;
+    setPitch: (pitch: number) => void;
+    setBearing: (bearing: number) => void;
     /** Perintahkan SipasMap untuk terbang ke koordinat tertentu */
     flyTo: (target: FlyToTarget) => void;
     /** Dipanggil oleh SipasMap setelah flyTo dieksekusi */
@@ -155,6 +161,8 @@ export const useGisUIStore = create<GisUIState>((set) => ({
 
     mapZoom: 11,
     mapCenter: [-6.4816, 106.8560],   // [lat, lng] — format Leaflet
+    pitch: 0,
+    bearing: 0,
     cursorCoords: null,
     activeBaseMap: 'voyager',
     activePanels: [],
@@ -224,6 +232,8 @@ export const useGisUIStore = create<GisUIState>((set) => ({
 
     setMapZoom: (mapZoom) => set({ mapZoom }),
     setMapCenter: (mapCenter) => set({ mapCenter }),
+    setPitch: (pitch) => set({ pitch }),
+    setBearing: (bearing) => set({ bearing }),
 
     flyTo: (flyToTarget) => set({ flyToTarget }),
 

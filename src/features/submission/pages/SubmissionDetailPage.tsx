@@ -1,11 +1,14 @@
 /**
  * ============================================================================
- * GEOSIPAS HTTP CONTROLLER ΓÇö SubmissionDetailPage [SubmissionDetailPage.tsx] (REVISED v8.3)
+ * GEOSIPAS PAGE COMPONENT — SubmissionDetailPage [SubmissionDetailPage.tsx] (REVISED v8.4)
  * ============================================================================
  * Peran: Halaman detail berkas pengajuan bagi pemohon dan dinas.
  *        Mendukung peninjauan data administratif, rincian teknis 13-aspek,
  *        visualisasi peta AutoCAD PostGIS terintegrasi, jejak audit (audit-trail),
  *        serta manajemen pendelegasian CTA untuk TTE Kadis.
+ * 
+ * Pembaruan v8.4: Pemisahan utuh form pengunggahan foto darat dan video drone,
+ *                penyelarasan query paralel, serta proteksi reaktif tombol verifikasi.
  * ============================================================================
  */
 
@@ -32,6 +35,7 @@ import {
   TechnicalTab, CompensationTab, PhotosTab, SilsilahTab
 } from '../components/detail-tabs';
 import { InspectionLogForm } from '../components/InspectionLogForm';
+import { AerialInspectionForm } from '../components/AerialInspectionForm';
 import { InspectionLogsGallery } from '../components/InspectionLogsGallery';
 
 const getStatusBadgeClassLocal = (status: string) => {
@@ -110,12 +114,21 @@ export default function SubmissionDetailPage() {
     enabled: !!id,
   });
 
-  const { data: inspectionLogsRes } = useQuery({
-    queryKey: ['submission-logs', id],
-    queryFn: () => SubmissionService.getInspectionLogs(id || ''),
+  // Query Paralel 1: Mengambil Data Kunjungan Lapangan Titik Darat (Ground Inspections)
+  const { data: groundInspectionsRes } = useQuery({
+    queryKey: ['ground-inspections', id],
+    queryFn: () => SubmissionService.getGroundInspections(id || ''),
     enabled: !!id,
   });
-  const logsCount = inspectionLogsRes?.data?.length || 0;
+  const groundLogsCount = groundInspectionsRes?.data?.length || 0;
+
+  // Query Paralel 2: Mengambil Data Rekaman Udara Drone (Aerial Inspection)
+  const { data: aerialInspectionRes } = useQuery({
+    queryKey: ['aerial-inspection', id],
+    queryFn: () => SubmissionService.getAerialInspection(id || ''),
+    enabled: !!id,
+  });
+  const hasAerialLog = !!aerialInspectionRes?.data;
 
   // Pre-populate evaluasi checklist jika sudah ada di DB
   useEffect(() => {
@@ -203,7 +216,7 @@ export default function SubmissionDetailPage() {
   const isLockedByMe = subData.adminLockId === user?.id || (!!user?.full_name && subData.adminLockName === user.full_name);
   const isTeknisiLockedByMe = subData.teknisiLockId === user?.id || (!!user?.full_name && subData.teknisiLockName === user.full_name);
 
-  // ΓöÇΓöÇΓöÇ SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ΓöÇΓöÇΓöÇ
+  // ─── SEKSI HASIL EVALUASI TEKNIS & TELAAH STAF ───
   const renderTelaahStafSection = (data: Submission) => {
     const hasTechnicalResult = data.kkprVerdict || data.telaahStaf;
     if (!hasTechnicalResult) return null;
@@ -260,7 +273,7 @@ export default function SubmissionDetailPage() {
   return (
     <div className="space-y-6 font-sans text-slate-700">
 
-      {/* ΓöÇΓöÇΓöÇ SEKSI 1: HEADER SUMMARY BLOCK ΓöÇΓöÇΓöÇ */}
+      {/* ─── SEKSI 1: HEADER SUMMARY BLOCK ─── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none border-b border-slate-200 pb-4">
         <div className="flex items-center gap-4 text-left">
           <button
@@ -344,12 +357,12 @@ export default function SubmissionDetailPage() {
                           rel="noreferrer"
                           className="inline-block text-[10px] font-bold text-teal-600 hover:underline mt-1"
                         >
-                          ≡ƒôÑ Unduh Berkas Coretan Dinas
+                          <Download className="h-3 w-3 mr-1 inline" /> Unduh Berkas Coretan Dinas
                         </a>
                       )}
                     </div>
                     <span className={cn(
-                      "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border leading-none rounded-none shrink-0",
+                      "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border leading-none shrink-0",
                       isCompliant ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                         isConditional ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-100"
                     )}>
@@ -379,7 +392,7 @@ export default function SubmissionDetailPage() {
         </div>
       )}
 
-      {/* ΓöÇΓöÇΓöÇ SEKSI 2: CORE WORKSPACE GRID ΓöÇΓöÇΓöÇ */}
+      {/* ─── SEKSI 2: CORE WORKSPACE GRID ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
         {/* KOLOM KIRI (8 col): DETAIL DATA TABULAR */}
@@ -428,7 +441,7 @@ export default function SubmissionDetailPage() {
               </div>
             )}
             {activeTab === 'pemohon' && <ApplicantTab sub={subData} />}
-            {activeTab === 'lokasi' && <LocationTab sub={subData} inspectionLogs={inspectionLogsRes?.data || []} />}
+            {activeTab === 'lokasi' && <LocationTab sub={subData} inspectionLogs={groundInspectionsRes?.data || []} />}
             {activeTab === 'teknis' && <TechnicalTab sub={subData} />}
             {activeTab === 'kompensasi' && (
               <CompensationTab sub={subData} onShowOnMap={handleShowCompensationOnMap} />
@@ -440,13 +453,27 @@ export default function SubmissionDetailPage() {
               <InspectionLogsGallery submissionId={subData.id} polygon={subData.location?.polygon} />
             )}
             {activeTab === 'inspeksi' && (
-              <InspectionLogForm
-                submissionId={subData.id}
-                onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: ['submission', id] });
-                  queryClient.invalidateQueries({ queryKey: ['submission-logs', id] });
-                }}
-              />
+              /* ─── PEMBARUAN v8.4: SUB-LAYOUT PEMISAH VISUAL TEGAS ANTARA FORM DARAT & UDARA DRONE ─── */
+              <div className="space-y-8 divide-y divide-slate-200">
+                <div className="animate-in fade-in duration-300">
+                  <InspectionLogForm
+                    submissionId={subData.id}
+                    onSuccess={() => {
+                      queryClient.invalidateQueries({ queryKey: ['submission', id] });
+                      queryClient.invalidateQueries({ queryKey: ['ground-inspections', id] });
+                    }}
+                  />
+                </div>
+                <div className="pt-8 animate-in fade-in duration-300">
+                  <AerialInspectionForm
+                    submissionId={subData.id}
+                    onSuccess={() => {
+                      queryClient.invalidateQueries({ queryKey: ['submission', id] });
+                      queryClient.invalidateQueries({ queryKey: ['aerial-inspection', id] });
+                    }}
+                  />
+                </div>
+              </div>
             )}
           </div>
 
@@ -530,7 +557,7 @@ export default function SubmissionDetailPage() {
                           </h5>
                           <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-1.5">
                             <span className="font-mono">{hist.date}</span>
-                            <span>ΓÇó</span>
+                            <span>•</span>
                             <span className="font-bold text-slate-500">{hist.actor}</span>
                           </div>
                           {hist.notes && (
@@ -611,7 +638,7 @@ export default function SubmissionDetailPage() {
                   onClick={() => unclaimMutation.mutate()}
                   className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
                 >
-                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "≡ƒöô Lepas Kunci (Batal)"}
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : <><Unlock className="h-3.5 w-3.5 mr-1 inline" /> Lepas Kunci (Batal)</>}
                 </button>
                 <Link
                   to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
@@ -691,7 +718,8 @@ export default function SubmissionDetailPage() {
                     <span>Lepas Kunci</span>
                   </button>
 
-                  {logsCount > 0 ? (
+                  {/* ─── PEMBARUAN v8.4: TOMBOL VERIFIKASI TEKNIS REAKTIF BERDASARKAN KELENGKAPAN SURVEI DARAT ─── */}
+                  {groundLogsCount > 0 ? (
                     <Link
                       to={`/pengajuan/verifikasi/${subData.id}`}
                       className="flex-1 py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
@@ -703,7 +731,7 @@ export default function SubmissionDetailPage() {
                     <button
                       type="button"
                       disabled
-                      title="Matriks Penilaian Teknis Terkunci: Wajib mengunggah log inspeksi lapangan terlebih dahulu."
+                      title="Matriks Penilaian Teknis Terkunci: Wajib mengunggah log inspeksi lapangan darat terlebih dahulu."
                       className="flex-1 py-2.5 bg-slate-100 text-slate-400 font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-slate-200 cursor-not-allowed shadow-none"
                     >
                       <Lock size={13} className="text-slate-400" />
@@ -712,7 +740,7 @@ export default function SubmissionDetailPage() {
                   )}
                 </div>
 
-                {logsCount > 0 ? (
+                {groundLogsCount > 0 ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -738,10 +766,11 @@ export default function SubmissionDetailPage() {
                   </button>
                 )}
 
-                {logsCount === 0 && (
+                {/* NOTIFIKASI PROTEKSI TOMBOL VERIFIKASI */}
+                {groundLogsCount === 0 && (
                   <div className="flex items-center gap-1.5 justify-center text-[9.5px] text-rose-600 font-semibold mt-1">
                     <AlertTriangle size={11} className="shrink-0" />
-                    <span>Ulasan kunjungan lapangan wajib dikirim terlebih dahulu untuk membuka kunci penilaian.</span>
+                    <span>Ulasan kunjungan lapangan darat wajib dikirim terlebih dahulu untuk membuka kunci penilaian.</span>
                   </div>
                 )}
               </div>

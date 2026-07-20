@@ -1,12 +1,13 @@
 /**
  * ============================================================================
- * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts] (REVISED v5.2)
+ * GEOSIPAS SUBMISSION SERVICE — [src/features/submission/services/submission.service.ts] (REVISED v5.5)
  * ============================================================================
  * Peran: Menangani seluruh komunikasi HTTP REST API dengan server backend.
  *        Diperbarui penuh untuk mendukung pengiriman silsilah permohonan lama (Revisi),
- *        payload metrik usulan pemohon (proposed), serta pengiriman hasil audit
+ *        payload metrik usulan pemohon (proposed), pengiriman hasil audit
  *        dinas berbasis dimensi fisik absolut terverifikasi (m² / meter) sesuai
- *        dengan kontrak Pydantic VerifyRequest di Backend yang baru.
+ *        dengan kontrak Pydantic VerifyRequest di Backend, serta pemisahan data 
+ *        inspeksi lapangan darat dan udara drone.
  * ============================================================================
  */
 
@@ -127,9 +128,9 @@ export const SubmissionService = {
   },
 
   /**
-   * ─── REVISI v5.2: UPDATE STATUS & KIRIM HASIL AUDIT DIMENSI FISIK ABSOLUT (m²) ───
+   * ─── REVISI v5.5: UPDATE STATUS & KIRIM HASIL AUDIT DIMENSI FISIK ABSOLUT (m²) ───
    * Mengirimkan keputusan verifikasi, angka hitung ulang fisik terverifikasi,
-   * serta dynamic checklist ke API `/verify` di backend dengan audit verifikator lengkap.
+   * serta draf SK/Checklist ke API `/verify` di backend dengan audit verifikator lengkap.
    */
   updateStatus: async (
     id: string,
@@ -256,6 +257,7 @@ export const SubmissionService = {
       return undefined;
     }
   },
+
   /**
    * Mengambil statistik laporan eksekutif berdasarkan rentang bulan/tahun awal hingga bulan/tahun akhir.
    */
@@ -365,35 +367,72 @@ export const SubmissionService = {
   },
 
   /**
-   * Mencatat hasil kunjungan/inspeksi lapangan tim verifikator teknis (PWA).
+   * ─── PEMBARUAN v5.5: CORE GROUND INSPECTION SERVICE (TITIK DARAT) ───
+   * Mencatat hasil kunjungan/inspeksi lapangan darat oleh tim verifikator teknis (PWA).
    */
-  createInspectionLog: async (id: string, formData: FormData): Promise<any> => {
+  createGroundInspection: async (id: string, formData: FormData): Promise<any> => {
     const headers = { ...getAuthHeaders() };
     // Catatan: jangan set 'Content-Type': 'application/json' karena ini multi-part form data
     delete (headers as any)['Content-Type'];
 
-    const response = await fetch(`${API_BASE_URL}/${id}/inspection-logs`, {
+    const response = await fetch(`${API_BASE_URL}/${id}/ground-inspections`, {
       method: 'POST',
       headers,
       body: formData
     });
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(errText || `Gagal mencatat log inspeksi lapangan (HTTP ${response.status})`);
+      throw new Error(errText || `Gagal mencatat log inspeksi darat lapangan (HTTP ${response.status})`);
     }
     return await response.json();
   },
 
   /**
-   * Mengambil riwayat log kunjungan/inspeksi lapangan.
+   * ─── PEMBARUAN v5.5: CORE GROUND INSPECTION SERVICE (TITIK DARAT) ───
+   * Mengambil riwayat log kunjungan/inspeksi lapangan darat.
    */
-  getInspectionLogs: async (id: string): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/${id}/inspection-logs`, {
+  getGroundInspections: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/ground-inspections`, {
       headers: getAuthHeaders()
     });
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(errText || `Gagal memuat log inspeksi lapangan (HTTP ${response.status})`);
+      throw new Error(errText || `Gagal memuat log inspeksi darat lapangan (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * ─── PEMBARUAN v5.5: CORE AERIAL INSPECTION SERVICE (DRONE VIDEO) ───
+   * Mengunggah rekaman video udara drone untuk monitoring makro kawasan (maksimal 100MB).
+   */
+  createAerialInspection: async (id: string, formData: FormData): Promise<any> => {
+    const headers = { ...getAuthHeaders() };
+    delete (headers as any)['Content-Type'];
+
+    const response = await fetch(`${API_BASE_URL}/${id}/aerial-inspection`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal mengunggah video drone untuk inspeksi udara (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * ─── PEMBARUAN v5.5: CORE AERIAL INSPECTION SERVICE (DRONE VIDEO) ───
+   * Mengambil data dan tautan video udara drone makro kawasan.
+   */
+  getAerialInspection: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/aerial-inspection`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat dokumentasi inspeksi udara drone (HTTP ${response.status})`);
     }
     return await response.json();
   }

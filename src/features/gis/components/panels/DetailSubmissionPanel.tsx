@@ -44,23 +44,36 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         window.dispatchEvent(new Event('map-clear-clash'));
     }, [submissionData?.id]);
 
-    const [inspectionLogs, setInspectionLogs] = useState<any[]>([]);
-    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const [groundLogs, setGroundLogs] = useState<any[]>([]);
+    const [aerialLog, setAerialLog] = useState<any | null>(null);
+    const [isLoadingInspections, setIsLoadingInspections] = useState(false);
 
     useEffect(() => {
         if (submissionData?.id) {
-            setIsLoadingLogs(true);
-            SubmissionService.getInspectionLogs(submissionData.id)
-                .then(res => {
-                    if (res && res.data) {
-                        setInspectionLogs(res.data);
+            setIsLoadingInspections(true);
+
+            // Panggil rute sidak darat dan udara secara paralel demi optimalisasi rendering
+            Promise.all([
+                SubmissionService.getGroundInspections(submissionData.id),
+                SubmissionService.getAerialInspection(submissionData.id)
+            ])
+                .then(([groundRes, aerialRes]) => {
+                    if (groundRes && groundRes.data) {
+                        setGroundLogs(groundRes.data);
+                    } else {
+                        setGroundLogs([]);
+                    }
+                    if (aerialRes && aerialRes.data) {
+                        setAerialLog(aerialRes.data);
+                    } else {
+                        setAerialLog(null);
                     }
                 })
                 .catch(err => {
-                    console.error('Failed to load inspection logs:', err);
+                    console.error('Gagal memuat log inspeksi spasial:', err);
                 })
                 .finally(() => {
-                    setIsLoadingLogs(false);
+                    setIsLoadingInspections(false);
                 });
         }
     }, [submissionData?.id]);
@@ -107,7 +120,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         const maxKlb = submissionData.bylawMaxKlb !== undefined ? submissionData.bylawMaxKlb : 3.5;
         const minKdh = submissionData.bylawMinKdh !== undefined ? submissionData.bylawMinKdh : 10.0;
         const minGsb = submissionData.bylawMinGsb !== undefined ? submissionData.bylawMinGsb : 5.0;
-        
+
         // Recalculate min RTH area dynamically: minKdh% * currentLandArea
         const minRth = (minKdh / 100) * currentLandArea;
 
@@ -194,7 +207,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
             setAuditResult(result);
 
             if (result.isClashing && result.clashGeometry) {
-                // Picu peta utama untuk merender garis clash poligon berwarna merah berkedip [sipas-fe.txt]
+                // Picu peta utama untuk merender garis clash poligon berwarna merah berkedip
                 window.dispatchEvent(
                     new CustomEvent('map-render-clash', {
                         detail: {
@@ -275,7 +288,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </div>
                 </div>
 
-                {/* BARU: LAPORAN GALAT / SELISIH DIMENSI FISIK RIIL (m² & %) */}
+                {/* LAPORAN GALAT / SELISIH DIMENSI FISIK RIIL (m² & %) */}
                 {submissionData.status !== 'Draft' && (
                     <div className="px-4 py-3.5 border-b border-slate-100 bg-[#fafafa]">
                         <div className="flex items-center gap-2 mb-3">
@@ -457,17 +470,36 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         <span className="text-[9px] text-slate-400 font-bold uppercase">Geotagged</span>
                     </div>
 
-                    {isLoadingLogs ? (
+                    {isLoadingInspections ? (
                         <div className="flex justify-center py-4">
                             <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
                         </div>
-                    ) : inspectionLogs.length === 0 ? (
+                    ) : groundLogs.length === 0 && !aerialLog ? (
                         <div className="p-3 bg-slate-50 text-[10px] text-slate-400 text-center font-medium">
                             Belum ada laporan bukti kunjungan lapangan untuk berkas ini.
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {inspectionLogs.map((log) => (
+                            {/* ─── PEMBARUAN v5.5: RENDER SEGMENT BUKTI UDARA (AERIAL DRONE VIDEO) SECARA DEDIKASI ─── */}
+                            {aerialLog && (
+                                <div className="p-3 bg-teal-50/20 border border-teal-200 space-y-2 text-xs">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[8px] font-black text-teal-700 uppercase tracking-widest block leading-none">🎥 Sidak Udara Drone</span>
+                                        <span className="px-1 py-0.5 text-[7px] font-black text-teal-800 bg-teal-50 border border-teal-200 rounded-none leading-none">AKTIF</span>
+                                    </div>
+                                    <div className="relative bg-black aspect-video overflow-hidden border border-slate-200">
+                                        <video src={aerialLog.droneVideoUrl} controls className="w-full h-full object-contain" />
+                                    </div>
+                                    <div className="space-y-0.5 text-[9px] text-slate-500 font-medium">
+                                        <p className="font-bold text-slate-700">Pilot: {aerialLog.pilotName}</p>
+                                        <p>Waktu: {new Date(aerialLog.timestamp).toLocaleString('id-ID')}</p>
+                                        {aerialLog.notes && <p className="italic text-slate-600 mt-1 line-clamp-2">"{aerialLog.notes}"</p>}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ─── PEMBARUAN v5.5: RENDER SEGMENT BUKTI FOTO GEOTAGGED DARAT ─── */}
+                            {groundLogs.map((log) => (
                                 <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 space-y-2 text-xs">
                                     <div className="flex justify-between items-start">
                                         <div className="text-left">
@@ -508,9 +540,9 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                                     {/* Photo Preview & Link */}
                                     <div className="flex items-center gap-3">
                                         <div className="w-16 h-12 bg-black border border-slate-200 shrink-0 overflow-hidden">
-                                            <img 
-                                                src={log.photoUrl} 
-                                                alt="Dokumentasi Lapangan" 
+                                            <img
+                                                src={log.photoUrl}
+                                                alt="Dokumentasi Lapangan"
                                                 className="w-full h-full object-cover cursor-pointer"
                                                 onClick={() => window.open(log.photoUrl, '_blank')}
                                             />
@@ -523,10 +555,10 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                                             ) : (
                                                 <span className="text-[9px] text-slate-350 italic">Tidak ada catatan lapangan.</span>
                                             )}
-                                            <a 
-                                                href={log.photoUrl} 
-                                                target="_blank" 
-                                                rel="noreferrer" 
+                                            <a
+                                                href={log.photoUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
                                                 className="text-[9px] font-black text-primary hover:underline uppercase block mt-1"
                                             >
                                                 Buka Foto Penuh ↗

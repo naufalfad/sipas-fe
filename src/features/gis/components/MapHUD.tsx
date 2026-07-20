@@ -18,6 +18,10 @@ export default function MapHUD() {
     const activeLayers = useGisUIStore((s) => s.activeLayers);
     const mapZoom = useGisUIStore((s) => s.mapZoom);
     const cursorCoords = useGisUIStore((s) => s.cursorCoords);
+    const pitch = useGisUIStore((s) => s.pitch);
+    const bearing = useGisUIStore((s) => s.bearing);
+    const flyTo = useGisUIStore((s) => s.flyTo);
+    const mapCenter = useGisUIStore((s) => s.mapCenter);
 
     const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isCoordsOpen, setIsCoordsOpen] = useState(false);
@@ -66,6 +70,29 @@ export default function MapHUD() {
     const triggerResetView = () => window.dispatchEvent(new Event("map-reset-view"));
 
     const zoomLabel = mapZoom < 10 ? "KAB." : mapZoom < 14 ? "KEC." : "DETAIL";
+
+    const is3D = pitch > 10;
+
+    const toggle3D = () => {
+        if (is3D) {
+            // Kembali ke 2D (Pitch 0, Bearing 0)
+            flyTo({
+                longitude: mapCenter[1],
+                latitude: mapCenter[0],
+                zoom: Math.round(mapZoom),
+                pitch: 0,
+                bearing: 0
+            });
+        } else {
+            // Masuk ke 3D (Pitch 60)
+            flyTo({
+                longitude: mapCenter[1],
+                latitude: mapCenter[0],
+                zoom: Math.max(Math.round(mapZoom), 14), // zoom in slightly for better 3D perspective
+                pitch: 60
+            });
+        }
+    };
 
     // ── PANEL WRAPPER ─────────────────────────────────────────────────────────
     const Panel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -161,17 +188,23 @@ export default function MapHUD() {
                     />
                     {isCoordsOpen && (
                         <div className="animate-in fade-in slide-in-from-top-1 duration-200 divide-y divide-slate-100">
-                            <div className="grid grid-cols-2 divide-x divide-slate-100">
-                                <div className="px-3 py-2 flex flex-col gap-0.5">
+                            <div className="grid grid-cols-3 divide-x divide-slate-100">
+                                <div className="px-2 py-2 flex flex-col gap-0.5">
                                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">LAT</span>
                                     <span className="text-[11px] font-mono font-bold text-slate-800 tabular-nums">
                                         {cursorCoords ? cursorCoords.lat.toFixed(5) : "—"}
                                     </span>
                                 </div>
-                                <div className="px-3 py-2 flex flex-col gap-0.5">
+                                <div className="px-2 py-2 flex flex-col gap-0.5">
                                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">LNG</span>
                                     <span className="text-[11px] font-mono font-bold text-slate-800 tabular-nums">
                                         {cursorCoords ? cursorCoords.lng.toFixed(5) : "—"}
+                                    </span>
+                                </div>
+                                <div className="px-2 py-2 flex flex-col gap-0.5">
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">MDPL</span>
+                                    <span className="text-[11px] font-mono font-bold text-slate-800 tabular-nums">
+                                        {cursorCoords && cursorCoords.elevation !== null ? `${Math.round(cursorCoords.elevation)}m` : "—"}
                                     </span>
                                 </div>
                             </div>
@@ -199,6 +232,16 @@ export default function MapHUD() {
                                     <span className="text-[12px] font-black text-slate-800 tabular-nums">{zoomLabel}</span>
                                 </div>
                             </div>
+                            <div className="grid grid-cols-2 divide-x divide-slate-100">
+                                <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Kemiringan</span>
+                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{Math.round(pitch)}°</span>
+                                </div>
+                                <div className="px-2.5 py-2 flex flex-col gap-0.5 items-center">
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">Putaran</span>
+                                    <span className="text-[12px] font-black text-slate-800 tabular-nums">{Math.round(bearing)}°</span>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </Panel>
@@ -209,21 +252,31 @@ export default function MapHUD() {
             <div className="hidden md:flex flex-col bg-white/95 backdrop-blur border border-slate-200 shadow-xl rounded-none overflow-hidden divide-y divide-slate-100 shrink-0">
                 <button
                     onClick={triggerZoomIn}
-                    className="w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-teal-700 transition-colors active:bg-slate-200 rounded-none outline-none"
+                    className="w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-teal-700 transition-colors active:bg-slate-200 rounded-none outline-none cursor-pointer"
                     title="Perbesar (Zoom In)"
                 >
                     <Plus size={18} strokeWidth={2.5} />
                 </button>
                 <button
                     onClick={triggerResetView}
-                    className="w-10 h-9 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-teal-700 transition-colors active:bg-slate-200 group rounded-none outline-none"
+                    className="w-10 h-9 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-teal-700 transition-colors active:bg-slate-200 group rounded-none outline-none cursor-pointer"
                     title="Reset Fokus Peta"
                 >
                     <Maximize2 size={14} strokeWidth={2.5} className="group-hover:scale-110 transition-transform" />
                 </button>
                 <button
+                    onClick={toggle3D}
+                    className={cn(
+                        "w-10 h-10 flex items-center justify-center transition-colors rounded-none outline-none cursor-pointer",
+                        is3D ? "bg-teal-600 text-white hover:bg-teal-700" : "text-slate-600 hover:bg-slate-50 hover:text-teal-700"
+                    )}
+                    title={is3D ? "Ubah ke Tampilan 2D" : "Ubah ke Tampilan 3D"}
+                >
+                    <span className="text-[10px] font-black">{is3D ? "2D" : "3D"}</span>
+                </button>
+                <button
                     onClick={triggerZoomOut}
-                    className="w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-teal-700 transition-colors active:bg-slate-200 rounded-none outline-none"
+                    className="w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-teal-700 transition-colors active:bg-slate-200 rounded-none outline-none cursor-pointer"
                     title="Perkecil (Zoom Out)"
                 >
                     <Minus size={18} strokeWidth={2.5} />

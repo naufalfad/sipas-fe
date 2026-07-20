@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 // Import Komponen Spasial Inti (Tema Terang Cohesive GFW Style)
 import GisNavbar from '../components/GisNavbar';
-import SipasMap from '../components/SipasMap';
+import SipasMap3D from '../components/SipasMap3D';
 import GisSidebar from '../components/GisSidebar';
 import PanelOrchestrator from '../components/PanelOrchestrator';
 import MapHUD from '../components/MapHUD';
@@ -32,10 +32,10 @@ export default function GISPage() {
     <main className="relative h-screen w-screen overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased select-none">
 
       {/* =====================================================================
-          LAYER 0: THE INFINITE CANVAS (PETA UTAMA 2D - LEAFLET)
+          LAYER 0: THE INFINITE CANVAS (PETA UTAMA 3D - MAPLIBRE)
           Berada di dasar (z-0) dan mengonsumsi 100% ruang viewport monitor.
       ====================================================================== */}
-      <SipasMap />
+      <SipasMap3D />
 
       {/* =====================================================================
           LAYER 1: THE GLOBAL CONTEXT (NAVBAR ATAS)

@@ -2409,7 +2409,7 @@ export default function GISDrawingMap({
         layerGroupRef.current = layerGroup;
 
         map.pm.addControls({
-            position: 'topleft',
+            position: 'topright',
             drawCircle: false,
             drawCircleMarker: false,
             drawPolyline: false,
@@ -2528,8 +2528,13 @@ export default function GISLayerControl() {
 
 --- FILE: src\components\maps\GISMapContainer.tsx ---
 
-import React from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, useMap, Polygon, GeoJSON } from 'react-leaflet';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, Layers, Check, Globe } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import L from 'leaflet';
+
+import * as turf from '@turf/turf';
 import 'leaflet/dist/leaflet.css';
 
 interface GISMapContainerProps {
@@ -2540,28 +2545,725 @@ interface GISMapContainerProps {
     className?: string;
 }
 
+const BASEMAPS = {
+    osm: {
+        name: 'OpenStreetMap',
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors',
+        maxNativeZoom: 19,
+    },
+    'google-hybrid': {
+        name: 'Bing',
+        url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+        attribution: '&copy; Google Maps',
+        maxNativeZoom: 20,
+    },
+    'google-sat': {
+        name: 'Google Satellite',
+        url: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        attribution: '&copy; Google Maps',
+        maxNativeZoom: 20,
+    },
+    esri: {
+        name: 'Esri Satellite',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri World Imagery',
+        maxNativeZoom: 18,
+    },
+};
+
+interface MapSyncListenerProps {
+    zoomInTrigger: number;
+    zoomOutTrigger: number;
+    onZoomChange: (zoom: number) => void;
+    isFullscreen: boolean;
+    onMouseMove: (coords: { lat: number; lng: number } | null) => void;
+    onAreaChange: (area: number) => void;
+    onCenterChange: (centerStr: string) => void;
+}
+
+function MapSyncListener({
+    zoomInTrigger,
+    zoomOutTrigger,
+    onZoomChange,
+    isFullscreen,
+    onMouseMove,
+    onAreaChange,
+    onCenterChange,
+}: MapSyncListenerProps) {
+    const map = useMap();
+
+    useEffect(() => {
+        const onZoom = () => {
+            onZoomChange(map.getZoom());
+        };
+        map.on('zoomend', onZoom);
+        return () => {
+            map.off('zoomend', onZoom);
+        };
+    }, [map, onZoomChange]);
+
+    useEffect(() => {
+        if (zoomInTrigger > 0) {
+            map.zoomIn();
+        }
+    }, [zoomInTrigger, map]);
+
+    useEffect(() => {
+        if (zoomOutTrigger > 0) {
+            map.zoomOut();
+        }
+    }, [zoomOutTrigger, map]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            map.invalidateSize();
+        }, 150);
+        return () => clearTimeout(timer);
+    }, [map, isFullscreen]);
+
+    useEffect(() => {
+        const handleMouseMove = (e: any) => {
+            onMouseMove({ lat: e.latlng.lat, lng: e.latlng.lng });
+        };
+        const handleMouseOut = () => {
+            onMouseMove(null);
+        };
+        map.on('mousemove', handleMouseMove);
+        map.on('mouseout', handleMouseOut);
+        return () => {
+            map.off('mousemove', handleMouseMove);
+            map.off('mouseout', handleMouseOut);
+        };
+    }, [map, onMouseMove]);
+
+    useEffect(() => {
+        const calculateStats = () => {
+            let totalArea = 0;
+            let centerStr = '-';
+
+            map.eachLayer((layer) => {
+
+                if (layer instanceof L.Polygon && !(layer instanceof L.Rectangle)) {
+                    try {
+                        const geojson = layer.toGeoJSON();
+                        totalArea += turf.area(geojson);
+
+                        const bounds = layer.getBounds();
+                        const center = bounds.getCenter();
+                        centerStr = `Lat: ${center.lat.toFixed(6)}, Lng: ${center.lng.toFixed(6)}`;
+                    } catch (e) {
+                        console.error('[GISMapContainer] Gagal kalkulasi bidang:', e);
+                    }
+                }
+            });
+
+            onAreaChange(totalArea);
+            onCenterChange(centerStr);
+        };
+
+        map.on('pm:create', calculateStats);
+        map.on('pm:edit', calculateStats);
+        map.on('pm:remove', calculateStats);
+        map.on('layeradd', calculateStats);
+        map.on('layerremove', calculateStats);
+
+        const timer = setTimeout(calculateStats, 500);
+
+        return () => {
+            map.off('pm:create', calculateStats);
+            map.off('pm:edit', calculateStats);
+            map.off('pm:remove', calculateStats);
+            map.off('layeradd', calculateStats);
+            map.off('layerremove', calculateStats);
+            clearTimeout(timer);
+        };
+    }, [map, onAreaChange, onCenterChange]);
+
+    return null;
+}
+
+interface MapControlsProps {
+    isFullscreen: boolean;
+    setIsFullscreen: (v: boolean) => void;
+    activeBaseMap: keyof typeof BASEMAPS;
+    setActiveBaseMap: (v: keyof typeof BASEMAPS) => void;
+    isMaskActive: boolean;
+    setIsMaskActive: (v: boolean) => void;
+    maskOpacity: number;
+    setMaskOpacity: (v: number) => void;
+}
+
+function MapControls({
+    isFullscreen,
+    setIsFullscreen,
+    activeBaseMap,
+    setActiveBaseMap,
+    isMaskActive,
+    setIsMaskActive,
+    maskOpacity,
+    setMaskOpacity,
+}: MapControlsProps) {
+    const map = useMap();
+    const [currentZoom, setCurrentZoom] = useState(map.getZoom());
+    const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
+    const [isBatasMenuOpen, setIsBatasMenuOpen] = useState(false);
+
+    useEffect(() => {
+        const onZoom = () => {
+            setCurrentZoom(map.getZoom());
+        };
+        map.on('zoomend', onZoom);
+        return () => {
+            map.off('zoomend', onZoom);
+        };
+    }, [map]);
+
+    const handleZoomIn = () => {
+        if (currentZoom < 20) {
+            map.zoomIn();
+        }
+    };
+
+    const handleZoomOut = () => {
+        if (currentZoom > map.getMinZoom()) {
+            map.zoomOut();
+        }
+    };
+
+    const handleToggleBatas = () => {
+        const nextVal = !isBatasMenuOpen;
+        setIsBatasMenuOpen(nextVal);
+        setIsMaskActive(nextVal);
+        setIsLayerMenuOpen(false);
+    };
+
+    const handleToggleBasemap = () => {
+        setIsLayerMenuOpen(!isLayerMenuOpen);
+        setIsBatasMenuOpen(false);
+    };
+
+    return (
+        <div className="leaflet-top leaflet-right" style={{ zIndex: 1000, pointerEvents: 'auto' }}>
+            <div className="leaflet-control flex flex-col gap-2 m-3 select-none">
+                {}
+                <button
+                    type="button"
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    className="w-9 h-9 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-md flex items-center justify-center hover:bg-slate-50 transition-all focus:outline-none cursor-pointer"
+                    title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh'}
+                >
+                    {isFullscreen ? <Minimize2 className="w-4.5 h-4.5 text-slate-600" /> : <Maximize2 className="w-4.5 h-4.5 text-slate-600" />}
+                </button>
+
+                {}
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={handleToggleBatas}
+                        className={cn(
+                            "w-9 h-9 border rounded-lg shadow-md flex items-center justify-center transition-all focus:outline-none cursor-pointer",
+                            isMaskActive ? 'bg-teal-50 border-teal-200 text-teal-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        )}
+                        title="Batas Wilayah"
+                    >
+                        <Globe className="w-4.5 h-4.5" />
+                    </button>
+                    {isBatasMenuOpen && isMaskActive && (
+                        <div className="absolute right-11 top-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 w-44 flex flex-col gap-1 z-[1010] text-left">
+                            <div className="flex justify-between items-center text-[10px] select-none">
+                                <span className="font-bold text-slate-500 uppercase">Keredupan:</span>
+                                <span className="font-mono font-bold text-teal-600">{maskOpacity}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="90"
+                                value={maskOpacity}
+                                onChange={(e) => setMaskOpacity(parseInt(e.target.value))}
+                                className="w-full h-1 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-teal-600 focus:outline-none"
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {}
+                <div className="flex flex-col bg-white border border-slate-200 rounded-lg shadow-md overflow-hidden">
+                    <button
+                        type="button"
+                        onClick={handleZoomIn}
+                        disabled={currentZoom >= 20}
+                        className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all border-b border-slate-100 focus:outline-none cursor-pointer"
+                        title="Perbesar (Zoom In)"
+                    >
+                        <ZoomIn className="w-4.5 h-4.5 text-slate-600" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleZoomOut}
+                        disabled={currentZoom <= map.getMinZoom()}
+                        className="w-9 h-9 flex items-center justify-center text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white transition-all focus:outline-none cursor-pointer"
+                        title="Perkecil (Zoom Out)"
+                    >
+                        <ZoomOut className="w-4.5 h-4.5 text-slate-600" />
+                    </button>
+                </div>
+
+                {}
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={handleToggleBasemap}
+                        className="w-9 h-9 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-md flex items-center justify-center hover:bg-slate-50 transition-all focus:outline-none cursor-pointer"
+                        title="Pilih Citra Satelit / Base Map"
+                    >
+                        <Layers className="w-4.5 h-4.5 text-slate-600" />
+                    </button>
+
+                    {isLayerMenuOpen && (
+                        <div className="absolute right-11 top-0 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 w-44 flex flex-col text-left">
+                            {(Object.keys(BASEMAPS) as Array<keyof typeof BASEMAPS>).map((key) => {
+                                const selected = activeBaseMap === key;
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveBaseMap(key);
+                                            setIsLayerMenuOpen(false);
+                                        }}
+                                        className={cn(
+                                            "px-3 py-2 text-xs flex items-center justify-between transition-colors focus:outline-none w-full text-left cursor-pointer",
+                                            selected
+                                                ? 'bg-emerald-50 text-emerald-700 font-bold'
+                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                                        )}
+                                    >
+                                        <span>{BASEMAPS[key].name}</span>
+                                        {selected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function GISMapContainer({
-    center = [-6.595189, 106.816629],
-    zoom = 13,
+    center = [-6.4816, 106.8560],
+    zoom = 14,
     children,
     className = 'w-full h-full rounded-xl shadow-inner border border-slate-200',
 }: GISMapContainerProps) {
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [activeBaseMap, setActiveBaseMap] = useState<keyof typeof BASEMAPS>('osm');
+    const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
+    const [isMaskActive, setIsMaskActive] = useState(false);
+    const [maskOpacity, setMaskOpacity] = useState(45);
+    const [isBatasMenuOpen, setIsBatasMenuOpen] = useState(false);
+    const [bogorGeoJson, setBogorGeoJson] = useState<any>(null);
+    const [bogorOutlineGeoJson, setBogorOutlineGeoJson] = useState<any>(null);
+
+    useEffect(() => {
+        let active = true;
+
+        fetch('/geojson/kab%20bogor/KAB_BOGOR_KECAMATAN.json')
+            .then((res) => res.json())
+            .then((data) => {
+                if (active) setBogorGeoJson(data);
+            })
+            .catch((err) => console.error('[GISMapContainer] Gagal memuat batas wilayah:', err));
+
+        fetch('/geojson/kab%20bogor/KAB_BOGOR_OUTLINE.json')
+            .then((res) => res.json())
+            .then((data) => {
+                if (active) setBogorOutlineGeoJson(data);
+            })
+            .catch((err) => console.error('[GISMapContainer] Gagal memuat garis batas terluar:', err));
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    const maskRings = React.useMemo(() => {
+        if (!bogorGeoJson) return [];
+        const rings: [number, number][][] = [
+
+            [
+                [-90, -180],
+                [-90, 180],
+                [90, 180],
+                [90, -180],
+                [-90, -180]
+            ]
+        ];
+
+        bogorGeoJson.features.forEach((feature: any) => {
+            const geom = feature.geometry;
+            if (!geom) return;
+
+            if (geom.type === 'Polygon') {
+                geom.coordinates.forEach((ring: any[]) => {
+                    rings.push(ring.map((p) => [p[1], p[0]]));
+                });
+            } else if (geom.type === 'MultiPolygon') {
+                geom.coordinates.forEach((poly: any[][]) => {
+                    poly.forEach((ring: any[]) => {
+                        rings.push(ring.map((p) => [p[1], p[0]]));
+                    });
+                });
+            }
+        });
+
+        return rings;
+    }, [bogorGeoJson]);
+
+    const [zoomInTrigger, setZoomInTrigger] = useState(0);
+    const [zoomOutTrigger, setZoomOutTrigger] = useState(0);
+    const [currentZoom, setCurrentZoom] = useState(zoom);
+
+    const [calculatedArea, setCalculatedArea] = useState<number>(0);
+    const [centerPoint, setCenterPoint] = useState<string>('-');
+    const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+    const handleToggleBasemapFs = () => {
+        setIsLayerMenuOpen(!isLayerMenuOpen);
+        setIsBatasMenuOpen(false);
+    };
+
+    const handleToggleBatasFs = () => {
+        const nextVal = !isBatasMenuOpen;
+        setIsBatasMenuOpen(nextVal);
+        setIsMaskActive(nextVal);
+        setIsLayerMenuOpen(false);
+    };
+
+    if (isFullscreen) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-slate-50 w-screen h-screen flex flex-col font-sans select-none antialiased text-slate-800">
+                {}
+                <header className="h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 shadow-sm shrink-0">
+                    <div className="flex items-center gap-3 text-left">
+                        <Globe size={22} className="text-teal-600 shrink-0" strokeWidth={2} />
+                        <div className="flex flex-col leading-none">
+                            <span className="font-sans font-semibold text-lg tracking-tight text-slate-800">
+                                Geo <span className="text-teal-600">SIPAS</span>
+                            </span>
+                            <span className="text-[8px] text-slate-400 font-bold tracking-[0.2em] uppercase mt-0.5">
+                                Visualisasi Spasial Lahan
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsFullscreen(false)}
+                        className="group flex items-center gap-2 text-slate-500 hover:text-rose-600 transition-all rounded-none outline-none border-none bg-transparent cursor-pointer"
+                    >
+                        <Minimize2 size={18} className="text-slate-500 group-hover:text-rose-600 transition-colors" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                            Keluar
+                        </span>
+                    </button>
+                </header>
+
+                {}
+                <div className="flex flex-1 relative overflow-hidden">
+                    {}
+                    <aside className="w-16 h-full flex flex-col items-center bg-white border-r border-slate-200 shrink-0 z-[1000] py-0">
+                        {}
+                        <div className="relative group w-full flex justify-center h-16">
+                            <button
+                                type="button"
+                                onClick={handleToggleBasemapFs}
+                                className={cn(
+                                    "w-full h-full flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
+                                    isLayerMenuOpen
+                                        ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
+                                        : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                                )}
+                                title="Pilih Base Map / Satelit"
+                            >
+                                <Layers size={18} />
+                                <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                    Base Map
+                                </span>
+                            </button>
+
+                            {isLayerMenuOpen && (
+                                <div className="absolute left-16 top-0 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 w-44 flex flex-col text-left z-[1010]">
+                                    {(Object.keys(BASEMAPS) as Array<keyof typeof BASEMAPS>).map((key) => {
+                                        const selected = activeBaseMap === key;
+                                        return (
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveBaseMap(key);
+                                                    setIsLayerMenuOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "px-3 py-2 text-xs flex items-center justify-between transition-colors focus:outline-none w-full text-left cursor-pointer",
+                                                    selected
+                                                        ? 'bg-emerald-50 text-emerald-700 font-bold'
+                                                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                                                )}
+                                            >
+                                                <span>{BASEMAPS[key].name}</span>
+                                                {selected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="w-full h-px bg-slate-150" />
+
+                        {}
+                        <div className="relative w-full flex justify-center h-16">
+                            <button
+                                type="button"
+                                onClick={handleToggleBatasFs}
+                                className={cn(
+                                    "w-full h-full flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] cursor-pointer",
+                                    isMaskActive
+                                        ? 'bg-teal-50 text-teal-600 border-teal-500 font-bold'
+                                        : 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                                )}
+                                title="Batas Wilayah"
+                            >
+                                <Globe size={18} />
+                                <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                    Batas Wilayah
+                                </span>
+                            </button>
+
+                            {isBatasMenuOpen && isMaskActive && (
+                                <div className="absolute left-16 top-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 w-44 flex flex-col gap-1 z-[1010] text-left">
+                                    <div className="flex justify-between items-center text-[10px] select-none">
+                                        <span className="font-bold text-slate-500 uppercase">Keredupan:</span>
+                                        <span className="font-mono font-bold text-teal-600">{maskOpacity}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="90"
+                                        value={maskOpacity}
+                                        onChange={(e) => setMaskOpacity(parseInt(e.target.value))}
+                                        className="w-full h-1 bg-slate-150 rounded-lg appearance-none cursor-pointer accent-teal-600 focus:outline-none"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="w-full h-px bg-slate-150" />
+
+                        {}
+                        <button
+                            type="button"
+                            onClick={() => setZoomInTrigger((t) => t + 1)}
+                            disabled={currentZoom >= 20}
+                            className="w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-30 disabled:hover:bg-white cursor-pointer"
+                            title="Perbesar (Zoom In)"
+                        >
+                            <ZoomIn size={18} />
+                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                Zoom In
+                            </span>
+                        </button>
+
+                        {}
+                        <button
+                            type="button"
+                            onClick={() => setZoomOutTrigger((t) => t + 1)}
+                            disabled={currentZoom <= 4}
+                            className="w-full h-16 flex flex-col items-center justify-center gap-1 transition-colors relative active:bg-slate-100 rounded-none outline-none border-l-[3px] border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-30 disabled:hover:bg-white cursor-pointer"
+                            title="Perkecil (Zoom Out)"
+                        >
+                            <ZoomOut size={18} />
+                            <span className="text-[8px] font-black uppercase tracking-widest leading-none">
+                                Zoom Out
+                            </span>
+                        </button>
+                    </aside>
+
+                    {}
+                    <div className="flex-1 h-full relative">
+                        <MapContainer
+                            center={center}
+                            zoom={zoom}
+                            minZoom={4}
+                            maxZoom={20}
+                            zoomControl={false}
+                            style={{ width: '100%', height: '100%' }}
+                            maxBounds={[[-15, 90], [15, 150]]}
+                            maxBoundsViscosity={1.0}
+                        >
+                            <TileLayer
+                                key={activeBaseMap}
+                                url={BASEMAPS[activeBaseMap].url}
+                                attribution={BASEMAPS[activeBaseMap].attribution}
+                                maxZoom={20}
+                                maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
+                            />
+                            {}
+                            {isMaskActive && maskRings.length > 0 && (
+                                <Polygon
+                                    positions={maskRings}
+                                    pathOptions={{
+                                        color: 'transparent',
+                                        weight: 0,
+                                        fillColor: '#090d16',
+                                        fillOpacity: maskOpacity / 100,
+                                        interactive: false
+                                    }}
+                                />
+                            )}
+                            {}
+                            {isMaskActive && bogorOutlineGeoJson && (
+                                <GeoJSON
+                                    data={bogorOutlineGeoJson}
+                                    style={{
+                                        color: '#0f766e',
+                                        weight: 2,
+                                        fill: false,
+                                        interactive: false
+                                    }}
+                                />
+                            )}
+                            <MapSyncListener
+                                zoomInTrigger={zoomInTrigger}
+                                zoomOutTrigger={zoomOutTrigger}
+                                onZoomChange={setCurrentZoom}
+                                isFullscreen={isFullscreen}
+                                onMouseMove={setCursorCoords}
+                                onAreaChange={setCalculatedArea}
+                                onCenterChange={setCenterPoint}
+                            />
+                            {children}
+                        </MapContainer>
+
+                        {}
+                        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm border border-slate-200 shadow-lg p-4 w-72 text-left text-xs z-[1000] flex flex-col gap-3 rounded-none">
+                            <div className="border-b border-slate-100 pb-2">
+                                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                                    <Globe className="w-3.5 h-3.5 text-teal-600" />
+                                    <span>Informasi Spasial Lahan</span>
+                                </h4>
+                            </div>
+                            <div className="space-y-1.5 text-slate-600">
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-slate-400">Luas Lahan:</span>
+                                    <span className="font-bold text-slate-800">
+                                        {calculatedArea > 0
+                                            ? `${calculatedArea.toLocaleString('id-ID', { maximumFractionDigits: 2 })} m²`
+                                            : '-'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-slate-400">Luas Hektar:</span>
+                                    <span className="font-bold text-slate-800">
+                                        {calculatedArea > 0
+                                            ? `${(calculatedArea / 10000).toLocaleString('id-ID', { maximumFractionDigits: 4 })} Ha`
+                                            : '-'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-medium text-slate-400">Pusat Bidang:</span>
+                                    <span className="font-mono text-[10px] text-slate-800">{centerPoint}</span>
+                                </div>
+                                <div className="flex justify-between border-t border-slate-100 pt-1.5 mt-1.5">
+                                    <span className="font-medium text-slate-400">Kursor (GPS Live):</span>
+                                    <span className="font-mono text-[10px] text-slate-800">
+                                        {cursorCoords
+                                            ? `Lat: ${cursorCoords.lat.toFixed(6)}, Lng: ${cursorCoords.lng.toFixed(6)}`
+                                            : '-'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-slate-100 pt-2 text-[9.5px] leading-relaxed text-slate-400">
+                                <span className="font-bold text-slate-500 uppercase block mb-1">Bantuan Menggambar:</span>
+                                <ul className="list-disc pl-3.5 space-y-0.5">
+                                    <li>Pilih alat gambar poligon di sudut kiri atas peta.</li>
+                                    <li>Klik peta untuk membuat batas bidang tanah baru.</li>
+                                    <li>Gunakan tombol **Base Map** di sidebar untuk mengganti visualisasi satelit.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className={className} style={{ width: '100%', height: '100%' }}>
+        <div className={cn(className, 'relative')} style={{ width: '100%', height: '100%' }}>
             <MapContainer
                 center={center}
                 zoom={zoom}
                 minZoom={4}
-                maxZoom={22}
+                maxZoom={20}
                 zoomControl={false}
                 style={{ width: '100%', height: '100%' }}
                 maxBounds={[[-15, 90], [15, 150]]}
                 maxBoundsViscosity={1.0}
             >
                 <TileLayer
-                    url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution="&copy; OpenStreetMap contributors"
-                    maxZoom={18}
+                    key={activeBaseMap}
+                    url={BASEMAPS[activeBaseMap].url}
+                    attribution={BASEMAPS[activeBaseMap].attribution}
+                    maxZoom={20}
+                    maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
+                />
+                {}
+                {isMaskActive && maskRings.length > 0 && (
+                    <Polygon
+                        positions={maskRings}
+                        pathOptions={{
+                            color: 'transparent',
+                            weight: 0,
+                            fillColor: '#090d16',
+                            fillOpacity: maskOpacity / 100,
+                            interactive: false
+                        }}
+                    />
+                )}
+                {}
+                {isMaskActive && bogorOutlineGeoJson && (
+                    <GeoJSON
+                        data={bogorOutlineGeoJson}
+                        style={{
+                            color: '#0f766e',
+                            weight: 2,
+                            fill: false,
+                            interactive: false
+                        }}
+                    />
+                )}
+                <MapSyncListener
+                    zoomInTrigger={zoomInTrigger}
+                    zoomOutTrigger={zoomOutTrigger}
+                    onZoomChange={setCurrentZoom}
+                    isFullscreen={isFullscreen}
+                    onMouseMove={setCursorCoords}
+                    onAreaChange={setCalculatedArea}
+                    onCenterChange={setCenterPoint}
+                />
+                <MapControls
+                    isFullscreen={isFullscreen}
+                    setIsFullscreen={setIsFullscreen}
+                    activeBaseMap={activeBaseMap}
+                    setActiveBaseMap={setActiveBaseMap}
+                    isMaskActive={isMaskActive}
+                    setIsMaskActive={setIsMaskActive}
+                    maskOpacity={maskOpacity}
+                    setMaskOpacity={setMaskOpacity}
                 />
                 {children}
             </MapContainer>
@@ -6951,7 +7653,7 @@ export default function SipasMap() {
   return (
     <div className="absolute inset-0 z-0">
       <MapContainer
-        key={`${mapCenterLat}-${mapCenterLng}-${mapZoom}`}
+        key="sipas-leaflet-map"
         center={[mapCenterLat, mapCenterLng]}
         zoom={mapZoom}
         minZoom={4}
@@ -7440,7 +8142,7 @@ export const SpatialGeoJSONLayers = ({
       {}
       {subPolygonsGeoJSON && subPolygonsGeoJSON.features?.length > 0 && (
         <GeoJSON
-          key={`sub-polygons-${selectedCompanyId}`}
+          key={`sub-polygons-${selectedCompanyId}-${subPolygonsGeoJSON.features.length}`}
           data={subPolygonsGeoJSON}
           style={(feature) => ({
             color: feature?.properties?.color ?? '#6b7280',
@@ -8160,23 +8862,35 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
         window.dispatchEvent(new Event('map-clear-clash'));
     }, [submissionData?.id]);
 
-    const [inspectionLogs, setInspectionLogs] = useState<any[]>([]);
-    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const [groundLogs, setGroundLogs] = useState<any[]>([]);
+    const [aerialLog, setAerialLog] = useState<any | null>(null);
+    const [isLoadingInspections, setIsLoadingInspections] = useState(false);
 
     useEffect(() => {
         if (submissionData?.id) {
-            setIsLoadingLogs(true);
-            SubmissionService.getInspectionLogs(submissionData.id)
-                .then(res => {
-                    if (res && res.data) {
-                        setInspectionLogs(res.data);
+            setIsLoadingInspections(true);
+
+            Promise.all([
+                SubmissionService.getGroundInspections(submissionData.id),
+                SubmissionService.getAerialInspection(submissionData.id)
+            ])
+                .then(([groundRes, aerialRes]) => {
+                    if (groundRes && groundRes.data) {
+                        setGroundLogs(groundRes.data);
+                    } else {
+                        setGroundLogs([]);
+                    }
+                    if (aerialRes && aerialRes.data) {
+                        setAerialLog(aerialRes.data);
+                    } else {
+                        setAerialLog(null);
                     }
                 })
                 .catch(err => {
-                    console.error('Failed to load inspection logs:', err);
+                    console.error('Gagal memuat log inspeksi spasial:', err);
                 })
                 .finally(() => {
-                    setIsLoadingLogs(false);
+                    setIsLoadingInspections(false);
                 });
         }
     }, [submissionData?.id]);
@@ -8563,17 +9277,36 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                         <span className="text-[9px] text-slate-400 font-bold uppercase">Geotagged</span>
                     </div>
 
-                    {isLoadingLogs ? (
+                    {isLoadingInspections ? (
                         <div className="flex justify-center py-4">
                             <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
                         </div>
-                    ) : inspectionLogs.length === 0 ? (
+                    ) : groundLogs.length === 0 && !aerialLog ? (
                         <div className="p-3 bg-slate-50 text-[10px] text-slate-400 text-center font-medium">
                             Belum ada laporan bukti kunjungan lapangan untuk berkas ini.
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {inspectionLogs.map((log) => (
+                            {}
+                            {aerialLog && (
+                                <div className="p-3 bg-teal-50/20 border border-teal-200 space-y-2 text-xs">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[8px] font-black text-teal-700 uppercase tracking-widest block leading-none">🎥 Sidak Udara Drone</span>
+                                        <span className="px-1 py-0.5 text-[7px] font-black text-teal-800 bg-teal-50 border border-teal-200 rounded-none leading-none">AKTIF</span>
+                                    </div>
+                                    <div className="relative bg-black aspect-video overflow-hidden border border-slate-200">
+                                        <video src={aerialLog.droneVideoUrl} controls className="w-full h-full object-contain" />
+                                    </div>
+                                    <div className="space-y-0.5 text-[9px] text-slate-500 font-medium">
+                                        <p className="font-bold text-slate-700">Pilot: {aerialLog.pilotName}</p>
+                                        <p>Waktu: {new Date(aerialLog.timestamp).toLocaleString('id-ID')}</p>
+                                        {aerialLog.notes && <p className="italic text-slate-600 mt-1 line-clamp-2">"{aerialLog.notes}"</p>}
+                                    </div>
+                                </div>
+                            )}
+
+                            {}
+                            {groundLogs.map((log) => (
                                 <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 space-y-2 text-xs">
                                     <div className="flex justify-between items-start">
                                         <div className="text-left">
@@ -9563,8 +10296,10 @@ export function useSipasMapData(localZoom: number) {
   }, [clearSpatialCache]);
 
   useEffect(() => {
+
+    setActiveSubmissionGeoJson(null);
+
     if (!selectedCompanyId) {
-      setActiveSubmissionGeoJson(null);
       return;
     }
 
@@ -9913,8 +10648,7 @@ export function useSipasMapData(localZoom: number) {
 --- FILE: src\features\gis\hooks\useSpatialValidator.ts ---
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
-
-import * as turf from '@turf/turf';
+import { API_BASE_URL as API_BASE_URL_CONFIG } from '@/config';
 
 export interface SpatialClashDetail {
     layerId: string;
@@ -9935,167 +10669,6 @@ export interface SpatialAuditResult {
     error?: string;
 }
 
-type ZonaType = 'sawah' | 'pasir' | 'kebun' | 'ladang' | 'pemukiman' | 'sungai' | 'relka';
-type SeverityLevel = 'danger' | 'warning' | 'info';
-
-interface ZoningRule {
-    severity: SeverityLevel;
-    reason: string;
-    dasar_hukum?: string;
-}
-
-const ZONING_MATRIX: Record<ZonaType, Record<string, ZoningRule>> = {
-    relka: {
-        _default: {
-            severity: 'danger',
-            reason: 'Kawasan sempadan rel kereta api 20m adalah zona bahaya keselamatan umum. Tidak ada pembangunan apapun yang diizinkan.',
-            dasar_hukum: 'UU No. 23/2007 tentang Perkeretaapian'
-        }
-    },
-    sungai: {
-
-        _default: {
-            severity: 'danger',
-            reason: 'Kawasan sempadan sungai 25m adalah zona mutlak lindung. Tidak ada pembangunan apapun yang diizinkan.',
-            dasar_hukum: 'PP No. 38/2011 tentang Sungai'
-        }
-    },
-    pasir: {
-
-        _default: {
-            severity: 'danger',
-            reason: 'Kawasan konservasi gumuk pasir adalah cagar alam yang dilindungi mutlak.',
-            dasar_hukum: 'UU No. 5/1990 tentang Konservasi Sumber Daya Alam'
-        }
-    },
-    sawah: {
-        PERUMAHAN: {
-            severity: 'danger',
-            reason: 'Perumahan di atas Lahan Sawah Dilindungi (LSD) dilarang keras — mengancam ketahanan pangan nasional.',
-            dasar_hukum: 'UU No. 41/2009 tentang Perlindungan Lahan Pertanian Pangan Berkelanjutan'
-        },
-        INDUSTRI: {
-            severity: 'danger',
-            reason: 'Industri di atas sawah berdampak destruktif ganda: hilangnya lahan pangan + pencemaran tanah & air irigasi.',
-            dasar_hukum: 'UU No. 41/2009 & UU No. 32/2009 tentang PPLH'
-        },
-        KOMERSIAL: {
-            severity: 'danger',
-            reason: 'Pembangunan komersial di atas sawah dilindungi (LSD) tidak sesuai peruntukan RTRW.',
-            dasar_hukum: 'UU No. 41/2009'
-        },
-        FASILITAS: {
-            severity: 'warning',
-            reason: 'Fasos/Fasum di atas sawah memerlukan kajian KLHS dan rekomendasi BPN khusus.',
-            dasar_hukum: 'UU No. 41/2009, dapat dikecualikan dengan mekanisme khusus'
-        },
-        _default: {
-            severity: 'danger',
-            reason: 'Rencana pembangunan menabrak Lahan Sawah Dilindungi (LSD).',
-            dasar_hukum: 'UU No. 41/2009'
-        }
-    },
-    kebun: {
-        PERUMAHAN: {
-            severity: 'warning',
-            reason: 'Perumahan di zona perkebunan memerlukan izin alih fungsi lahan dari Kementerian Pertanian.',
-            dasar_hukum: 'UU No. 39/2014 tentang Perkebunan'
-        },
-        INDUSTRI: {
-            severity: 'danger',
-            reason: 'Industri di zona perkebunan berisiko tinggi — pencemaran pestisida dan alih fungsi lahan masif.',
-            dasar_hukum: 'UU No. 39/2014 & Permentan No. 98/2013'
-        },
-        KOMERSIAL: {
-            severity: 'warning',
-            reason: 'Pembangunan komersial di area perkebunan memerlukan perubahan RDTR dan izin alih fungsi.',
-            dasar_hukum: 'UU No. 39/2014'
-        },
-        FASILITAS: {
-            severity: 'info',
-            reason: 'Fasos/Fasum terbatas (posyandu, mushola) dapat dipertimbangkan di tepi kawasan perkebunan.',
-            dasar_hukum: 'Disesuaikan dengan ketentuan RDTR setempat'
-        },
-        _default: {
-            severity: 'warning',
-            reason: 'Lahan berada di kawasan perkebunan. Diperlukan izin alih fungsi.',
-            dasar_hukum: 'UU No. 39/2014'
-        }
-    },
-    ladang: {
-        PERUMAHAN: {
-            severity: 'warning',
-            reason: 'Perumahan di ladang/tegalan masih dapat dikaji jika RDTR mengizinkan konversi lahan kering.',
-            dasar_hukum: 'Perda RDTR Kab. Bogor'
-        },
-        INDUSTRI: {
-            severity: 'warning',
-            reason: 'Industri di area ladang harus melewati AMDAL penuh dan izin lingkungan dari DPMPTSP.',
-            dasar_hukum: 'UU No. 32/2009 tentang PPLH'
-        },
-        KOMERSIAL: {
-            severity: 'info',
-            reason: 'Komersial ringan di lahan ladang/tegalan relatif dapat diproses jika sesuai peruntukan RDTR.',
-            dasar_hukum: 'Perda RDTR Kab. Bogor'
-        },
-        FASILITAS: {
-            severity: 'info',
-            reason: 'Fasos/Fasum di lahan ladang umumnya dapat diakomodasi, perlu verifikasi RDTR.',
-            dasar_hukum: 'Perda RDTR Kab. Bogor'
-        },
-        _default: {
-            severity: 'warning',
-            reason: 'Rencana tapak menabrak lahan ladang/tegalan pertanian kering.',
-            dasar_hukum: 'Perda RDTR Kab. Bogor'
-        }
-    },
-    pemukiman: {
-        PERUMAHAN: {
-            severity: 'info',
-            reason: 'Pembangunan perumahan SESUAI dengan peruntukan zona pemukiman dalam RDTR. Zona kompatibel.',
-            dasar_hukum: 'UU No. 1/2011 tentang Perumahan dan Kawasan Permukiman'
-        },
-        INDUSTRI: {
-            severity: 'danger',
-            reason: 'Industri di zona pemukiman menciptakan konflik tata ruang kritis: kebisingan, polusi, dan risiko K3 bagi warga.',
-            dasar_hukum: 'UU No. 26/2007 tentang Penataan Ruang & UU No. 32/2009 tentang PPLH'
-        },
-        KOMERSIAL: {
-            severity: 'warning',
-            reason: 'Komersial besar di zona pemukiman perlu kajian dampak lalu lintas (Andalalin) dan izin perubahan fungsi.',
-            dasar_hukum: 'Perda Kab. Bogor tentang RTRW/RDTR'
-        },
-        FASILITAS: {
-            severity: 'info',
-            reason: 'Fasos/Fasum (sekolah, masjid, RS, taman) di zona pemukiman SESUAI dan sangat dianjurkan.',
-            dasar_hukum: 'SNI 03-1733-2004 tentang Tata cara perencanaan lingkungan perumahan'
-        },
-        _default: {
-            severity: 'warning',
-            reason: 'Perlu kajian kesesuaian peruntukan zona pemukiman untuk kategori ini.',
-            dasar_hukum: 'Perda RDTR Kab. Bogor'
-        }
-    }
-};
-
-function getZoningRule(zona: ZonaType, category: string): ZoningRule {
-    const zonaRules = ZONING_MATRIX[zona];
-    if (!zonaRules) return { severity: 'warning', reason: 'Data zonasi tidak tersedia.' };
-    return zonaRules[category] || zonaRules['_default'] || { severity: 'warning', reason: 'Tidak ada aturan zonasi spesifik.' };
-}
-
-function calculateZoningScore(details: SpatialClashDetail[], totalArea: number): number {
-    if (details.length === 0) return 100;
-    let penalty = 0;
-    for (const d of details) {
-        const ratio = totalArea > 0 ? d.clashAreaSqm / totalArea : 0;
-        if (d.severity === 'danger') penalty += ratio * 60 + 20;
-        else if (d.severity === 'warning') penalty += ratio * 25 + 5;
-
-    }
-    return Math.max(0, Math.round(100 - Math.min(penalty, 100)));
-}
-
 export function useSpatialValidator() {
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -10109,143 +10682,50 @@ export function useSpatialValidator() {
             if (!applicantPolygonCoords || applicantPolygonCoords.length < 3) {
                 setIsProcessing(false);
                 return {
-                    isClashing: false, clashGeometry: null, clashAreaSqm: 0,
-                    details: [], zoningScore: 100, verdict: 'LAYAK',
+                    isClashing: false,
+                    clashGeometry: null,
+                    clashAreaSqm: 0,
+                    details: [],
+                    zoningScore: 100,
+                    verdict: 'LAYAK',
                     error: 'Geometri tanah tidak valid untuk kalkulasi spasial.'
                 };
             }
 
             try {
-
-                const formattedCoords = applicantPolygonCoords.map(([a, b]) => {
-                    if (a < 20 && b > 90) return [b, a];
-                    return [a, b];
+                const token = sessionStorage.getItem('token');
+                const response = await fetch(`${API_BASE_URL_CONFIG}/api/v1/submissions/spatial-audit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify({
+                        polygon: applicantPolygonCoords,
+                        category
+                    })
                 });
 
-                const firstPoint = formattedCoords[0];
-                const lastPoint = formattedCoords[formattedCoords.length - 1];
-                if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-                    formattedCoords.push([...firstPoint]);
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.detail || 'Gagal memproses analisis spasial di server.');
                 }
 
-                const applicantPolygon = turf.polygon([formattedCoords]);
-
-                const applicantAreaSqm = turf.area(applicantPolygon);
-
-                const details: SpatialClashDetail[] = [];
-                let combinedClashGeometry: any = null;
-                let totalDangerWarningArea = 0;
-
-                const mergeGeometry = (intersection: any) => {
-                    if (!combinedClashGeometry) {
-                        combinedClashGeometry = intersection;
-                    } else {
-                        try {
-                            combinedClashGeometry = turf.union(combinedClashGeometry, intersection);
-                        } catch {
-                            combinedClashGeometry = intersection;
-                        }
-                    }
-                };
-
-                const checkLayer = async (
-                    zona: ZonaType,
-                    layerName: string,
-                    loader: () => Promise<any>,
-                    useBuffer?: { meters: number }
-                ) => {
-                    try {
-                        const geoJsonModule = await loader();
-                        const geoData = geoJsonModule.default || geoJsonModule;
-                        let clashArea = 0;
-
-                        for (const feature of (geoData as any).features) {
-                            if (!feature.geometry) continue;
-                            try {
-                                const subject = useBuffer
-                                    ? turf.buffer(feature, useBuffer.meters, { units: 'meters' })
-                                    : feature;
-                                if (!subject) continue;
-
-                                const intersection = turf.intersect(applicantPolygon, subject);
-                                if (intersection) {
-                                    const areaSqm = turf.area(intersection);
-                                    clashArea += areaSqm;
-                                    mergeGeometry(intersection);
-                                }
-                            } catch {  }
-                        }
-
-                        if (clashArea > 0) {
-                            const rule = getZoningRule(zona, category);
-                            const clashAreaRounded = Math.round(clashArea);
-                            const percentOfLahan = applicantAreaSqm > 0
-                                ? ((clashArea / applicantAreaSqm) * 100).toFixed(1)
-                                : '?';
-
-                            details.push({
-                                layerId: `layer-${zona === 'sungai' ? 'river' : zona === 'pemukiman' ? 'aqi' : zona}`,
-                                layerName,
-                                clashAreaSqm: clashAreaRounded,
-                                description: `${rule.reason} (${percentOfLahan}% dari lahan — ${clashAreaRounded.toLocaleString('id-ID')} m²)`,
-                                severity: rule.severity,
-                                zoningNote: rule.dasar_hukum
-                            });
-
-                            if (rule.severity === 'danger' || rule.severity === 'warning') {
-                                totalDangerWarningArea += clashArea;
-                            }
-                        } else {
-
-                            details.push({
-                                layerId: `layer-${zona === 'sungai' ? 'river' : zona === 'pemukiman' ? 'aqi' : zona}`,
-                                layerName,
-                                clashAreaSqm: 0,
-                                description: `Bersih — tidak ada tumpang tindih dengan ${layerName}.`,
-                                severity: 'info'
-                            });
-                        }
-                    } catch (e) {
-                        console.error(`Gagal memuat/menghitung layer ${layerName}:`, e);
-                    }
-                };
-
-                await Promise.all([
-                    checkLayer('sungai',    'Sempadan Sungai 25m',          () => fetch('/geojson/bogor/SUNGAI_LN_25K.json').then(res => res.json()),          { meters: 25 }),
-                    checkLayer('relka',     'Sempadan Jalur Kereta Api 20m', () => fetch('/geojson/kab bogor/RELKA_LN_25K.json').then(res => res.json()),       { meters: 20 }),
-                    checkLayer('pasir',     'Kawasan Konservasi Gumuk Pasir',() => fetch('/geojson/kab bogor/PASIR_AR_25K.json').then(res => res.json())),
-                    checkLayer('sawah',     'Lahan Sawah Dilindungi (LSD)', () => fetch('/geojson/bogor/AGRISAWAH_AR_25K.json').then(res => res.json())),
-                    checkLayer('kebun',     'Kawasan Perkebunan',           () => fetch('/geojson/bogor/AGRIKEBUN_AR_25K.json').then(res => res.json())),
-                    checkLayer('ladang',    'Kawasan Ladang / Tegalan',     () => fetch('/geojson/bogor/AGRILADANG_AR_25K.json').then(res => res.json())),
-                    checkLayer('pemukiman', 'Zona Peruntukan Pemukiman',    () => fetch('/geojson/bogor/PEMUKIMAN_AR_25K.json').then(res => res.json())),
-                ]);
-
-                const zoningScore = calculateZoningScore(details, applicantAreaSqm);
-                const hasDanger  = details.some(d => d.severity === 'danger');
-                const hasWarning = details.some(d => d.severity === 'warning');
-                const verdict: SpatialAuditResult['verdict'] =
-                    hasDanger  ? 'TIDAK_LAYAK' :
-                    hasWarning ? 'PERLU_REVISI' :
-                    'LAYAK';
-
+                const result = await response.json();
                 setIsProcessing(false);
-
-                return {
-                    isClashing: hasDanger || hasWarning,
-                    clashGeometry: combinedClashGeometry,
-                    clashAreaSqm: Math.round(totalDangerWarningArea),
-                    details,
-                    zoningScore,
-                    verdict
-                };
+                return result;
 
             } catch (err: any) {
                 setIsProcessing(false);
-                const errMsg = err?.message || 'Gagal memproses analisis spasial multi-layer.';
+                const errMsg = err?.message || 'Gagal memproses analisis spasial.';
                 toast.error(errMsg);
                 return {
-                    isClashing: false, clashGeometry: null, clashAreaSqm: 0,
-                    details: [], zoningScore: 0, verdict: 'TIDAK_LAYAK',
+                    isClashing: false,
+                    clashGeometry: null,
+                    clashAreaSqm: 0,
+                    details: [],
+                    zoningScore: 0,
+                    verdict: 'TIDAK_LAYAK',
                     error: errMsg
                 };
             }
@@ -11232,6 +11712,372 @@ export interface SitePlan {
   };
 }
 
+--- FILE: src\features\submission\components\AerialInspectionForm.tsx ---
+import React, { useState, useEffect, useRef } from 'react';
+import { Video, User, UploadCloud, CheckCircle2, Loader2, HelpCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { SubmissionService } from '../services/submission.service';
+import { toast } from 'sonner';
+
+interface AerialInspectionFormProps {
+    submissionId: string;
+    onSuccess?: () => void;
+}
+
+interface ExistingAerialLog {
+    id: number;
+    idPermohonan: string;
+    pilotName: string;
+    timestamp: string;
+    droneVideoUrl: string;
+    flightMetadata?: Record<string, any> | null;
+    notes?: string | null;
+}
+
+export function AerialInspectionForm({ submissionId, onSuccess }: AerialInspectionFormProps) {
+    const [pilotName, setPilotName] = useState('');
+    const [notes, setNotes] = useState('');
+    const [videoFile, setVideoFile] = useState<File | null>(null);
+    const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+
+    const [isDragActive, setIsDragActive] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loadingExisting, setLoadingExisting] = useState(false);
+    const [existingLog, setExistingLog] = useState<ExistingAerialLog | null>(null);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const fetchExistingLog = async () => {
+        setLoadingExisting(true);
+        try {
+            const res = await SubmissionService.getAerialInspection(submissionId);
+            if (res && res.data) {
+                setExistingLog(res.data);
+                setPilotName(res.data.pilotName);
+                setNotes(res.data.notes || '');
+            } else {
+                setExistingLog(null);
+            }
+        } catch (err) {
+            console.error('Gagal memuat log inspeksi udara eksis:', err);
+        } finally {
+            setLoadingExisting(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchExistingLog();
+    }, [submissionId]);
+
+    const handleDrag = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setIsDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setIsDragActive(false);
+        }
+    };
+
+    const processVideoFile = (file: File) => {
+
+        const isVideo = file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.mov');
+        if (!isVideo) {
+            toast.error('Format file tidak didukung! Harap pilih file video berformat .mp4 atau .mov.');
+            return;
+        }
+
+        const MAX_SIZE = 100 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+            toast.error('Gagal: Ukuran file video drone melebihi batas maksimal 100MB.');
+            return;
+        }
+
+        setVideoFile(file);
+        const objectUrl = URL.createObjectURL(file);
+        setVideoPreviewUrl(objectUrl);
+        toast.success(`Video '${file.name}' siap untuk diunggah.`);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragActive(false);
+
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+            processVideoFile(file);
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            processVideoFile(file);
+        }
+    };
+
+    const handleRemoveSelectedVideo = () => {
+        setVideoFile(null);
+        if (videoPreviewUrl) {
+            URL.revokeObjectURL(videoPreviewUrl);
+            setVideoPreviewUrl(null);
+        }
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!pilotName.trim()) {
+            toast.warning('Nama pilot drone wajib diisi.');
+            return;
+        }
+
+        if (!videoFile) {
+            toast.warning('Berkas rekaman video drone wajib dipilih.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        const toastId = toast.loading('Sedang mengunggah dokumentasi udara ke server...');
+
+        try {
+            const formData = new FormData();
+            formData.append('pilot_name', pilotName);
+            formData.append('notes', notes);
+            formData.append('drone_video', videoFile);
+
+            await SubmissionService.createAerialInspection(submissionId, formData);
+            toast.success('Log dokumentasi udara drone berhasil disimpan!', { id: toastId });
+
+            handleRemoveSelectedVideo();
+            fetchExistingLog();
+            if (onSuccess) onSuccess();
+        } catch (err: any) {
+            let friendlyMsg = err.message || 'Terjadi kesalahan sistem internal.';
+            try {
+                const parsed = JSON.parse(err.message);
+                if (parsed.message) {
+                    friendlyMsg = parsed.message;
+                    if (parsed.detail && Array.isArray(parsed.detail)) {
+                        const details = parsed.detail.map((d: any) => {
+                            const field = d.loc ? d.loc[d.loc.length - 1] : '';
+                            return `${field ? field + ': ' : ''}${d.msg}`;
+                        }).join(', ');
+                        friendlyMsg += ` (${details})`;
+                    }
+                }
+            } catch (e) {
+
+            }
+            toast.error(`Gagal menyimpan dokumentasi udara: ${friendlyMsg}`, { id: toastId });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6 text-left select-none font-sans bg-white">
+            {}
+            <div className="border-b border-slate-200 pb-2.5">
+                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Video size={15} className="text-primary" />
+                    Input Bukti Sidak Udara (Aerial Drone Inspection)
+                </h4>
+                <span className="text-[10px] text-slate-450 block mt-1">
+                    Unggah dokumentasi rekaman video udara makro kawasan menggunakan pesawat nirawak (drone) [Slide 6]
+                </span>
+            </div>
+
+            {}
+            <div className="p-3.5 bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-[10px] space-y-1.5 leading-relaxed">
+                <span className="font-bold uppercase text-slate-800 flex items-center gap-1.5">
+                    <HelpCircle size={13} className="text-slate-500" />
+                    Ketentuan Sidak Udara:
+                </span>
+                <ol className="list-decimal pl-4 space-y-1 text-slate-500">
+                    <li>Pengunggahan video drone diwajibkan secara mutlak bagi permohonan kategori <strong>PERUMAHAN</strong> dan <strong>INDUSTRI</strong> sebelum berkas diajukan ke Kabid.</li>
+                    <li>Kapasitas berkas video yang diunggah dibatasi maksimal berukuran <strong>100 Megabytes (100MB)</strong>.</li>
+                    <li>Sistem menerapkan kebijakan *idempotent overwrite*. Pengunggahan video drone baru akan otomatis menghapus file video lama di storage server.</li>
+                </ol>
+            </div>
+
+            {}
+            {loadingExisting ? (
+                <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 text-slate-400 text-xs">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                    <span>Mendeteksi status unggahan drone sebelumnya...</span>
+                </div>
+            ) : existingLog ? (
+                <div className="p-4 bg-emerald-50/50 border border-emerald-200 text-emerald-800 text-xs leading-normal space-y-3">
+                    <div className="flex items-start gap-2.5">
+                        <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold uppercase tracking-wider text-[10px] text-emerald-950">Video Drone Terunggah (OK)</p>
+                            <p className="text-[10px] text-emerald-700 mt-0.5 leading-relaxed">
+                                Berkas video udara telah terdaftar aman di server untuk permohonan ini.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-2.5 border border-emerald-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-[10px] font-sans text-slate-600 text-left">
+                        <div>
+                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase tracking-wider">Nama Pilot Drone</span>
+                            <span className="font-bold text-slate-800">{existingLog.pilotName}</span>
+                        </div>
+                        <div>
+                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase tracking-wider">Tanggal Sidak Udara</span>
+                            <span className="font-semibold text-slate-700">{new Date(existingLog.timestamp).toLocaleString('id-ID')}</span>
+                        </div>
+                        {existingLog.notes && (
+                            <div className="col-span-2">
+                                <span className="text-[8.5px] text-slate-400 font-bold block uppercase tracking-wider">Catatan Penerbangan</span>
+                                <span className="font-medium text-slate-700 italic">"{existingLog.notes}"</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-2 flex justify-between items-center text-[10px]">
+                        <span className="text-slate-400 font-semibold uppercase text-[9px] tracking-wider">Aksi Spasial:</span>
+                        <a
+                            href={existingLog.droneVideoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-emerald-700 hover:text-emerald-800 font-bold hover:underline"
+                        >
+                            Putar Rekaman Video Drone Aktif ↗
+                        </a>
+                    </div>
+                </div>
+            ) : (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-[10px] flex items-start gap-2 text-justify">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5 animate-pulse" />
+                    <span>Dokumentasi sidak udara drone belum terdaftar untuk berkas permohonan ini. Silakan lakukan proses pengunggahan di bawah.</span>
+                </div>
+            )}
+
+            {}
+            <form onSubmit={handleSubmit} className="space-y-4 max-w-xl">
+                {}
+                <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nama Pilot Drone / Penanggung Jawab *</label>
+                    <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                            <User size={13} />
+                        </span>
+                        <input
+                            type="text"
+                            value={pilotName}
+                            onChange={(e) => setPilotName(e.target.value)}
+                            className="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-300 text-slate-800 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-sans"
+                            placeholder="Masukkan nama pilot / operator drone..."
+                            required
+                        />
+                    </div>
+                </div>
+
+                {}
+                <div className="space-y-1.5 text-left">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unggah File Rekaman Video Drone (.mp4 / .mov) *</label>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="video/mp4,video/quicktime"
+                        className="hidden"
+                    />
+
+                    {videoPreviewUrl ? (
+                        <div className="border border-slate-300 p-3.5 bg-slate-50 space-y-3">
+                            <div className="flex items-center justify-between gap-3 text-xs text-slate-700 bg-white p-2.5 border border-slate-200">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-teal-600 shrink-0">🎥</span>
+                                    <span className="font-bold truncate max-w-[220px]" title={videoFile?.name}>
+                                        {videoFile?.name}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-mono">
+                                        ({videoFile ? (videoFile.size / (1024 * 1024)).toFixed(1) : 0} MB)
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveSelectedVideo}
+                                    className="p-1 text-slate-400 hover:text-rose-600 transition-colors border border-slate-200 hover:border-rose-300 rounded-none bg-white cursor-pointer"
+                                    title="Hapus video terpilih"
+                                >
+                                    <Trash2 size={13} />
+                                </button>
+                            </div>
+
+                            {}
+                            <div className="relative border border-slate-200 bg-black aspect-video flex items-center justify-center overflow-hidden">
+                                <video src={videoPreviewUrl} controls className="w-full h-full object-contain" />
+                            </div>
+                        </div>
+                    ) : (
+                        <div
+                            onDragEnter={handleDrag}
+                            onDragLeave={handleDrag}
+                            onDragOver={handleDrag}
+                            onDrop={handleDrop}
+                            onClick={() => fileInputRef.current?.click()}
+                            className={`border-2 border-dashed p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 rounded-none min-h-[160px]
+                ${isDragActive
+                                    ? 'border-primary bg-secondary/30 scale-[0.99] shadow-inner'
+                                    : 'border-slate-300 bg-white hover:border-slate-400'
+                                }`}
+                        >
+                            <UploadCloud size={28} className={isDragActive ? 'text-primary' : 'text-slate-400'} />
+                            <div className="space-y-0.5">
+                                <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                                    {isDragActive ? 'Lepaskan Berkas Sekarang' : 'Seret & Lepas File Video'}
+                                </p>
+                                <p className="text-[9px] text-slate-400">Atau klik di sini untuk memilih berkas dari folder lokal Anda</p>
+                            </div>
+                            <span className="text-[8.5px] font-bold text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 mt-2">
+                                MAKSIMAL UKURAN BERKAS: 100MB (.MP4 / .MOV)
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {}
+                <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Catatan Rona Udara / Flight Log</label>
+                    <textarea
+                        rows={3}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Tuliskan catatan teknis rona udara (contoh: kondisi angin bersahabat, vegetasi sekeliling, kecocokan batas dengan citra satelit rujukan, dll)..."
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-300 text-slate-800 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-sans"
+                    />
+                </div>
+
+                {}
+                <button
+                    type="submit"
+                    disabled={isSubmitting || !videoFile || !pilotName.trim()}
+                    className="w-full py-2.5 bg-primary hover:opacity-95 text-white font-black text-xs uppercase tracking-widest rounded-none border-none transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
+                >
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 className="h-4 w-4 animate-spin text-white" />
+                            <span>Mentransfer Berkas Drone ke Cloud Storage...</span>
+                        </>
+                    ) : (
+                        <>
+                            <CheckCircle2 size={13} className="text-teal-400" />
+                            <span>Simpan Dokumentasi Udara</span>
+                        </>
+                    )}
+                </button>
+            </form>
+        </div>
+    );
+}
+
 --- FILE: src\features\submission\components\FormSections.tsx ---
 
 export { ApplicantSection } from './form-sections/ApplicantSection';
@@ -11309,14 +12155,14 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
   const fetchLogs = () => {
     setLoadingLogs(true);
-    SubmissionService.getInspectionLogs(submissionId)
+    SubmissionService.getGroundInspections(submissionId)
       .then((res) => {
         if (res && res.data) {
           setLogsList(res.data);
         }
       })
       .catch((err) => {
-        console.error('Gagal memuat log:', err);
+        console.error('Gagal memuat log inspeksi darat:', err);
       })
       .finally(() => {
         setLoadingLogs(false);
@@ -11339,12 +12185,12 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(err => {
-            console.error('Play error:', err);
+            console.error('Webcam Play error:', err);
           });
         }
       }, 100);
     } catch (err: any) {
-      console.error('Error starting webcam:', err);
+      console.error('Gagal menyalakan webcam:', err);
       toast.error(`Gagal mengaktifkan kamera laptop/webcam: ${err.message}`);
     }
   };
@@ -11382,7 +12228,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           toast.success('Foto webcam berhasil ditangkap!');
         })
         .catch((err) => {
-          console.error('Failed to create file from webcam:', err);
+          console.error('Gagal memproses berkas biner dari webcam:', err);
           toast.error('Gagal memproses tangkapan gambar.');
         });
     }
@@ -11408,7 +12254,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       },
       (error) => {
         setGpsLoading(false);
-        console.error('Error getting location:', error);
+        console.error('Gagal mendeteksi lokasi GPS:', error);
         toast.error(`Gagal mendeteksi lokasi GPS: ${error.message}`);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -11465,7 +12311,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
         existingLogs.push(offlineLog);
         localStorage.setItem('offline_inspection_logs', JSON.stringify(existingLogs));
         toast.success('Penyimpanan Lokal Offline Berhasil!', {
-          description: 'Aplikasi sedang offline. Data kunjungan disimpan di HP Anda, silakan upload saat mendapat sinyal.',
+          description: 'Aplikasi sedang offline. Data kunjungan disimpan di HP Anda, silakan unggah saat mendapat sinyal.',
         });
         resetForm();
         if (onSuccess) onSuccess();
@@ -11484,15 +12330,15 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       formData.append('notes', notes);
       formData.append('photo', photo);
 
-      await SubmissionService.createInspectionLog(submissionId, formData);
-      toast.success('Log kunjungan lapangan berhasil diunggah!', {
+      await SubmissionService.createGroundInspection(submissionId, formData);
+      toast.success('Log kunjungan lapangan darat berhasil diunggah!', {
         description: 'TTE presensi terekam secara geospasial di database.',
       });
       resetForm();
       fetchLogs();
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      toast.error(`Gagal mengunggah laporan kunjungan: ${err.message}`);
+      toast.error(`Gagal mengunggah laporan kunjungan darat: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -11512,25 +12358,25 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       <div className="border-b border-slate-200 pb-2.5">
         <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
           <Camera size={15} className="text-primary" />
-          Input Bukti Kunjungan Lapangan
+          Input Bukti Kunjungan Lapangan Darat (Ground Inspection)
         </h4>
         <span className="text-[10px] text-slate-450 block mt-1">
-          Verifikasi kehadiran fisik petugas di area plot poligon SHP batas lahan
+          Verifikasi kehadiran fisik petugas di area koordinat tapak secara presisi
         </span>
       </div>
 
       {}
       <div className="p-3.5 bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-[10px] space-y-1.5 leading-relaxed">
-        <span className="font-bold uppercase tracking-wider block text-slate-800 flex items-center gap-1.5">
+        <span className="font-bold uppercase text-slate-800 flex items-center gap-1.5">
           <HelpCircle size={13} className="text-slate-500" />
-          Langkah Kerja Tim Inspeksi:
+          Langkah Kerja Tim Inspeksi Darat:
         </span>
         <ol className="list-decimal pl-4 space-y-1 text-slate-500">
           <li>Kunci berkas pengajuan di kantor (Portal Desktop) sebelum berangkat ke lapangan.</li>
-          <li>Kunjungi titik fisik lahan proyek (seperti patok batas, area RTH, atau lebar PSU jalan).</li>
-          <li>Ambil foto objek tersebut di tempat. <strong>Hanya kamera aktif perangkat HP atau Webcam Laptop yang diperbolehkan</strong> (untuk mencegah kecurangan).</li>
-          <li>Klik tombol <strong>Dapatkan Lokasi GPS</strong> untuk merekam titik koordinat eksak Anda berdiri.</li>
-          <li>Klik <strong>Unggah Bukti Kunjungan</strong>. Silakan ambil beberapa foto di titik koordinat berbeda sepanjang lahan.</li>
+          <li>Kunjungi titik fisik lahan proyek (seperti patok batas BPN, area RTH, atau lebar PSU jalan).</li>
+          <li>Ambil foto objek tersebut di tempat. <strong>Hanya kamera aktif perangkat HP atau Webcam Laptop yang diperbolehkan</strong> (mencegah manipulasi foto).</li>
+          <li>Klik tombol <strong>Dapatkan Lokasi GPS</strong> untuk merekam titik koordinat eksak tempat Anda berdiri.</li>
+          <li>Klik <strong>Unggah Bukti Kunjungan</strong>. Silakan ambil beberapa foto di titik koordinat berbeda sepanjang bidang lahan.</li>
         </ol>
       </div>
 
@@ -11558,7 +12404,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
         {}
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dokumentasi Foto Lapangan</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dokumentasi Foto Lapangan (Geotagged)</label>
 
           {isWebcamActive ? (
             <div className="space-y-2 border border-slate-300 p-2.5 bg-black">
@@ -11659,12 +12505,12 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
         {}
         <div className="space-y-1">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Catatan Tambahan / Hasil Lapangan</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Catatan Tambahan / Temuan Lapangan</label>
           <textarea
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Tuliskan keterangan detail kondisi lapangan (contoh: patok batas barat, patok batas utara, lebar jalan, dll)..."
+            placeholder="Tuliskan keterangan detail kondisi rona fisik lapangan (contoh: patok batas barat, kondisi RTH, ROW lebar jalan rencana, dll)..."
             className="w-full px-3 py-2 text-xs bg-white border border-slate-300 text-slate-800 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-none font-sans"
           />
         </div>
@@ -11676,14 +12522,14 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           className="w-full py-2.5 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-none border-none transition-colors cursor-pointer hover:bg-primary/95 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
         >
           {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          <span>{isOffline ? 'Simpan Offline' : 'Unggah Bukti Kunjungan'}</span>
+          <span>{isOffline ? 'Simpan Offline' : 'Unggah Bukti Kunjungan Darat'}</span>
         </button>
       </form>
 
       {}
       <div className="border-t border-slate-200 pt-4 space-y-2 select-none">
         <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-widest block text-left">
-          Daftar Bukti Kunjungan Terunggah ({logsList.length})
+          Daftar Bukti Kunjungan Darat Terunggah ({logsList.length})
         </h5>
 
         {loadingLogs ? (
@@ -11692,7 +12538,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
           </div>
         ) : logsList.length === 0 ? (
           <div className="p-2 text-[9px] text-slate-400 text-center italic">
-            Belum ada dokumentasi foto yang diunggah untuk berkas ini.
+            Belum ada dokumentasi foto darat yang diunggah untuk berkas ini.
           </div>
         ) : (
           <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto max-w-xl">
@@ -11702,7 +12548,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
                 <div className="flex-1 text-left min-w-0">
                   <span className="font-bold text-slate-700 block truncate">{log.notes || 'Foto Bukti Kunjungan'}</span>
                   <span className="text-[8.5px] text-slate-450 block mt-0.5 font-mono">
-                    {new Date(log.timestamp).toLocaleTimeString('id-ID')} • Dev: {log.distanceMeters !== null ? `${log.distanceMeters.toFixed(1)}m` : '—'}
+                    {new Date(log.timestamp).toLocaleTimeString('id-ID')} • Dev: {log.distanceMeters !== null && log.distanceMeters !== undefined ? `${log.distanceMeters.toFixed(1)}m` : '—'}
                   </span>
                 </div>
                 <div>
@@ -11721,12 +12567,12 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
       {}
       {logsList.length > 0 && (
         <div className="p-3.5 bg-slate-50 border-l-2 border-teal-600 text-slate-700 text-[10px] space-y-1.5 text-left select-none max-w-xl">
-          <span className="font-bold block uppercase flex items-center gap-1.5 text-teal-800">
+          <span className="font-bold uppercase flex items-center gap-1.5 text-teal-800">
             <CheckCircle2 size={13} className="text-teal-600" />
-            Tugas Lapangan Selesai?
+            Bukti Darat Dikunci
           </span>
           <p className="leading-relaxed text-slate-500 text-[9.5px]">
-            Semua bukti ulasan kunjungan geotagged telah terunggah dengan aman ke server. Silakan kembali ke kantor untuk melanjutkan komparasi dimensi fisik, menjalankan audit tata ruang, dan merakit ulasan Telaah Staf melalui Web Desktop.
+            Dokumentasi rona darat lapangan geotagged telah terunggah dengan aman ke server. Silakan lengkapi juga ulasan **Sidak Udara Drone** (jika diwajibkan untuk kategori perumahan/industri) sebelum mengajukan draf ulasan Telaah Staf ke Kepala Bidang.
           </p>
         </div>
       )}
@@ -11736,6 +12582,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
 
 --- FILE: src\features\submission\components\InspectionLogsGallery.tsx ---
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SubmissionService } from '../services/submission.service';
 import {
@@ -11748,58 +12595,77 @@ import {
   Clock,
   ImageOff,
   ExternalLink,
-} from 'lucide-react';
+  Video} from 'lucide-react';
+import { InspectionLogsMap } from './InspectionLogsMap';
 
 interface InspectionLogsGalleryProps {
   submissionId: string;
+  polygon?: [number, number][];
 }
 
-export function InspectionLogsGallery({ submissionId }: InspectionLogsGalleryProps) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['inspection-logs', submissionId],
-    queryFn: () => SubmissionService.getInspectionLogs(submissionId),
+const parseUTCDateTime = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const cleanStr = (dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.match(/-\d{2}:\d{2}$/))
+    ? dateStr
+    : `${dateStr}Z`;
+  return new Date(cleanStr);
+};
+
+export function InspectionLogsGallery({ submissionId, polygon }: InspectionLogsGalleryProps) {
+
+  const {
+    data: groundData,
+    isLoading: isGroundLoading,
+    isError: isGroundError
+  } = useQuery({
+    queryKey: ['ground-inspections', submissionId],
+    queryFn: () => SubmissionService.getGroundInspections(submissionId),
     refetchInterval: 30_000,
   });
 
-  const logs: any[] = data?.data ?? [];
+  const {
+    data: aerialData,
+    isLoading: isAerialLoading,
+    isError: isAerialError
+  } = useQuery({
+    queryKey: ['aerial-inspection', submissionId],
+    queryFn: () => SubmissionService.getAerialInspection(submissionId),
+    refetchInterval: 30_000,
+  });
+
+  const [focusedCoords, setFocusedCoords] = useState<[number, number] | null>(null);
+
+  const groundLogs: any[] = groundData?.data ?? [];
+  const aerialLog: any = aerialData?.data ?? null;
+
+  const isLoading = isGroundLoading || isAerialLoading;
+  const isError = isGroundError || isAerialError;
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
-        <Loader2 size={28} className="animate-spin" />
-        <span className="text-xs font-semibold uppercase tracking-wider">Memuat dokumentasi sidak lapangan...</span>
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400 font-sans">
+        <Loader2 size={28} className="animate-spin text-primary" />
+        <span className="text-xs font-semibold uppercase tracking-wider">Memuat berkas dokumentasi sidak lapangan...</span>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-2 text-rose-500">
+      <div className="flex flex-col items-center justify-center py-16 gap-2 text-rose-500 font-sans">
         <XCircle size={28} />
-        <span className="text-xs font-semibold uppercase tracking-wider">Gagal memuat data. Periksa koneksi server.</span>
+        <span className="text-xs font-semibold uppercase tracking-wider">Gagal memproses penarikan data spasial dari server.</span>
       </div>
     );
   }
 
-  if (logs.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
-        <ImageOff size={36} className="text-slate-300" />
-        <div className="text-center">
-          <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Belum Ada Dokumentasi Sidak</p>
-          <p className="text-xs text-slate-400 mt-1">Tim Inspeksi belum mengunggah foto kunjungan lapangan untuk berkas ini.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const validCount = logs.filter((l) => l.isVerified).length;
-  const invalidCount = logs.length - validCount;
+  const validCount = groundLogs.filter((l) => l.isVerified).length;
+  const invalidCount = groundLogs.length - validCount;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {}
-      <div className="flex flex-wrap items-center gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-wrap items-center gap-4 pb-4 border-b border-slate-200 select-none text-left">
         <div className="flex items-center gap-2">
           <Camera size={16} className="text-primary" />
           <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">
@@ -11807,16 +12673,21 @@ export function InspectionLogsGallery({ submissionId }: InspectionLogsGalleryPro
           </h4>
         </div>
         <div className="flex items-center gap-3 ml-auto flex-wrap">
-          <div className="text-[10px] font-black bg-slate-100 text-slate-700 px-2.5 py-1 uppercase tracking-wider">
-            {logs.length} Foto Total
+          <div className="text-[10px] font-black bg-slate-100 text-slate-700 px-2.5 py-1 uppercase tracking-wider border">
+            {groundLogs.length} Titik Darat
           </div>
-          {validCount > 0 && (
+          {aerialLog && (
             <div className="text-[10px] font-black bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 uppercase tracking-wider flex items-center gap-1">
-              <CheckCircle2 size={10} /> {validCount} Lokasi Sesuai
+              <Video size={10} /> 1 Dokumentasi Udara
+            </div>
+          )}
+          {validCount > 0 && (
+            <div className="text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-250 px-2.5 py-1 uppercase tracking-wider flex items-center gap-1">
+              <CheckCircle2 size={10} /> {validCount} GPS Sesuai
             </div>
           )}
           {invalidCount > 0 && (
-            <div className="text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 uppercase tracking-wider flex items-center gap-1">
+            <div className="text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-250 px-2.5 py-1 uppercase tracking-wider flex items-center gap-1">
               <XCircle size={10} /> {invalidCount} Di Luar Lokasi
             </div>
           )}
@@ -11824,115 +12695,586 @@ export function InspectionLogsGallery({ submissionId }: InspectionLogsGalleryPro
       </div>
 
       {}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-        {logs.map((log: any, idx: number) => (
-          <div key={log.id ?? idx} className="border border-slate-200 bg-white flex flex-col">
+      {aerialLog && (
+        <div className="border border-slate-300 p-5 bg-slate-50/50 space-y-4 rounded-none text-left select-none animate-in fade-in duration-300">
+          <div className="border-b border-slate-200 pb-2.5 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Video size={15} className="text-teal-700" />
+              <h5 className="text-xs font-black text-slate-900 uppercase tracking-wide">Hasil Rekaman Udara Drone (Aerial View)</h5>
+            </div>
+            <span className="px-2 py-0.5 bg-teal-50 border border-teal-200 text-teal-700 text-[8.5px] font-black uppercase tracking-wider rounded-none leading-none">
+              AKTIF
+            </span>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-5 items-stretch">
             {}
-            <div className="relative bg-slate-900 aspect-video overflow-hidden">
-              {log.photoUrl ? (
-                <img
-                  src={log.photoUrl}
-                  alt={`Dokumentasi sidak #${idx + 1}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '';
-                    (e.target as HTMLImageElement).parentElement!.innerHTML =
-                      '<div class="w-full h-full flex items-center justify-center text-slate-500 text-xs">Foto tidak tersedia</div>';
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
-                  Foto tidak tersedia
+            <div className="md:w-3/5 aspect-video bg-black border border-slate-200 overflow-hidden relative shrink-0">
+              <video
+                src={aerialLog.droneVideoUrl}
+                controls
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            {}
+            <div className="md:w-2/5 flex flex-col justify-between space-y-4 font-sans text-xs">
+              <div className="space-y-3">
+                {aerialLog.notes ? (
+                  <p className="font-medium text-slate-600 italic leading-relaxed border-l-2 border-slate-300 pl-3 text-justify">
+                    "{aerialLog.notes}"
+                  </p>
+                ) : (
+                  <p className="text-slate-400 italic">Tidak ada catatan rona udara.</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3.5 bg-white p-3 border border-slate-200 text-[10px] text-slate-500">
+                  <div>
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase tracking-wider">Pilot Drone / PIC</span>
+                    <span className="font-bold text-slate-800 flex items-center gap-1 mt-0.5">
+                      <User size={10} className="text-slate-400 shrink-0" />
+                      {aerialLog.pilotName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase tracking-wider">Waktu Penerbangan</span>
+                    <span className="font-semibold text-slate-700 flex items-center gap-1 mt-0.5">
+                      <Clock size={10} className="text-slate-400 shrink-0" />
+                      {new Date(aerialLog.timestamp).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  {aerialLog.flightMetadata && Object.keys(aerialLog.flightMetadata).length > 0 && (
+                    <div className="col-span-2 pt-1.5 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-1">
+                      {aerialLog.flightMetadata.drone_model && (
+                        <span>🛸 {aerialLog.flightMetadata.drone_model}</span>
+                      )}
+                      {aerialLog.flightMetadata.flight_altitude_meters && (
+                        <span>📈 {aerialLog.flightMetadata.flight_altitude_meters}m Alt</span>
+                      )}
+                      {aerialLog.flightMetadata.weather_condition && (
+                        <span>☀️ {aerialLog.flightMetadata.weather_condition}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {}
-              <div className="absolute top-2 left-2 bg-black/70 text-white text-[9px] font-black px-2 py-0.5 uppercase tracking-widest">
-                #{idx + 1}
               </div>
 
-              {}
-              <div className={`absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 ${log.isVerified ? 'bg-teal-600 text-white' : 'bg-rose-600 text-white'}`}>
-                {log.isVerified ? <CheckCircle2 size={9} /> : <XCircle size={9} />}
-                {log.isVerified ? 'LOKASI SESUAI' : 'DI LUAR LOKASI'}
-              </div>
-
-              {}
-              {log.photoUrl && (
+              <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] select-none">
+                <span className="text-slate-400 font-bold uppercase tracking-wider">Otoritas Hukum</span>
                 <a
-                  href={log.photoUrl}
+                  href={aerialLog.droneVideoUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1 transition-colors"
-                  title="Buka foto ukuran penuh"
+                  className="text-teal-700 hover:text-teal-800 font-bold flex items-center gap-1 decoration-none"
                 >
-                  <ExternalLink size={12} />
+                  Unduh / Buka di Tab Baru ↗
                 </a>
-              )}
-            </div>
-
-            {}
-            <div className="p-3 space-y-2 flex-1">
-              {}
-              {log.notes && (
-                <p className="text-[10px] text-slate-700 leading-normal font-medium border-l-2 border-slate-300 pl-2">
-                  {log.notes}
-                </p>
-              )}
-
-              <div className="space-y-1.5 text-[9.5px] text-slate-500">
-                {}
-                <div className="flex items-center gap-1.5">
-                  <User size={10} className="text-slate-400 shrink-0" />
-                  <span className="font-bold text-slate-700 truncate">{log.inspectorName || '—'}</span>
-                </div>
-
-                {}
-                <div className="flex items-center gap-1.5">
-                  <Clock size={10} className="text-slate-400 shrink-0" />
-                  <span>
-                    {log.timestamp
-                      ? new Date(log.timestamp).toLocaleString('id-ID', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })
-                      : '—'}
-                  </span>
-                </div>
-
-                {}
-                <div className="flex items-start gap-1.5">
-                  <MapPin size={10} className={`shrink-0 mt-0.5 ${log.isVerified ? 'text-teal-500' : 'text-rose-400'}`} />
-                  <div className="font-mono leading-tight">
-                    {log.latitude !== null && log.longitude !== null ? (
-                      <>
-                        <span className="block">{Number(log.latitude).toFixed(6)}, {Number(log.longitude).toFixed(6)}</span>
-                        {log.distanceMeters !== null && log.distanceMeters !== undefined && (
-                          <span className={`font-black text-[8.5px] ${log.isVerified ? 'text-teal-600' : 'text-rose-600'}`}>
-                            Deviasi: {Number(log.distanceMeters).toFixed(1)}m dari batas lahan
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="italic">Koordinat tidak tersedia</span>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
-
-            {}
-            <div className={`h-1 w-full ${log.isVerified ? 'bg-teal-500' : 'bg-rose-500'}`} />
           </div>
-        ))}
+        </div>
+      )}
+
+      {}
+      <div id="inspection-logs-map-container" className="h-[320px] w-full border border-slate-200 relative z-10 bg-slate-100">
+        <InspectionLogsMap
+          polygon={polygon}
+          logs={groundLogs}
+          focusedCoords={focusedCoords}
+          onFocusReset={() => setFocusedCoords(null)}
+          submissionId={submissionId}
+        />
       </div>
 
       {}
-      <div className="pt-3 border-t border-slate-100 text-[9.5px] text-slate-400 leading-relaxed">
-        Foto dengan status <strong className="text-teal-700">LOKASI SESUAI</strong> berarti koordinat GPS petugas saat mengambil foto berada dalam jarak ≤100m dari batas poligon lahan. Foto dengan status <strong className="text-rose-700">DI LUAR LOKASI</strong> berpotensi tidak diambil di lokasi proyek yang sebenarnya.
+      {groundLogs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 bg-white border border-slate-200 select-none">
+          <ImageOff size={28} className="text-slate-300" />
+          <div className="text-center">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Belum Ada Titik Sidak Darat</p>
+            <p className="text-[10px] text-slate-400 mt-1">Gunakan perangkat mobile PWA untuk mendaftarkan koordinat foto darat.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          {groundLogs.map((log: any, idx: number) => (
+            <div key={log.id ?? idx} className="border border-slate-200 bg-white flex flex-col justify-between">
+              <div>
+                {}
+                <div className="relative bg-slate-900 aspect-video overflow-hidden">
+                  {log.photoUrl ? (
+                    <img
+                      src={log.photoUrl}
+                      alt={`Dokumentasi sidak #${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '';
+                        (e.target as HTMLImageElement).parentElement!.innerHTML =
+                          '<div class="w-full h-full flex items-center justify-center text-slate-500 text-xs">Foto tidak tersedia</div>';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
+                      Foto tidak tersedia
+                    </div>
+                  )}
+
+                  {}
+                  <div className="absolute top-2 left-2 bg-black/70 text-white text-[9px] font-black px-2 py-0.5 uppercase tracking-widest">
+                    #{idx + 1}
+                  </div>
+
+                  {}
+                  <div className={`absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 ${log.isVerified ? 'bg-teal-600 text-white' : 'bg-rose-600 text-white'}`}>
+                    {log.isVerified ? <CheckCircle2 size={9} /> : <XCircle size={9} />}
+                    {log.isVerified ? 'LOKASI SESUAI' : 'DI LUAR LOKASI'}
+                  </div>
+
+                  {}
+                  {log.photoUrl && (
+                    <a
+                      href={log.photoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1 transition-colors"
+                      title="Buka foto ukuran penuh"
+                    >
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
+
+                {}
+                <div className="p-3.5 space-y-3">
+                  {}
+                  {log.notes && (
+                    <p className="text-[10px] text-slate-700 leading-normal font-medium border-l-2 border-slate-300 pl-2 text-justify">
+                      "{log.notes}"
+                    </p>
+                  )}
+
+                  <div className="space-y-1.5 text-[9.5px] text-slate-500">
+                    {}
+                    <div className="flex items-center gap-1.5">
+                      <User size={10} className="text-slate-400 shrink-0" />
+                      <span className="font-bold text-slate-700 truncate">{log.inspectorName || '—'}</span>
+                    </div>
+
+                    {}
+                    <div className="flex items-center gap-1.5">
+                      <Clock size={10} className="text-slate-400 shrink-0" />
+                      <span>
+                        {log.timestamp
+                          ? parseUTCDateTime(log.timestamp).toLocaleString('id-ID', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                            timeZone: 'Asia/Jakarta'
+                          })
+                          : '—'}
+                      </span>
+                    </div>
+
+                    {}
+                    <div className="flex items-start gap-1.5">
+                      <MapPin size={10} className={`shrink-0 mt-0.5 ${log.isVerified ? 'text-teal-500' : 'text-rose-400'}`} />
+                      <div className="font-mono leading-tight text-left">
+                        {log.latitude !== null && log.longitude !== null ? (
+                          <>
+                            <span className="block">{Number(log.latitude).toFixed(6)}, {Number(log.longitude).toFixed(6)}</span>
+                            {log.distanceMeters !== null && log.distanceMeters !== undefined && (
+                              <span className={`font-black text-[8.5px] ${log.isVerified ? 'text-teal-600' : 'text-rose-600'}`}>
+                                Deviasi: {Number(log.distanceMeters).toFixed(1)}m dari batas lahan
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="italic">Koordinat tidak tersedia</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {}
+              <div className="px-3.5 pb-3">
+                {log.latitude !== null && log.longitude !== null && (
+                  <div className="pt-2.5 border-t border-slate-100 text-left">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFocusedCoords([Number(log.latitude), Number(log.longitude)]);
+                        document.getElementById('inspection-logs-map-container')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="text-[9px] font-black text-teal-700 hover:text-teal-800 transition-colors uppercase tracking-widest flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 outline-none"
+                    >
+                      <MapPin size={11} className="text-teal-600" />
+                      <span>Fokus Kamera Peta</span>
+                    </button>
+                  </div>
+                )}
+                {}
+                <div className={`h-1 w-full mt-3 ${log.isVerified ? 'bg-teal-500' : 'bg-rose-500'}`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {}
+      <div className="pt-3 border-t border-slate-100 text-[9.5px] text-slate-400 leading-relaxed text-left select-none">
+        Foto dengan status <strong className="text-teal-700">LOKASI SESUAI</strong> berarti koordinat GPS petugas saat mengambil foto berada dalam jarak ≤100m dari batas poligon lahan. Foto dengan status <strong className="text-rose-700">DI LUAR LOKASI</strong> berpotensi tidak diambil di lokasi proyek yang sebenarnya secara fisik.
       </div>
     </div>
   );
+}
+
+--- FILE: src\features\submission\components\InspectionLogsMap.tsx ---
+
+import { useEffect, useMemo, Fragment, useState } from 'react';
+import { Polygon, Marker, Popup, useMap, Polyline, CircleMarker, GeoJSON } from 'react-leaflet';
+import GISMapContainer from '@/components/maps/GISMapContainer';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { API_BASE_URL } from '@/config';
+
+const parseUTCDateTime = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const cleanStr = (dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.match(/-\d{2}:\d{2}$/))
+    ? dateStr
+    : `${dateStr}Z`;
+  return new Date(cleanStr);
+};
+
+interface InspectionLogsMapProps {
+    polygon?: [number, number][];
+    logs: any[];
+    focusedCoords: [number, number] | null;
+    onFocusReset: () => void;
+    submissionId?: string;
+}
+
+interface SpiderfiedLog {
+  log: any;
+  renderPos: [number, number];
+  originalPos: [number, number];
+  isSpiderfied: boolean;
+  index: number;
+}
+
+const getSpiderfiedLogs = (logs: any[]): SpiderfiedLog[] => {
+  const groups: any[][] = [];
+  const distanceThreshold = 0.00018;
+
+  logs.forEach((log) => {
+    if (log.latitude === null || log.longitude === null) return;
+    const lat = Number(log.latitude);
+    const lng = Number(log.longitude);
+
+    let foundGroup = false;
+    for (const group of groups) {
+      const baseLat = Number(group[0].latitude);
+      const baseLng = Number(group[0].longitude);
+      const distance = Math.sqrt(Math.pow(lat - baseLat, 2) + Math.pow(lng - baseLng, 2));
+      if (distance < distanceThreshold) {
+        group.push(log);
+        foundGroup = true;
+        break;
+      }
+    }
+
+    if (!foundGroup) {
+      groups.push([log]);
+    }
+  });
+
+  const spiderfied: SpiderfiedLog[] = [];
+
+  groups.forEach((group) => {
+    const N = group.length;
+    const centerLat = Number(group[0].latitude);
+    const centerLng = Number(group[0].longitude);
+
+    if (N === 1) {
+      spiderfied.push({
+        log: group[0],
+        renderPos: [centerLat, centerLng],
+        originalPos: [centerLat, centerLng],
+        isSpiderfied: false,
+        index: logs.indexOf(group[0])
+      });
+    } else {
+      const radius = 0.00020;
+      group.forEach((log, i) => {
+        const theta = (2 * Math.PI * i) / N;
+        const offsetLat = Math.sin(theta) * radius;
+        const offsetLng = Math.cos(theta) * radius;
+        spiderfied.push({
+          log,
+          renderPos: [centerLat + offsetLat, centerLng + offsetLng],
+          originalPos: [centerLat, centerLng],
+          isSpiderfied: true,
+          index: logs.indexOf(log)
+        });
+      });
+    }
+  });
+
+  return spiderfied.sort((a, b) => a.index - b.index);
+};
+
+function MapController({ polygon, focusedCoords, onFocusReset }: {
+    polygon?: [number, number][];
+    focusedCoords: [number, number] | null;
+    onFocusReset: () => void;
+}) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (polygon && polygon.length > 2) {
+            try {
+
+                const leafletPolygon = polygon.map(([a, b]) => {
+                    const isLatFirst = a < 20 && b > 90;
+                    return (isLatFirst ? [a, b] : [b, a]) as [number, number];
+                });
+
+                const bounds = L.latLngBounds(leafletPolygon);
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, {
+                        padding: [40, 40],
+                        animate: true,
+                        duration: 1.2
+                    });
+                }
+            } catch (err) {
+                console.warn('[InspectionLogsMap] Gagal menyelaraskan batas poligon lahan:', err);
+            }
+        }
+    }, [map, polygon]);
+
+    useEffect(() => {
+        if (focusedCoords) {
+            map.flyTo(focusedCoords, 18, {
+                animate: true,
+                duration: 1.5
+            });
+
+            onFocusReset();
+        }
+    }, [map, focusedCoords, onFocusReset]);
+
+    return null;
+}
+
+export function InspectionLogsMap({ polygon, logs, focusedCoords, onFocusReset, submissionId }: InspectionLogsMapProps) {
+    const spiderfiedLogs = useMemo(() => getSpiderfiedLogs(logs), [logs]);
+    const [cadGeoJson, setCadGeoJson] = useState<any>(null);
+
+    useEffect(() => {
+        if (!submissionId) return;
+        const token = sessionStorage.getItem('token');
+        fetch(`${API_BASE_URL}/api/v1/submissions/${submissionId}/geojson`, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            }
+        })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => setCadGeoJson(data))
+            .catch(err => console.error('[InspectionLogsMap] Gagal memuat CAD GeoJSON:', err));
+    }, [submissionId]);
+
+    const parsedPolygonCoords = useMemo<[number, number][]>(() => {
+        if (!polygon || polygon.length === 0) return [];
+        return polygon.map(([a, b]) => {
+            const isLatFirst = a < 20 && b > 90;
+            return (isLatFirst ? [a, b] : [b, a]) as [number, number];
+        });
+    }, [polygon]);
+
+    const defaultCenter: [number, number] = useMemo(() => {
+        if (parsedPolygonCoords.length > 0) {
+            return parsedPolygonCoords[0];
+        }
+        return [-6.4816, 106.8560];
+    }, [parsedPolygonCoords]);
+
+    const getCustomMarkerIcon = (index: number, isVerified: boolean) => {
+        const markerColor = isVerified ? '#0d9488' : '#e11d48';
+        const shadowColor = isVerified ? 'rgba(13,148,136,0.35)' : 'rgba(225,29,72,0.35)';
+
+        return L.divIcon({
+            className: '',
+            iconSize: [28, 28],
+            iconAnchor: [14, 28],
+            popupAnchor: [0, -28],
+            html: `
+        <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+          <!-- Ekor Pin Penunjuk -->
+          <div style="
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%) rotate(45deg);
+            width: 12px;
+            height: 12px;
+            background-color: ${markerColor};
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.15);
+          "></div>
+          <!-- Kepala Bulat Pin bertuliskan nomor indeks log -->
+          <div style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2.5px solid #ffffff;
+            background-color: ${markerColor};
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+            font-size: 10px;
+            font-weight: 900;
+            box-shadow: 0 4px 10px ${shadowColor};
+          ">
+            ${index}
+          </div>
+        </div>
+      `
+        });
+    };
+
+    return (
+        <div className="w-full h-full relative" style={{ minHeight: '100%' }}>
+            <GISMapContainer
+                center={defaultCenter}
+                zoom={14}
+                className="w-full h-full"
+            >
+
+                {}
+                {parsedPolygonCoords.length > 2 && (
+                    <Polygon
+                        positions={parsedPolygonCoords}
+                        pathOptions={{
+                            color: '#3b82f6',
+                            weight: 2.5,
+                            dashArray: '5, 5',
+                            fillColor: '#60a5fa',
+                            fillOpacity: 0.08
+                        }}
+                    />
+                )}
+
+                 {}
+                {cadGeoJson && cadGeoJson.features?.length > 0 && (
+                  <GeoJSON
+                    key={`cad-features-${submissionId}-${cadGeoJson.features.length}`}
+                    data={cadGeoJson}
+                    style={(feature) => {
+                      const color = feature?.properties?.color ?? '#14b8a6';
+                      return {
+                        color: color,
+                        weight: 1,
+                        fillColor: color,
+                        fillOpacity: feature?.properties?.layer_name === 'PTSP_PSU_JALAN' ? 0.35 : 0.65
+                      };
+                    }}
+                  />
+                )}
+
+                {}
+                {(() => {
+                    const renderedCenters = new Set<string>();
+                    return spiderfiedLogs.map(({ log, renderPos, originalPos, isSpiderfied, index }) => {
+                        const logPos = renderPos;
+                        const centerKey = `${originalPos[0]},${originalPos[1]}`;
+                        const shouldRenderCenter = isSpiderfied && !renderedCenters.has(centerKey);
+                        if (shouldRenderCenter) {
+                            renderedCenters.add(centerKey);
+                        }
+
+                        return (
+                            <Fragment key={log.id ?? index}>
+                                {isSpiderfied && (
+                                    <Polyline
+                                        positions={[originalPos, renderPos]}
+                                        pathOptions={{
+                                            color: '#64748b',
+                                            weight: 1.5,
+                                            dashArray: '4, 4',
+                                            opacity: 0.7
+                                        }}
+                                    />
+                                )}
+                                {shouldRenderCenter && (
+                                    <CircleMarker
+                                        center={originalPos}
+                                        radius={4}
+                                        pathOptions={{
+                                            color: '#475569',
+                                            fillColor: '#94a3b8',
+                                            fillOpacity: 0.9,
+                                            weight: 1.5
+                                        }}
+                                    />
+                                )}
+                                <Marker
+                                    position={logPos}
+                                    icon={getCustomMarkerIcon(index + 1, !!log.isVerified)}
+                                >
+                                    <Popup>
+                                        <div className="p-1 space-y-1.5 text-xs text-slate-800 text-left" style={{ fontFamily: 'sans-serif', minWidth: '160px' }}>
+                                            <div className="flex justify-between items-center gap-2">
+                                                <span className="font-extrabold text-[11px] text-slate-900 uppercase">Sidak #{index + 1}</span>
+                                                <span
+                                                    className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider border leading-none"
+                                                    style={{
+                                                        color: log.isVerified ? '#0f766e' : '#be123c',
+                                                        backgroundColor: log.isVerified ? '#f0fdfa' : '#fff1f2',
+                                                        borderColor: log.isVerified ? '#ccfbf1' : '#ffe4e6',
+                                                    }}
+                                                >
+                                                    {log.isVerified ? 'Sesuai' : 'Luar Lokasi'}
+                                                </span>
+                                            </div>
+
+                                            {log.photoUrl && (
+                                                <div className="w-full aspect-video overflow-hidden border border-slate-100 bg-slate-50">
+                                                    <img src={log.photoUrl} alt={`Foto Sidak #${index + 1}`} className="w-full h-full object-cover" />
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-0.5 text-[9px] text-slate-500 font-medium">
+                                                <p className="font-bold text-slate-700">Verifikator: {log.inspectorName || '—'}</p>
+                                                <p>Waktu: {log.timestamp ? parseUTCDateTime(log.timestamp).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) : '—'}</p>
+                                                {log.distanceMeters !== null && log.distanceMeters !== undefined && (
+                                                    <p className="font-bold font-mono" style={{ color: log.isVerified ? '#0d9488' : '#e11d48' }}>
+                                                        Deviasi: {Number(log.distanceMeters).toFixed(1)}m dari batas
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </Popup>
+                                </Marker>
+                            </Fragment>
+                        );
+                    });
+                })()}
+
+                {}
+                <MapController
+                    polygon={polygon}
+                    focusedCoords={focusedCoords}
+                    onFocusReset={onFocusReset}
+                />
+            </GISMapContainer>
+        </div>
+    );
 }
 
 --- FILE: src\features\submission\components\MiniMap.tsx ---
@@ -12367,18 +13709,99 @@ export { PhotosTab } from './PhotosTab';
 export { SilsilahTab } from './SilsilahTab';
 
 --- FILE: src\features\submission\components\detail-tabs\LocationTab.tsx ---
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, Fragment } from 'react';
 import { Landmark, MapPin } from 'lucide-react';
-import { GeoJSON } from 'react-leaflet';
+import { GeoJSON, Marker, Popup, Polyline, CircleMarker } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import { leafletRingToGeoJSON } from '@/lib/geoUtils';
 import { API_BASE_URL } from '@/config';
 
+const parseUTCDateTime = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const cleanStr = (dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.match(/-\d{2}:\d{2}$/))
+    ? dateStr
+    : `${dateStr}Z`;
+  return new Date(cleanStr);
+};
+
 interface LocationTabProps {
   sub: any;
+  inspectionLogs?: any[];
 }
 
-export const LocationTab = ({ sub }: LocationTabProps) => {
+interface SpiderfiedLog {
+  log: any;
+  renderPos: [number, number];
+  originalPos: [number, number];
+  isSpiderfied: boolean;
+  index: number;
+}
+
+const getSpiderfiedLogs = (logs: any[]): SpiderfiedLog[] => {
+  const groups: any[][] = [];
+  const distanceThreshold = 0.00018;
+
+  logs.forEach((log) => {
+    if (log.latitude === null || log.longitude === null) return;
+    const lat = Number(log.latitude);
+    const lng = Number(log.longitude);
+
+    let foundGroup = false;
+    for (const group of groups) {
+      const baseLat = Number(group[0].latitude);
+      const baseLng = Number(group[0].longitude);
+      const distance = Math.sqrt(Math.pow(lat - baseLat, 2) + Math.pow(lng - baseLng, 2));
+      if (distance < distanceThreshold) {
+        group.push(log);
+        foundGroup = true;
+        break;
+      }
+    }
+
+    if (!foundGroup) {
+      groups.push([log]);
+    }
+  });
+
+  const spiderfied: SpiderfiedLog[] = [];
+
+  groups.forEach((group) => {
+    const N = group.length;
+    const centerLat = Number(group[0].latitude);
+    const centerLng = Number(group[0].longitude);
+
+    if (N === 1) {
+      spiderfied.push({
+        log: group[0],
+        renderPos: [centerLat, centerLng],
+        originalPos: [centerLat, centerLng],
+        isSpiderfied: false,
+        index: logs.indexOf(group[0])
+      });
+    } else {
+      const radius = 0.00020;
+      group.forEach((log, i) => {
+        const theta = (2 * Math.PI * i) / N;
+        const offsetLat = Math.sin(theta) * radius;
+        const offsetLng = Math.cos(theta) * radius;
+        spiderfied.push({
+          log,
+          renderPos: [centerLat + offsetLat, centerLng + offsetLng],
+          originalPos: [centerLat, centerLng],
+          isSpiderfied: true,
+          index: logs.indexOf(log)
+        });
+      });
+    }
+  });
+
+  return spiderfied.sort((a, b) => a.index - b.index);
+};
+
+export const LocationTab = ({ sub, inspectionLogs = [] }: LocationTabProps) => {
+  const spiderfiedLogs = useMemo(() => getSpiderfiedLogs(inspectionLogs), [inspectionLogs]);
   const [cadGeoJson, setCadGeoJson] = useState<any>(null);
 
   useEffect(() => {
@@ -12570,7 +13993,7 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
                     style={(feature) => {
                       const color = feature?.properties?.color ?? '#14b8a6';
                       return {
-                        color: '#ffffff',
+                        color: color,
                         weight: 1,
                         fillColor: color,
                         fillOpacity: feature?.properties?.layer_name === 'PTSP_PSU_JALAN' ? 0.35 : 0.65
@@ -12578,6 +14001,129 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
                     }}
                   />
                 )}
+
+                {}
+                {(() => {
+                  const renderedCenters = new Set<string>();
+                  return spiderfiedLogs.map(({ log, renderPos, originalPos, isSpiderfied, index }) => {
+                    const logPos = renderPos;
+                    const markerColor = log.isVerified ? '#0d9488' : '#e11d48';
+                    const shadowColor = log.isVerified ? 'rgba(13,148,136,0.35)' : 'rgba(225,29,72,0.35)';
+
+                    const customIcon = L.divIcon({
+                      className: '',
+                      iconSize: [28, 28],
+                      iconAnchor: [14, 28],
+                      popupAnchor: [0, -28],
+                      html: `
+                        <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+                          <div style="
+                            position: absolute;
+                            bottom: 0;
+                            left: 50%;
+                            transform: translateX(-50%) rotate(45deg);
+                            width: 12px;
+                            height: 12px;
+                            background-color: ${markerColor};
+                            box-shadow: 2px 2px 4px rgba(0,0,0,0.15);
+                          "></div>
+                          <div style="
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 50%;
+                            border: 2.5px solid #ffffff;
+                            background-color: ${markerColor};
+                            color: #ffffff;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-family: sans-serif;
+                            font-size: 10px;
+                            font-weight: 900;
+                            box-shadow: 0 4px 10px ${shadowColor};
+                          ">
+                            ${index + 1}
+                          </div>
+                        </div>
+                      `
+                    });
+
+                    const centerKey = `${originalPos[0]},${originalPos[1]}`;
+                    const shouldRenderCenter = isSpiderfied && !renderedCenters.has(centerKey);
+                    if (shouldRenderCenter) {
+                      renderedCenters.add(centerKey);
+                    }
+
+                    return (
+                      <Fragment key={log.id ?? index}>
+                        {isSpiderfied && (
+                          <Polyline
+                            positions={[originalPos, renderPos]}
+                            pathOptions={{
+                              color: '#64748b',
+                              weight: 1.5,
+                              dashArray: '4, 4',
+                              opacity: 0.7
+                            }}
+                          />
+                        )}
+                        {shouldRenderCenter && (
+                          <CircleMarker
+                            center={originalPos}
+                            radius={4}
+                            pathOptions={{
+                              color: '#475569',
+                              fillColor: '#94a3b8',
+                              fillOpacity: 0.9,
+                              weight: 1.5
+                            }}
+                          />
+                        )}
+                        <Marker
+                          position={logPos}
+                          icon={customIcon}
+                        >
+                          <Popup>
+                            <div className="p-1 space-y-1.5 text-xs text-slate-800 text-left" style={{ fontFamily: 'sans-serif', minWidth: '160px' }}>
+                              <div className="flex justify-between items-center gap-2">
+                                <span className="font-extrabold text-[11px] text-slate-900 uppercase">Sidak #{index + 1}</span>
+                                <span
+                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider border leading-none"
+                                  style={{
+                                    color: log.isVerified ? '#0f766e' : '#be123c',
+                                    backgroundColor: log.isVerified ? '#f0fdfa' : '#fff1f2',
+                                    borderColor: log.isVerified ? '#ccfbf1' : '#ffe4e6',
+                                  }}
+                                >
+                                  {log.isVerified ? 'Sesuai' : 'Luar Lokasi'}
+                                </span>
+                              </div>
+
+                              {log.photoUrl && (
+                                <div className="w-full aspect-video overflow-hidden border border-slate-100 bg-slate-50">
+                                  <img src={log.photoUrl} alt={`Foto Sidak #${index + 1}`} className="w-full h-full object-cover" />
+                                </div>
+                              )}
+
+                              <div className="space-y-0.5 text-[9px] text-slate-500 font-medium">
+                                <p className="font-bold text-slate-700">Verifikator: {log.inspectorName || '—'}</p>
+                                <p>Waktu: {log.timestamp ? parseUTCDateTime(log.timestamp).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) : '—'}</p>
+                                {log.distanceMeters !== null && log.distanceMeters !== undefined && (
+                                  <p className="font-bold font-mono" style={{ color: log.isVerified ? '#0d9488' : '#e11d48' }}>
+                                    Deviasi: {Number(log.distanceMeters).toFixed(1)}m dari batas
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      </Fragment>
+                    );
+                  });
+                })()}
               </GISMapContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-slate-400 text-xs">
@@ -12610,6 +14156,14 @@ export const LocationTab = ({ sub }: LocationTabProps) => {
             <div className="flex items-center gap-2">
               <span className="h-3 w-4 bg-[#14b8a6] block shrink-0"></span>
               PSU / Sarana Utilitas
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 bg-[#0d9488] border border-white rounded-full block shrink-0 shadow-sm"></span>
+              Sidak Lapangan (Sesuai)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 bg-[#e11d48] border border-white rounded-full block shrink-0 shadow-sm"></span>
+              Sidak Lapangan (Luar Lokasi)
             </div>
           </div>
         </div>
@@ -15580,7 +17134,7 @@ export const SubmissionSection = () => {
           <select {...register('submission.submissionType')} className={inputClass}>
             <option value="BARU">Site Plan Baru (Lahan Bersih)</option>
             <option value="REVISI">Revisi Pengesahan Site Plan</option>
-            <option value="PERPANJANGAN">Perpanjangan Masa Berlaku</option>
+
           </select>
         </div>
 
@@ -18077,6 +19631,7 @@ import {
   TechnicalTab, CompensationTab, PhotosTab, SilsilahTab
 } from '../components/detail-tabs';
 import { InspectionLogForm } from '../components/InspectionLogForm';
+import { AerialInspectionForm } from '../components/AerialInspectionForm';
 import { InspectionLogsGallery } from '../components/InspectionLogsGallery';
 
 const getStatusBadgeClassLocal = (status: string) => {
@@ -18151,12 +19706,19 @@ export default function SubmissionDetailPage() {
     enabled: !!id,
   });
 
-  const { data: inspectionLogsRes } = useQuery({
-    queryKey: ['submission-logs', id],
-    queryFn: () => SubmissionService.getInspectionLogs(id || ''),
+  const { data: groundInspectionsRes } = useQuery({
+    queryKey: ['ground-inspections', id],
+    queryFn: () => SubmissionService.getGroundInspections(id || ''),
     enabled: !!id,
   });
-  const logsCount = inspectionLogsRes?.data?.length || 0;
+  const groundLogsCount = groundInspectionsRes?.data?.length || 0;
+
+  const { data: aerialInspectionRes } = useQuery({
+    queryKey: ['aerial-inspection', id],
+    queryFn: () => SubmissionService.getAerialInspection(id || ''),
+    enabled: !!id,
+  });
+  const hasAerialLog = !!aerialInspectionRes?.data;
 
   useEffect(() => {
     if (sub) {
@@ -18234,7 +19796,8 @@ export default function SubmissionDetailPage() {
   const showKabidPanel = isKabidActive && subData.status === 'Menunggu Rekomendasi';
   const showKadisPanel = isKadisActive && subData.status === 'Menunggu Persetujuan';
 
-  const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && subData.status === 'Verifikasi Teknis';
+  const terminalStatuses = ['Disetujui', 'Ditolak', 'Tidak Berlaku'];
+  const showTeknisPanel = hasPermission(AppPermission.CAN_VERIFY_TECHNICAL) && !terminalStatuses.includes(subData.status);
   const isLockedByMe = subData.adminLockId === user?.id || (!!user?.full_name && subData.adminLockName === user.full_name);
   const isTeknisiLockedByMe = subData.teknisiLockId === user?.id || (!!user?.full_name && subData.teknisiLockName === user.full_name);
 
@@ -18378,12 +19941,12 @@ export default function SubmissionDetailPage() {
                           rel="noreferrer"
                           className="inline-block text-[10px] font-bold text-teal-600 hover:underline mt-1"
                         >
-                          📥 Unduh Berkas Coretan Dinas
+                          <Download className="h-3 w-3 mr-1 inline" /> Unduh Berkas Coretan Dinas
                         </a>
                       )}
                     </div>
                     <span className={cn(
-                      "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border leading-none rounded-none shrink-0",
+                      "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border leading-none shrink-0",
                       isCompliant ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                         isConditional ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-100"
                     )}>
@@ -18421,7 +19984,7 @@ export default function SubmissionDetailPage() {
 
           {}
           <div className="flex border-b border-border overflow-x-auto select-none bg-slate-50 p-1 gap-1">
-            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit', ...((activeRole && activeRole !== 'Pemohon') ? ['dokumen-sidak'] : []), ...((activeRole && activeRole !== 'Pemohon' && activeRole !== 'Kepala Bidang' && activeRole !== 'Kepala Dinas') ? ['inspeksi'] : [])] as const).map((tab) => {
+            {(['ringkasan', 'pemohon', 'lokasi', 'teknis', 'kompensasi', 'foto', ...((activeRole === 'Admin SIPAS' || activeRole === 'Super Admin') ? ['silsilah'] : []), 'audit', ...(((activeRole && activeRole !== 'Pemohon') || hasPermission(AppPermission.CAN_VERIFY_TECHNICAL)) ? ['dokumen-sidak'] : []), ...(((activeRole && activeRole !== 'Pemohon' && activeRole !== 'Kepala Bidang' && activeRole !== 'Kepala Dinas') || hasPermission(AppPermission.CAN_VERIFY_TECHNICAL)) ? ['inspeksi'] : [])] as const).map((tab) => {
               const isActive = activeTab === tab;
               const labels: Record<string, string> = {
                 ringkasan: 'Ringkasan',
@@ -18462,7 +20025,7 @@ export default function SubmissionDetailPage() {
               </div>
             )}
             {activeTab === 'pemohon' && <ApplicantTab sub={subData} />}
-            {activeTab === 'lokasi' && <LocationTab sub={subData} />}
+            {activeTab === 'lokasi' && <LocationTab sub={subData} inspectionLogs={groundInspectionsRes?.data || []} />}
             {activeTab === 'teknis' && <TechnicalTab sub={subData} />}
             {activeTab === 'kompensasi' && (
               <CompensationTab sub={subData} onShowOnMap={handleShowCompensationOnMap} />
@@ -18471,15 +20034,30 @@ export default function SubmissionDetailPage() {
             {activeTab === 'silsilah' && <SilsilahTab sub={subData} />}
             {activeTab === 'audit' && <AuditTrailViewer submissionId={subData.id} />}
             {activeTab === 'dokumen-sidak' && (
-              <InspectionLogsGallery submissionId={subData.id} />
+              <InspectionLogsGallery submissionId={subData.id} polygon={subData.location?.polygon} />
             )}
             {activeTab === 'inspeksi' && (
-              <InspectionLogForm
-                submissionId={subData.id}
-                onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true });
-                }}
-              />
+
+              <div className="space-y-8 divide-y divide-slate-200">
+                <div className="animate-in fade-in duration-300">
+                  <InspectionLogForm
+                    submissionId={subData.id}
+                    onSuccess={() => {
+                      queryClient.invalidateQueries({ queryKey: ['submission', id] });
+                      queryClient.invalidateQueries({ queryKey: ['ground-inspections', id] });
+                    }}
+                  />
+                </div>
+                <div className="pt-8 animate-in fade-in duration-300">
+                  <AerialInspectionForm
+                    submissionId={subData.id}
+                    onSuccess={() => {
+                      queryClient.invalidateQueries({ queryKey: ['submission', id] });
+                      queryClient.invalidateQueries({ queryKey: ['aerial-inspection', id] });
+                    }}
+                  />
+                </div>
+              </div>
             )}
           </div>
 
@@ -18643,7 +20221,7 @@ export default function SubmissionDetailPage() {
                   onClick={() => unclaimMutation.mutate()}
                   className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all rounded-none cursor-pointer border border-border bg-white"
                 >
-                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : "🔓 Lepas Kunci (Batal)"}
+                  {unclaimMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 inline" /> : <><Unlock className="h-3.5 w-3.5 mr-1 inline" /> Lepas Kunci (Batal)</>}
                 </button>
                 <Link
                   to={`/pengajuan/verifikasi-administrasi/${subData.id}`}
@@ -18707,7 +20285,7 @@ export default function SubmissionDetailPage() {
                 </div>
               </div>
             ) : (
-               <div className="space-y-2.5 w-full pt-2">
+              <div className="space-y-2.5 w-full pt-2">
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -18723,7 +20301,8 @@ export default function SubmissionDetailPage() {
                     <span>Lepas Kunci</span>
                   </button>
 
-                  {logsCount > 0 ? (
+                  {}
+                  {groundLogsCount > 0 ? (
                     <Link
                       to={`/pengajuan/verifikasi/${subData.id}`}
                       className="flex-1 py-2.5 bg-[#415D43] hover:bg-[#415D43]/90 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer decoration-none shadow-md text-center"
@@ -18735,7 +20314,7 @@ export default function SubmissionDetailPage() {
                     <button
                       type="button"
                       disabled
-                      title="Matriks Penilaian Teknis Terkunci: Wajib mengunggah log inspeksi lapangan terlebih dahulu."
+                      title="Matriks Penilaian Teknis Terkunci: Wajib mengunggah log inspeksi lapangan darat terlebih dahulu."
                       className="flex-1 py-2.5 bg-slate-100 text-slate-400 font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border border-slate-200 cursor-not-allowed shadow-none"
                     >
                       <Lock size={13} className="text-slate-400" />
@@ -18744,7 +20323,7 @@ export default function SubmissionDetailPage() {
                   )}
                 </div>
 
-                {logsCount > 0 ? (
+                {groundLogsCount > 0 ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -18770,10 +20349,11 @@ export default function SubmissionDetailPage() {
                   </button>
                 )}
 
-                {logsCount === 0 && (
+                {}
+                {groundLogsCount === 0 && (
                   <div className="flex items-center gap-1.5 justify-center text-[9.5px] text-rose-600 font-semibold mt-1">
                     <AlertTriangle size={11} className="shrink-0" />
-                    <span>Ulasan kunjungan lapangan wajib dikirim terlebih dahulu untuk membuka kunci penilaian.</span>
+                    <span>Ulasan kunjungan lapangan darat wajib dikirim terlebih dahulu untuk membuka kunci penilaian.</span>
                   </div>
                 )}
               </div>
@@ -20675,13 +22255,13 @@ export default function SubmissionVerificationPage() {
     enabled: !!id,
   });
 
-  const { data: inspectionLogsRes } = useQuery({
-    queryKey: ['submission-logs', id],
-    queryFn: () => SubmissionService.getInspectionLogs(id || ''),
+  const { data: groundInspectionsRes } = useQuery({
+    queryKey: ['ground-inspections', id],
+    queryFn: () => SubmissionService.getGroundInspections(id || ''),
     enabled: !!id,
   });
-  const logsCount = inspectionLogsRes?.data?.length || 0;
-  const hasVerifiedLog = inspectionLogsRes?.data?.some((log: any) => log.isVerified) || false;
+  const groundLogsCount = groundInspectionsRes?.data?.length || 0;
+  const hasVerifiedLog = groundInspectionsRes?.data?.some((log: any) => log.isVerified) || false;
 
   const filteredAspects = useMemo(() => {
     if (!sub) return VERIFICATION_ASPECTS;
@@ -21014,9 +22594,9 @@ export default function SubmissionVerificationPage() {
   };
 
   const handleCreateStaffAnalysisDraft = () => {
-    if (logsCount === 0) {
+    if (groundLogsCount === 0) {
       toast.error('Gagal memproses draf dokumen telaah!', {
-        description: 'Anda wajib mengunggah setidaknya 1 bukti kunjungan lapangan (Log Inspeksi) sebelum dapat mengesahkan matriks verifikasi teknis.',
+        description: 'Anda wajib mengunggah setidaknya 1 bukti kunjungan lapangan darat (Ground Inspection) sebelum dapat mengesahkan matriks verifikasi teknis.',
       });
       return;
     }
@@ -21256,7 +22836,7 @@ export default function SubmissionVerificationPage() {
                   sedangkan hasil verifikasi fisik lapangan adalah <span className="font-mono font-semibold">{verifiedLandArea !== '' ? Number(verifiedLandArea).toLocaleString('id-ID') : '-'} m²</span>.
                   {landError && (
                     <span className={cn("font-bold ml-1", landError.diff >= 0 ? "text-emerald-700" : "text-rose-600")}>
-                      Terdapat selisih sebesar {landError.diff >= 0 ? `tambahan +${landError.diff.toLocaleString('id-ID')}` : `pengurangan ${landError.diff.toLocaleString('id-ID')}`} m² ({landError.diff >= 0 ? '+' : ''}{landError.pct.toFixed(1)}%).
+                      Terdapat selisih sebesar {landError.diff >= 0 ? `tambahan +${landError.diff.toLocaleString('id-ID')}` : `pengurangan {landError.diff.toLocaleString('id-ID')}`} m² ({landError.diff >= 0 ? '+' : ''}{landError.pct.toFixed(1)}%).
                     </span>
                   )}
                 </p>
@@ -21297,7 +22877,7 @@ export default function SubmissionVerificationPage() {
 
       {}
       <div className="space-y-4 bg-white border border-slate-300 p-5 rounded-none">
-        <div className="border-b border-slate-300 pb-2">
+        <div className="border-b border-slate-200 pb-2">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Live Scorecard Kepatuhan Perda RDTR</h2>
           <p className="text-[10px] text-slate-500 mt-0.5">Persentase dihitung secara reaktif oleh sistem mengikuti input luasan fisik (m²) Anda di form atas.</p>
         </div>
@@ -21418,13 +22998,13 @@ export default function SubmissionVerificationPage() {
         {}
         <div className="lg:col-span-7 space-y-6">
           {}
-          {logsCount === 0 ? (
-            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed select-none text-left">
+          {groundLogsCount === 0 ? (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 rounded-none leading-relaxed select-none text-left animate-in fade-in duration-300">
               <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={16} />
               <div>
                 <p className="font-bold uppercase tracking-wider text-[10px]">Peringatan Keras: Belum Ada Log Kunjungan Lapangan</p>
                 <p className="mt-1 text-slate-500">
-                  Sistem mendeteksi bahwa berkas ini belum memiliki dokumentasi survei sidak lapangan spasial (PWA). Berdasarkan Perbup Bogor, Tim Teknis <strong>diwajibkan mengunggah sekurangnya 1 bukti foto geotagged</strong> di lokasi proyek sebelum dapat mengesahkan matriks verifikasi dan menerbitkan draf Telaah Staf.
+                  Sistem mendeteksi bahwa berkas ini belum memiliki dokumentasi survei sidak lapangan darat (Ground Inspection). Berdasarkan Perbup Bogor, Tim Teknis <strong>diwajibkan mengunggah sekurangnya 1 bukti foto geotagged</strong> di lokasi proyek sebelum dapat mengesahkan matriks verifikasi dan menerbitkan draf Telaah Staf.
                 </p>
               </div>
             </div>
@@ -21434,7 +23014,7 @@ export default function SubmissionVerificationPage() {
               <div>
                 <p className="font-bold uppercase tracking-wider text-[10px]">Peringatan Keamanan: Koordinat Di Luar Lokasi</p>
                 <p className="mt-1 text-slate-500">
-                  Terdapat {logsCount} log kunjungan lapangan yang tercatat, namun seluruh foto dokumentasi terdeteksi diambil di luar batas toleransi lokasi lahan proyek (jarak deviasi &gt; 100m). Mohon pastikan kembali validitas presensi sebelum melanjutkan.
+                  Terdapat {groundLogsCount} log kunjungan lapangan darat yang tercatat, namun seluruh foto dokumentasi terdeteksi diambil di luar batas toleransi lokasi lahan proyek (jarak deviasi &gt; 100m). Mohon pastikan kembali validitas presensi sebelum melanjutkan.
                 </p>
               </div>
             </div>
@@ -21444,7 +23024,7 @@ export default function SubmissionVerificationPage() {
               <div>
                 <p className="font-bold uppercase tracking-wider text-[10px] text-emerald-900">Kunjungan Lapangan Terverifikasi</p>
                 <p className="text-slate-500 text-[10px] mt-0.5">
-                  Sistem mendeteksi {logsCount} bukti ulasan kunjungan lapangan geotagged yang valid secara spasial. Penilaian siap disahkan.
+                  Sistem mendeteksi {groundLogsCount} bukti ulasan kunjungan lapangan darat geotagged yang valid secara spasial. Penilaian siap disahkan.
                 </p>
               </div>
             </div>
@@ -22364,30 +23944,57 @@ export const SubmissionService = {
     return await response.json();
   },
 
-  createInspectionLog: async (id: string, formData: FormData): Promise<any> => {
+  createGroundInspection: async (id: string, formData: FormData): Promise<any> => {
     const headers = { ...getAuthHeaders() };
 
     delete (headers as any)['Content-Type'];
 
-    const response = await fetch(`${API_BASE_URL}/${id}/inspection-logs`, {
+    const response = await fetch(`${API_BASE_URL}/${id}/ground-inspections`, {
       method: 'POST',
       headers,
       body: formData
     });
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(errText || `Gagal mencatat log inspeksi lapangan (HTTP ${response.status})`);
+      throw new Error(errText || `Gagal mencatat log inspeksi darat lapangan (HTTP ${response.status})`);
     }
     return await response.json();
   },
 
-  getInspectionLogs: async (id: string): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/${id}/inspection-logs`, {
+  getGroundInspections: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/ground-inspections`, {
       headers: getAuthHeaders()
     });
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(errText || `Gagal memuat log inspeksi lapangan (HTTP ${response.status})`);
+      throw new Error(errText || `Gagal memuat log inspeksi darat lapangan (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  createAerialInspection: async (id: string, formData: FormData): Promise<any> => {
+    const headers = { ...getAuthHeaders() };
+    delete (headers as any)['Content-Type'];
+
+    const response = await fetch(`${API_BASE_URL}/${id}/aerial-inspection`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal mengunggah video drone untuk inspeksi udara (HTTP ${response.status})`);
+    }
+    return await response.json();
+  },
+
+  getAerialInspection: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/${id}/aerial-inspection`, {
+      headers: getAuthHeaders()
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memuat dokumentasi inspeksi udara drone (HTTP ${response.status})`);
     }
     return await response.json();
   }
@@ -22625,6 +24232,29 @@ export interface LegacyMetadata {
   replaced_sk_doc_url: string;
 }
 
+export interface FieldInspectionLog {
+  id: number;
+  idPermohonan: string;
+  inspectorName: string;
+  timestamp: string;
+  latitude: number;
+  longitude: number;
+  distanceMeters?: number | null;
+  isVerified: boolean;
+  photoUrl: string;
+  notes?: string | null;
+}
+
+export interface AerialInspectionLog {
+  id: number;
+  idPermohonan: string;
+  pilotName: string;
+  timestamp: string;
+  droneVideoUrl: string;
+  flightMetadata?: Record<string, any> | null;
+  notes?: string | null;
+}
+
 export interface Submission {
   id: string;
   submissionNo: string;
@@ -22758,6 +24388,9 @@ export interface Submission {
     documentUrl?: string;
     status: 'BELUM_TERPENUHI' | 'PROSES_VERIFIKASI' | 'TERPENUHI';
   }[];
+
+  inspection_logs?: FieldInspectionLog[];
+  aerial_inspection?: AerialInspectionLog | null;
 }
 
 --- FILE: src\features\submission\utils\upload.ts ---
