@@ -309,7 +309,7 @@ export const SpatialGeoJSONLayers = ({
       {/* ─── SITEPLAN DETAIL (internal SHP / CAD vectors) ─── */}
       {subPolygonsGeoJSON && subPolygonsGeoJSON.features?.length > 0 && (
         <GeoJSON
-          key={`sub-polygons-${selectedCompanyId}`}
+          key={`sub-polygons-${selectedCompanyId}-${subPolygonsGeoJSON.features.length}`}
           data={subPolygonsGeoJSON}
           style={(feature) => ({
             color: feature?.properties?.color ?? '#6b7280',

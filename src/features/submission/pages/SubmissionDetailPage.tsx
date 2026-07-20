@@ -443,7 +443,8 @@ export default function SubmissionDetailPage() {
               <InspectionLogForm
                 submissionId={subData.id}
                 onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: ['submission', id], exact: true });
+                  queryClient.invalidateQueries({ queryKey: ['submission', id] });
+                  queryClient.invalidateQueries({ queryKey: ['submission-logs', id] });
                 }}
               />
             )}

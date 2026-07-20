@@ -84,8 +84,10 @@ export function useSipasMapData(localZoom: number) {
 
   // ─── AMANDEMEN: FETCH GEOJSON SITE PLAN DARI BACKEND SECARA STATELESS ───
   useEffect(() => {
+    // Bersihkan data spasial sebelumnya segera untuk memicu unmount layer peta lama
+    setActiveSubmissionGeoJson(null);
+
     if (!selectedCompanyId) {
-      setActiveSubmissionGeoJson(null);
       return;
     }
 

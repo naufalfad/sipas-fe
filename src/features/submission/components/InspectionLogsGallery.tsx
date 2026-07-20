@@ -215,6 +215,21 @@ export function InspectionLogsGallery({ submissionId, polygon }: InspectionLogsG
                       )}
                     </div>
                   </div>
+
+                  {/* DRONE VIDEO LINK */}
+                  {log.droneVideoUrl && (
+                    <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 mt-2 select-none">
+                      <span className="text-[10px]">🎥</span>
+                      <a
+                        href={log.droneVideoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[9.5px] font-bold text-teal-600 hover:text-teal-700 decoration-none cursor-pointer"
+                      >
+                        Buka Video Drone Lapangan
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
