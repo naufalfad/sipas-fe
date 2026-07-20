@@ -64,6 +64,7 @@ interface GisUIState {
     mapOpacity: number;
     maskOpacity: number;
     activeBaseMap: string;
+    isTerrainActive: boolean;
 
     // ── Layer Drone (Orthophoto) & Deteksi Konflik ───────────────────────────
     isDroneLayerActive: boolean;
@@ -106,6 +107,7 @@ interface GisUIState {
     toggleDroneLayer: () => void;
     setDroneLayerOpacity: (opacity: number) => void;
     setClashGeoJson: (geoJson: any | null) => void;
+    toggleTerrain: () => void;
 
     // ── Actions: Selection & Kompensasi ──────────────────────────────────────
     setSelectedCompanyId: (id: string | null) => void;
@@ -154,6 +156,7 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     clashGeoJson: null,
     selectedCompanyId: null,
     activeKompensasi: null,
+    isTerrainActive: true,
 
     // Spasial Tembolok & Sub-layer Default
     activeSubmissionGeoJson: null,
@@ -197,6 +200,7 @@ export const useGisUIStore = create<GisUIState>((set) => ({
 
     setDroneLayerOpacity: (droneLayerOpacity) => set({ droneLayerOpacity }),
     setClashGeoJson: (clashGeoJson) => set({ clashGeoJson }),
+    toggleTerrain: () => set((state) => ({ isTerrainActive: !state.isTerrainActive })),
 
     // ── Implementasi Actions: Selection & Kompensasi ─────────────────────────
 

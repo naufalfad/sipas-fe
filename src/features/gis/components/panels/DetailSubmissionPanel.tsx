@@ -3,12 +3,13 @@ import { useMemo, useState, useEffect } from 'react';
 import {
     MapPin, CheckCircle2,
     AlertTriangle, Calculator, Percent, Ruler,
-    Globe, Crosshair, Loader2, Camera
+    Globe, Crosshair, Loader2, Camera, Sparkles
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useSpatialValidator } from '../../hooks/useSpatialValidator';
 import { toast } from 'sonner';
 import { SubmissionService } from '@/features/submission/services/submission.service';
+import { useGisUIStore } from '@/app/store/useGisUIStore';
 
 interface DetailSubmissionPanelProps {
     submissionData: any; // Menerima payload data pengajuan aktif dari orchestrator
@@ -37,6 +38,36 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
     /* STREAMING_CHUNK:Initializing hooks and clear clash triggers */
     const { validateRiverBuffer, isProcessing: isChecking } = useSpatialValidator();
     const [auditResult, setAuditResult] = useState<any>(null);
+
+    const pitch = useGisUIStore((s) => s.pitch);
+    const flyTo = useGisUIStore((s) => s.flyTo);
+    const is3DActive = pitch > 10;
+
+    const handleToggle3DView = () => {
+        if (!submissionData) return;
+        const markerLng = submissionData.centroidLng ?? (submissionData.location?.longitude || submissionData.location?.lng || 106.8560);
+        const markerLat = submissionData.centroidLat ?? (submissionData.location?.latitude || submissionData.location?.lat || -6.4816);
+        
+        if (is3DActive) {
+            flyTo({
+                longitude: markerLng,
+                latitude: markerLat,
+                zoom: 16,
+                pitch: 0,
+                bearing: 0
+            });
+            toast.info("Tampilan peta diubah ke 2D (Tegak Lurus).");
+        } else {
+            flyTo({
+                longitude: markerLng,
+                latitude: markerLat,
+                zoom: 17,
+                pitch: 60,
+                bearing: -30
+            });
+            toast.success("Tampilan peta diubah ke 3D (Perspektif GPU).");
+        }
+    };
 
     // Reset hasil audit saat pemohon memilih berkas industri berbeda di peta
     useEffect(() => {
@@ -268,6 +299,27 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </p>
                 </div>
 
+                {/* 3D WebGIS Camera Controller Button */}
+                <div className="px-4 py-3 border-b border-slate-100 bg-teal-500/5 flex items-center justify-between gap-3 select-none">
+                    <div className="space-y-0.5">
+                        <span className="text-[9px] font-black uppercase text-teal-800 tracking-wider">Perspektif 3D WebGL</span>
+                        <span className="text-[8px] font-medium text-slate-400 block leading-none">Visualisasikan ketinggian kaveling secara riil</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleToggle3DView}
+                        className={cn(
+                            "px-3 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all rounded-none border outline-none cursor-pointer flex items-center gap-1.5",
+                            is3DActive 
+                                ? "bg-teal-600 text-white border-teal-600 hover:bg-teal-700" 
+                                : "bg-white text-teal-700 border-teal-200 hover:bg-teal-50"
+                        )}
+                    >
+                        <Sparkles size={11} />
+                        <span>{is3DActive ? "AKTIF (2D)" : "AKTIFKAN 3D"}</span>
+                    </button>
+                </div>
+
                 {/* Core Parameters Metadata Grid */}
                 <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 text-left">
                     <div className="bg-white p-4">
@@ -422,41 +474,46 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     )}
                 </div>
 
-                {/* Matriks Validasi Standar Daerah (Three-sided comparison layout) */}
+                {/* Matriks Validasi Standar Daerah (Three-sided comparison card layout) */}
                 <div className="text-left">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
                         <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 leading-none">
                             <Calculator size={12} className="text-slate-500" /> Matriks Validasi Standar Daerah
                         </h4>
                     </div>
-                    <div className="overflow-hidden">
-                        <div className="flex bg-slate-50 border-b text-[8px] font-black uppercase tracking-wider text-slate-400 py-2 px-4">
-                            <div className="flex-1 text-left">Parameter Teknis</div>
-                            <div className="w-28 text-right">Proposed</div>
-                            <div className="w-24 text-right">Perda</div>
-                            <div className="w-28 text-right">Verified</div>
-                            <div className="w-14 text-center">Status</div>
-                        </div>
-                        <div className="divide-y divide-slate-100 bg-white">
-                            {validationMatrix.map((row, idx) => (
-                                <div key={idx} className="flex items-center text-xs py-2.5 px-4 hover:bg-slate-50/50 transition-colors">
-                                    <div className="flex-1 text-left font-semibold text-slate-700 truncate pr-2" title={row.parameter}>{row.parameter}</div>
-                                    <div className="w-28 text-right font-mono font-medium text-slate-500 whitespace-nowrap">{row.hasilProposed}</div>
-                                    <div className="w-24 text-right font-mono text-slate-400 whitespace-nowrap">{row.standarPerda}</div>
-                                    <div className="w-28 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{row.hasilVerified}</div>
-                                    <div className="w-14 flex justify-center">
-                                        <span className={cn(
-                                            "px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider leading-none rounded-none",
-                                            row.status === "LOLOS"
-                                                ? "text-teal-700 bg-teal-50"
-                                                : "text-amber-700 bg-amber-50 animate-pulse"
-                                        )}>
-                                            {row.status}
-                                        </span>
+                    <div className="divide-y divide-slate-100 bg-white">
+                        {validationMatrix.map((row, idx) => (
+                            <div key={idx} className="p-3.5 hover:bg-slate-50/50 transition-colors space-y-2.5">
+                                {/* Top row: Parameter Name and Status Badge */}
+                                <div className="flex justify-between items-start gap-3">
+                                    <span className="text-[10px] font-bold text-slate-800 uppercase tracking-tight leading-snug">{row.parameter}</span>
+                                    <span className={cn(
+                                        "px-2 py-0.5 text-[8px] font-black uppercase tracking-wider leading-none rounded-none border shrink-0",
+                                        row.status === "LOLOS"
+                                            ? "text-teal-700 bg-teal-50 border-teal-200"
+                                            : "text-amber-700 bg-amber-50 border-amber-200 animate-pulse"
+                                    )}>
+                                        {row.status}
+                                    </span>
+                                </div>
+                                
+                                {/* Metrics grid: Proposed, Perda, Verified */}
+                                <div className="grid grid-cols-3 gap-2 text-xs">
+                                    <div className="bg-slate-50/70 p-2 border border-slate-100 flex flex-col gap-0.5">
+                                        <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider leading-none">Proposed</span>
+                                        <span className="font-mono font-bold text-[10px] text-slate-650 truncate">{row.hasilProposed}</span>
+                                    </div>
+                                    <div className="bg-slate-50/70 p-2 border border-slate-100 flex flex-col gap-0.5">
+                                        <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider leading-none">Perda</span>
+                                        <span className="font-mono text-[10px] text-slate-550 truncate">{row.standarPerda}</span>
+                                    </div>
+                                    <div className="bg-slate-50/70 p-2 border border-slate-100 flex flex-col gap-0.5">
+                                        <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider leading-none">Verified</span>
+                                        <span className="font-mono font-extrabold text-[10px] text-slate-900 truncate">{row.hasilVerified}</span>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 

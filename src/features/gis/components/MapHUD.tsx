@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
     Plus, Minus, Maximize2, Map as MapIcon,
-    ChevronDown, ChevronUp, Crosshair, Navigation
+    ChevronDown, ChevronUp, Crosshair, Navigation, Mountain
 } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,9 @@ export default function MapHUD() {
     const bearing = useGisUIStore((s) => s.bearing);
     const flyTo = useGisUIStore((s) => s.flyTo);
     const mapCenter = useGisUIStore((s) => s.mapCenter);
+    const isTerrainActive = useGisUIStore((s) => s.isTerrainActive);
+    const toggleTerrain = useGisUIStore((s) => s.toggleTerrain);
+    const toggleLayer = useGisUIStore((s) => s.toggleLayer);
 
     const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isCoordsOpen, setIsCoordsOpen] = useState(false);
@@ -63,7 +66,6 @@ export default function MapHUD() {
         activeLayers.includes("layer-pasir") ||
         activeLayers.includes("layer-kebun") ||
         activeLayers.includes("layer-ladang");
-    if (isZoningActive) return null;
 
     const triggerZoomIn = () => window.dispatchEvent(new Event("map-zoom-in"));
     const triggerZoomOut = () => window.dispatchEvent(new Event("map-zoom-out"));
@@ -91,6 +93,16 @@ export default function MapHUD() {
                 zoom: Math.max(Math.round(mapZoom), 14), // zoom in slightly for better 3D perspective
                 pitch: 60
             });
+        }
+    };
+
+    const handleToggleTerrainAndContours = () => {
+        toggleTerrain();
+        // Toggle the contour lines layer for a unified visual topography experience
+        const isContoursCurrentlyActive = activeLayers.includes("layer-kontur");
+        // Only toggle if state will sync
+        if (isContoursCurrentlyActive === isTerrainActive) {
+            toggleLayer("layer-kontur");
         }
     };
 
@@ -125,7 +137,8 @@ export default function MapHUD() {
         <div className="absolute bottom-20 md:bottom-8 right-4 md:right-8 z-40 pointer-events-auto flex flex-row items-end gap-2.5 select-none">
 
             {/* ── KOLOM KIRI: Semua panel informatif ── */}
-            <div className="flex flex-col items-end gap-2 text-left w-60">
+            {!isZoningActive && (
+                <div className="flex flex-col items-end gap-2 text-left w-60">
 
                 {/* 1. PANEL LEGENDA KEPATUHAN (collapsible) */}
                 <Panel className="w-full">
@@ -247,6 +260,7 @@ export default function MapHUD() {
                 </Panel>
 
             </div>
+            )}
 
             {/* ── KOLOM KANAN: Tombol Kontrol Vertikal ── */}
             <div className="hidden md:flex flex-col bg-white/95 backdrop-blur border border-slate-200 shadow-xl rounded-none overflow-hidden divide-y divide-slate-100 shrink-0">
@@ -273,6 +287,16 @@ export default function MapHUD() {
                     title={is3D ? "Ubah ke Tampilan 2D" : "Ubah ke Tampilan 3D"}
                 >
                     <span className="text-[10px] font-black">{is3D ? "2D" : "3D"}</span>
+                </button>
+                <button
+                    onClick={handleToggleTerrainAndContours}
+                    className={cn(
+                        "w-10 h-10 flex items-center justify-center transition-colors rounded-none outline-none cursor-pointer",
+                        isTerrainActive ? "bg-emerald-600 text-white hover:bg-emerald-700" : "text-slate-600 hover:bg-slate-50 hover:text-teal-700"
+                    )}
+                    title={isTerrainActive ? "Matikan Efek Lereng/Terrain 3D & Kontur" : "Aktifkan Efek Lereng/Terrain 3D & Kontur"}
+                >
+                    <Mountain size={16} strokeWidth={2} />
                 </button>
                 <button
                     onClick={triggerZoomOut}

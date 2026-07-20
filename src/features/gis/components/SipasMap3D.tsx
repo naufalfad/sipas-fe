@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -15,9 +15,6 @@ import { useGisUIStore } from '@/app/store/useGisUIStore';
 import { useConfigStore } from '@/app/store/useConfigStore';
 import { useSipasMapData, type ProcessedSubmission } from '../hooks/useSipasMapData';
 import { API_BASE_URL } from '@/config';
-
-// MapTiler API Key (Free tier key for 3D terrain)
-const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY || 'get_your_own_OpIi9283';
 
 // ─── Konstanta ─────────────────────────────────────────────────────────────────
 const INITIAL_ZOOM = 11;
@@ -58,7 +55,8 @@ function getMapStyle(activeBaseMap: string): any {
         type: 'raster',
         tiles: [tileUrl],
         tileSize: 256,
-        attribution: attribution
+        attribution: attribution,
+        maxzoom: 18
       }
     },
     layers: [
@@ -83,6 +81,7 @@ export default function SipasMap3D() {
   const droneLayerOpacity = useGisUIStore((s) => s.droneLayerOpacity);
   const spatialConflicts = useGisUIStore((s) => s.spatialConflicts);
   const visibleSubLayers = useGisUIStore((s) => s.visibleSubLayers);
+  const isTerrainActive = useGisUIStore((s) => s.isTerrainActive);
 
   const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
   const setMapZoom = useGisUIStore((s) => s.setMapZoom);
@@ -156,25 +155,28 @@ export default function SipasMap3D() {
       zoom: mapZoom || INITIAL_ZOOM,
       pitch: 0,
       bearing: 0,
+      maxZoom: 22,
       transformRequest
     });
 
     mapRef.current = map;
 
-    // Navigation and Scale Controls
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+    // Scale Control only (Built-in NavigationControl disabled to avoid double overlaps)
     map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
 
     map.on('load', () => {
-      // Setup Terrain API from MapTiler
+      // Setup Terrain API from public Mapzen S3 (Free, no API key required)
       map.addSource('terrain-dem', {
         type: 'raster-dem',
-        tiles: [`https://api.maptiler.com/tiles/terrain-dem-v2/{z}/{x}/{y}.webp?key=${MAPTILER_API_KEY}`],
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+        encoding: 'terrarium',
         tileSize: 256,
-        maxzoom: 14
+        maxzoom: 15
       });
-      // Enable 3D hillshade/terrain
-      map.setTerrain({ source: 'terrain-dem', exaggeration: 1.0 });
+      // Enable 3D hillshade/terrain conditionally
+      if (isTerrainActive) {
+        map.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 });
+      }
 
       // Add Drone Layer Source
       map.addSource('drone-orthophoto', {
@@ -813,6 +815,20 @@ export default function SipasMap3D() {
       conflictMarkers.forEach((m) => m.remove());
     };
   }, [spatialConflicts]);
+
+  // 11. Sync 3D Terrain mesh (exaggeration) dynamically
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (isTerrainActive) {
+      if (map.getSource('terrain-dem')) {
+        map.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 });
+      }
+    } else {
+      map.setTerrain(null);
+    }
+  }, [isTerrainActive]);
 
   return (
     <div className="absolute inset-0 z-0">
