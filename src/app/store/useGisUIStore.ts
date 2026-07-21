@@ -72,8 +72,9 @@ interface GisUIState {
     droneLayerOpacity: number;
     clashGeoJson: any | null; // Buffer area hasil kalkulasi Turf.js
 
-    // ── Selection & Data ─────────────────────────────────────────────────────
+    // ── Selection & Data (Multi-Overlay Support) ─────────────────────────────
     selectedCompanyId: string | null;
+    selectedSubmissionIds: string[]; // Multi-select ID siteplan terdaftar untuk overlay simultan
     activeKompensasi: LahanKompensasi | null;
 
     // ── SPASIAL TEMBOLOK (ACTIVE GEOMETRIES CACHE) ───────────────────────────
@@ -112,6 +113,9 @@ interface GisUIState {
 
     // ── Actions: Selection & Kompensasi ──────────────────────────────────────
     setSelectedCompanyId: (id: string | null) => void;
+    toggleSubmissionSelection: (id: string) => void;
+    selectAllSubmissions: (ids: string[]) => void;
+    clearSubmissionSelections: () => void;
     setActiveKompensasi: (kompensasi: LahanKompensasi | null) => void;
     updateKompensasiStatus: (idKompensasi: string, status: LahanKompensasi['statusPemenuhan']) => void;
 
@@ -156,6 +160,7 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     droneLayerOpacity: 70,
     clashGeoJson: null,
     selectedCompanyId: null,
+    selectedSubmissionIds: [],
     activeKompensasi: null,
     isTerrainActive: true,
 
@@ -206,6 +211,16 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     // ── Implementasi Actions: Selection & Kompensasi ─────────────────────────
 
     setSelectedCompanyId: (selectedCompanyId) => set({ selectedCompanyId }),
+
+    toggleSubmissionSelection: (id) => set((state) => ({
+        selectedSubmissionIds: state.selectedSubmissionIds.includes(id)
+            ? state.selectedSubmissionIds.filter((subId) => subId !== id)
+            : [...state.selectedSubmissionIds, id]
+    })),
+
+    selectAllSubmissions: (selectedSubmissionIds) => set({ selectedSubmissionIds }),
+
+    clearSubmissionSelections: () => set({ selectedSubmissionIds: [] }),
 
     setActiveKompensasi: (activeKompensasi) => set({ activeKompensasi }),
 

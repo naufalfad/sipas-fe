@@ -13,22 +13,59 @@ import {
   Search,
 } from 'lucide-react';
 
+import { SubmissionService } from '@/features/submission/services/submission.service';
+
 export default function BimReviewerPage() {
   const navigate = useNavigate();
-  const { parcelId } = useParams<{ parcelId?: string }>();
+  const { submissionId, parcelId } = useParams<{ submissionId?: string; parcelId?: string }>();
+  const activeId = submissionId || parcelId || 'DEMO-001';
   const setActiveParcel = useBimStore((s) => s.setActiveParcel);
+  const uploadedCadFileName = useBimStore((s) => s.uploadedCadFileName);
 
   useEffect(() => {
-    if (parcelId) {
-      setActiveParcel({
-        id: parcelId,
-        name: `Persil Lahan #${parcelId}`,
-        nop: `32.01.040.005.${parcelId}`,
-        areaM2: 15400,
-        zone: 'Kawasan Perdagangan & Jasa (K3)',
-      });
+    let isMounted = true;
+    if (activeId) {
+      SubmissionService.getAllList()
+        .then((list) => {
+          if (!isMounted) return;
+          const found = list.find((sub) => sub.id === activeId || sub.submissionNo === activeId);
+          if (found) {
+            const cadName = (found as any).cadFileName || (found as any).documents?.cadDoc || (found as any).cadDoc || 'sample_siteplan.dxf';
+            setActiveParcel({
+              id: found.id,
+              name: `${found.housingName} (Oleh: ${found.developerName || 'Pemohon'})`,
+              nop: `NOP: 32.01.040.005.${found.submissionNo.replace(/\D/g, '') || '088'}`,
+              areaM2: found.landArea || 24500,
+              zone: found.status ? `Status: ${found.status}` : 'Kawasan Perdagangan & Jasa (K3)',
+              cadFileName: cadName,
+            });
+          } else {
+            setActiveParcel({
+              id: activeId,
+              name: `Permohonan Proyek 3D #${activeId}`,
+              nop: `32.01.040.005.${activeId.replace(/\D/g, '') || '99'}`,
+              areaM2: 24500,
+              zone: 'Kawasan Perdagangan & Jasa (K3)',
+              cadFileName: 'mock_large_siteplan.dxf',
+            });
+          }
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          setActiveParcel({
+            id: activeId,
+            name: `Permohonan Proyek 3D #${activeId}`,
+            nop: `32.01.040.005.${activeId.replace(/\D/g, '') || '99'}`,
+            areaM2: 24500,
+            zone: 'Kawasan Perdagangan & Jasa (K3)',
+            cadFileName: 'sample_siteplan.dxf',
+          });
+        });
     }
-  }, [parcelId, setActiveParcel]);
+    return () => {
+      isMounted = false;
+    };
+  }, [activeId, setActiveParcel]);
 
   const activeParcelName = useBimStore((s) => s.activeParcelName);
   const activeParcelNop = useBimStore((s) => s.activeParcelNop);
@@ -40,7 +77,7 @@ export default function BimReviewerPage() {
     setIsExporting(true);
     setTimeout(() => {
       setIsExporting(false);
-      alert('Laporan Audit Spesifikasi 3D BIM & Spasial Bogor berhasil di-generate!');
+      alert(`Laporan Audit Spesifikasi 3D BIM (${activeId}) & Spasial Bogor berhasil di-generate!`);
     }, 1500);
   };
 
@@ -52,10 +89,10 @@ export default function BimReviewerPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/gis')}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold"
+            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Kembali ke GIS 2D</span>
+            <span>Kembali ke Peta GIS</span>
           </button>
 
           <div className="h-5 w-px bg-slate-800" />
@@ -79,11 +116,19 @@ export default function BimReviewerPage() {
           </div>
         </div>
 
-        {/* Center Section: NOP Badge Search Info */}
-        <div className="hidden md:flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
-          <Search className="w-3.5 h-3.5 text-slate-500" />
-          <span className="text-slate-400">NOP:</span>
-          <span className="font-mono text-teal-300 font-bold">{activeParcelNop}</span>
+        {/* Center Section: NOP Badge Search Info & Uploaded CAD Badge */}
+        <div className="hidden md:flex items-center gap-3 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+          <div className="flex items-center gap-1.5">
+            <Search className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-slate-400">NOP:</span>
+            <span className="font-mono text-teal-300 font-bold">{activeParcelNop}</span>
+          </div>
+          <div className="h-4 w-px bg-slate-800" />
+          <div className="flex items-center gap-1.5">
+            <Box className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-slate-400">Berkas CAD:</span>
+            <span className="font-mono text-cyan-300 font-bold">{uploadedCadFileName}</span>
+          </div>
         </div>
 
         {/* Right Section: Audit Export & Tools */}

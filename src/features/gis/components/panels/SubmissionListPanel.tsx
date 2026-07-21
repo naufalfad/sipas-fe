@@ -20,6 +20,11 @@ export default function SubmissionListPanel() {
     const selectedCompanyId = useGisUIStore((s) => s.selectedCompanyId);
     const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
 
+    const selectedSubmissionIds = useGisUIStore((s) => s.selectedSubmissionIds);
+    const toggleSubmissionSelection = useGisUIStore((s) => s.toggleSubmissionSelection);
+    const selectAllSubmissions = useGisUIStore((s) => s.selectAllSubmissions);
+    const clearSubmissionSelections = useGisUIStore((s) => s.clearSubmissionSelections);
+
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
@@ -57,6 +62,11 @@ export default function SubmissionListPanel() {
         // 1. Sinkronisasi ID terpilih ke store global
         setSelectedCompanyId(sub.id);
 
+        // Auto-select submission ID if not already checked
+        if (!selectedSubmissionIds.includes(sub.id)) {
+            toggleSubmissionSelection(sub.id);
+        }
+
         // 2. Bersihkan laci-laci melayang sebelah kanan
         closePanelsToTheRight(-1);
 
@@ -77,6 +87,16 @@ export default function SubmissionListPanel() {
                     detail: { lat: sub.location.lat, lng: sub.location.lng }
                 })
             );
+        }
+    };
+
+    const isAllFilteredSelected = filteredSubmissions.length > 0 && filteredSubmissions.every((sub) => selectedSubmissionIds.includes(sub.id));
+
+    const handleToggleSelectAllSubmissions = () => {
+        if (isAllFilteredSelected) {
+            clearSubmissionSelections();
+        } else {
+            selectAllSubmissions(filteredSubmissions.map((s) => s.id));
         }
     };
 
@@ -129,31 +149,54 @@ export default function SubmissionListPanel() {
             {/* --- SEKSI 2: SEAMLESS DATA FLUSH LIST --- */}
             <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
 
-                {/* Banner Informasional Spasial */}
-                <div className="px-5 py-3 border-b border-slate-100 flex items-start gap-2 bg-slate-50/50 select-none">
-                    <ClipboardList size={13} className="text-teal-600 mt-0.5 shrink-0" />
-                    <p className="text-[10px] font-normal text-slate-500 leading-normal text-left">
-                        Menampilkan {filteredSubmissions.length} berkas pengajuan aktif. Klik baris berkas untuk memfokuskan lokasi perizinan di peta [Slide 8].
-                    </p>
+                {/* Banner Informasional Spasial & Multi-Overlay Toggle */}
+                <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between select-none">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700">
+                        <ClipboardList size={13} className="text-teal-600 shrink-0" />
+                        <span>Multi-Overlay Siteplan ({selectedSubmissionIds.length} Terpilih)</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleToggleSelectAllSubmissions}
+                        className="text-[9px] font-black uppercase text-teal-700 hover:text-teal-800 bg-teal-50 px-2 py-0.5 border border-teal-200 cursor-pointer"
+                    >
+                        {isAllFilteredSelected ? "Deselect All" : "Select All"}
+                    </button>
                 </div>
 
                 {/* List Items */}
                 {filteredSubmissions.length > 0 ? (
                     filteredSubmissions.map((sub) => {
                         const isSelected = selectedCompanyId === sub.id;
+                        const isOverlayChecked = selectedSubmissionIds.includes(sub.id);
 
                         return (
-                            <button
+                            <div
                                 key={sub.id}
-                                onClick={() => handleItemClick(sub)}
                                 className={cn(
-                                    "w-full px-5 py-3 border-b border-slate-100 hover:bg-slate-50/60 transition-all text-left outline-none flex items-center justify-between gap-3 min-w-0 rounded-none",
+                                    "w-full px-4 py-3 border-b border-slate-100 hover:bg-slate-50/60 transition-all text-left flex items-start gap-3 min-w-0 rounded-none",
                                     isSelected
                                         ? "bg-teal-50/20 border-l-[3px] border-l-teal-600"
                                         : "bg-white border-l-[3px] border-l-transparent"
                                 )}
                             >
-                                <div className="flex flex-col gap-0.5 min-w-0 flex-1 text-left">
+                                {/* Multi-Overlay Checkbox */}
+                                <input
+                                    type="checkbox"
+                                    checked={isOverlayChecked}
+                                    onChange={(e) => {
+                                        e.stopPropagation();
+                                        toggleSubmissionSelection(sub.id);
+                                    }}
+                                    className="mt-1 h-3.5 w-3.5 accent-teal-600 rounded-none cursor-pointer shrink-0"
+                                    title="Centang untuk tampilkan overlay siteplan ini di peta GIS"
+                                />
+
+                                <div
+                                    onClick={() => handleItemClick(sub)}
+                                    className="flex items-center justify-between gap-2 flex-1 cursor-pointer min-w-0"
+                                >
+                                    <div className="flex flex-col gap-0.5 min-w-0 flex-1 text-left">
 
                                     {/* Badge Status Tipis (Slide 4) */}
                                     <div className="flex items-center gap-2">
@@ -191,8 +234,9 @@ export default function SubmissionListPanel() {
                                     size={15}
                                     className={cn("shrink-0 transition-transform text-slate-300", isSelected ? "text-teal-600 translate-x-0.5" : "group-hover:text-slate-500 group-hover:translate-x-0.5")}
                                 />
-                            </button>
-                        );
+                            </div>
+                        </div>
+                    );
                     })
                 ) : (
                     /* Empty State */

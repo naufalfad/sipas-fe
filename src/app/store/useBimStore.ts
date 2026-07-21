@@ -16,6 +16,7 @@ interface BimState {
   activeParcelNop: string;
   activeParcelAreaM2: number;
   activeParcelZone: string;
+  uploadedCadFileName: string;
   activeTileset: TileSet3DSpec | null;
   rtcAnchor: RtcAnchorPoint | null;
   isLoadingTileset: boolean;
@@ -35,7 +36,7 @@ interface BimState {
   envLayers: EnvironmentalSimLayers;
 
   // ── Actions ─────────────────────────────────────────────────────────────
-  setActiveParcel: (parcel: { id: string; name: string; nop: string; areaM2: number; zone: string }) => void;
+  setActiveParcel: (parcel: { id: string; name: string; nop: string; areaM2: number; zone: string; cadFileName?: string }) => void;
   setActiveTileset: (tileset: TileSet3DSpec | null) => void;
   setRtcAnchor: (anchor: RtcAnchorPoint | null) => void;
   setIsLoadingTileset: (isLoading: boolean) => void;
@@ -75,6 +76,7 @@ export const useBimStore = create<BimState>((set) => ({
   activeParcelNop: '32.01.040.005.012-0088.0',
   activeParcelAreaM2: 12500,
   activeParcelZone: 'Kawasan Perdagangan & Jasa (K3)',
+  uploadedCadFileName: 'sample_siteplan.dxf',
   activeTileset: null,
   rtcAnchor: null,
   isLoadingTileset: false,
@@ -97,6 +99,7 @@ export const useBimStore = create<BimState>((set) => ({
       activeParcelNop: parcel.nop,
       activeParcelAreaM2: parcel.areaM2,
       activeParcelZone: parcel.zone,
+      uploadedCadFileName: parcel.cadFileName || 'peta_siteplan.dxf',
     }),
 
   setActiveTileset: (activeTileset) => set({ activeTileset }),

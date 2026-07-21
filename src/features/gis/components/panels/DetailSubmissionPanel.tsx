@@ -1,9 +1,10 @@
 /* STREAMING_CHUNK:Configuring imports and base validation schema interfaces */
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     MapPin, CheckCircle2,
     AlertTriangle, Calculator, Percent, Ruler,
-    Globe, Crosshair, Loader2, Camera, Sparkles
+    Globe, Crosshair, Loader2, Camera, Sparkles, Box, ArrowRight
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useSpatialValidator } from '../../hooks/useSpatialValidator';
@@ -36,6 +37,7 @@ const getStatusBadgeClass = (status: string) => {
 
 export default function DetailSubmissionPanel({ submissionData }: DetailSubmissionPanelProps) {
     /* STREAMING_CHUNK:Initializing hooks and clear clash triggers */
+    const navigate = useNavigate();
     const { validateRiverBuffer, isProcessing: isChecking } = useSpatialValidator();
     const [auditResult, setAuditResult] = useState<any>(null);
 
@@ -308,11 +310,40 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                     </p>
                 </div>
 
+                {/* CONTEXTUAL ENTRY POINT: 3D BIM REVIEWER WORKSPACE (ALA BLENDER) */}
+                {submissionData?.id && (
+                    <div className="p-3 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-slate-850 to-teal-950 text-white flex flex-col gap-2 select-none shadow-inner">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Box size={16} className="text-teal-400" />
+                                <div>
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-teal-300">
+                                        Inspector 3D BIM Model
+                                    </h4>
+                                    <p className="text-[9px] text-slate-400">Workspace Render Fisik Gedung Ala Blender</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => navigate(`/gis/bim-reviewer/${submissionData.id}`)}
+                            className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded transition flex items-center justify-between shadow cursor-pointer border-none"
+                        >
+                            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider">
+                                <Box size={13} />
+                                📦 Buka Reviewer 3D Model
+                            </span>
+                            <ArrowRight size={13} />
+                        </button>
+                    </div>
+                )}
+
                 {/* 3D WebGIS Camera Controller Button */}
                 <div className="px-4 py-3 border-b border-slate-100 bg-teal-500/5 flex items-center justify-between gap-3 select-none">
                     <div className="space-y-0.5">
                         <span className="text-[9px] font-black uppercase text-teal-800 tracking-wider">Perspektif 3D WebGL</span>
-                        <span className="text-[8px] font-medium text-slate-400 block leading-none">Visualisasikan ketinggian kaveling secara riil</span>
+                        <span className="text-[8px] font-medium text-slate-400 block leading-none">Visualisasikan kemiringan kaveling secara riil</span>
                     </div>
                     <button
                         type="button"

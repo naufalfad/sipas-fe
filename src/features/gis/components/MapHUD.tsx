@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
     Plus, Minus, Maximize2, Map as MapIcon,
-    ChevronDown, ChevronUp, Crosshair, Navigation, Mountain, Box
+    ChevronDown, ChevronUp, Crosshair, Navigation, Mountain
 } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
@@ -300,14 +300,6 @@ export default function MapHUD() {
                     title={is3D ? "Ubah ke Tampilan 2D (Pitch 0°)" : "Ubah ke Tampilan 3D (Pitch 60°)"}
                 >
                     <span className="text-[10px] font-black">{is3D ? "2D" : "3D"}</span>
-                </button>
-                <button
-                    onClick={() => window.location.href = "/gis/bim-reviewer"}
-                    className="w-10 h-10 flex flex-col items-center justify-center bg-teal-950 text-teal-300 hover:bg-teal-900 transition-colors rounded-none outline-none cursor-pointer border-none"
-                    title="Buka Viewport 3D BIM Reviewer Real-Time"
-                >
-                    <Box size={14} />
-                    <span className="text-[7px] font-black uppercase tracking-tighter">BIM</span>
                 </button>
                 <button
                     onClick={handleToggleTerrainAndContours}

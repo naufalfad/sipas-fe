@@ -296,7 +296,7 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: '/gis/bim-reviewer/:parcelId',
+    path: '/gis/bim-reviewer/:submissionId',
     element: (
       <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin']}>
         <BimReviewerPage />

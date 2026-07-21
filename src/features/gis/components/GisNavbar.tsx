@@ -5,7 +5,7 @@ import { normalizeRole } from '@/components/auth/ProtectedRoute';
 import type { UserRole } from '@/app/store/useUIStore';
 import {
     ChevronLeft, Globe, LogOut, ChevronDown,
-    RefreshCw, Share2, Box
+    RefreshCw, Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -83,18 +83,6 @@ export default function GisNavbar() {
 
             {/* SISI KANAN: Alat Sinkronisasi, Simulasi Role, & Profil Sesi */}
             <div className="flex items-center gap-1 md:gap-3">
-
-                {/* Tombol 3D BIM Reviewer */}
-                <button
-                    onClick={() => navigate('/gis/bim-reviewer')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded transition-all active:scale-95 border-none cursor-pointer shadow-sm"
-                    title="Buka Viewport 3D BIM Reviewer Real-Time"
-                >
-                    <Box size={14} />
-                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">
-                        3D BIM Reviewer
-                    </span>
-                </button>
 
                 {/* Tombol Sync Spasial */}
                 <button

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, ClipboardList, Map as MapIcon, Box, Info } from 'lucide-react';
+import { Layers, ClipboardList, Map as MapIcon, Info } from 'lucide-react';
 import { useGisUIStore } from '@/app/store/useGisUIStore';
 import type { GisPanelType } from '@/app/store/useGisUIStore';
 
@@ -25,15 +25,7 @@ export default function GisSidebar() {
             type: 'layer-kewajiban',
             label: 'Layers',
             icon: Layers,
-            title: 'Konfigurasi Layer Regulasi & 3D BIM',
-        },
-        {
-            type: 'bim-reviewer',
-            label: '3D BIM',
-            icon: Box,
-            title: 'BIM Reviewer 3D Real-Time',
-            isDirectRoute: true,
-            routePath: '/gis/bim-reviewer',
+            title: 'Konfigurasi Layer Spasial & Regulasi',
         },
         {
             type: 'basemap-gallery',

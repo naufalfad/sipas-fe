@@ -83,6 +83,7 @@ export default function SipasMap3D() {
   const visibleSubLayers = useGisUIStore((s) => s.visibleSubLayers);
   const isTerrainActive = useGisUIStore((s) => s.isTerrainActive);
 
+  const selectedSubmissionIds = useGisUIStore((s) => s.selectedSubmissionIds);
   const setSelectedCompanyId = useGisUIStore((s) => s.setSelectedCompanyId);
   const setMapZoom = useGisUIStore((s) => s.setMapZoom);
   const setMapCenter = useGisUIStore((s) => s.setMapCenter);
@@ -700,7 +701,7 @@ export default function SipasMap3D() {
     } else {
       mapData.processedSubmissions.forEach((sub) => {
         const el = document.createElement('div');
-        const isSelected = selectedCompanyId === sub.id;
+        const isSelected = selectedCompanyId === sub.id || selectedSubmissionIds.includes(sub.id);
         const size = isSelected ? 32 : 28;
         const boxShadow = isSelected
           ? `0 0 0 3px ${sub.color},0 4px 16px rgba(0,0,0,0.5)`
@@ -731,7 +732,7 @@ export default function SipasMap3D() {
         markersRef.current.push(m);
       });
     }
-  }, [mapData.clusters, mapData.processedSubmissions, selectedCompanyId, localZoom]);
+  }, [mapData.clusters, mapData.processedSubmissions, selectedCompanyId, selectedSubmissionIds, localZoom]);
 
   // 8. Render Popups
   useEffect(() => {
