@@ -16,7 +16,8 @@ export type GisPanelType =
     | 'ai-copilot'
     | 'sensor-management'
     | 'compensation-manager'  // Tambahan modul manajemen kompensasi
-    | 'conflict-inspector';   // Tambahan modul inspeksi konflik lapangan
+    | 'conflict-inspector'    // Tambahan modul inspeksi konflik lapangan
+    | 'bim-reviewer';         // Modul 3D BIM Reviewer Real-Time
 
 export interface GisPanel {
     id: string;

@@ -171,7 +171,7 @@ export function AerialInspectionForm({ submissionId, onSuccess }: AerialInspecti
             <div className="border-b border-slate-200 pb-2.5">
                 <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Video size={15} className="text-primary" />
-                    Input Bukti Sidak Udara (Aerial Drone Inspection)
+                    Input Bukti Verifikasi Lapangan Udara (Aerial Drone Inspection)
                 </h4>
                 <span className="text-[10px] text-slate-450 block mt-1">
                     Unggah dokumentasi rekaman video udara makro kawasan menggunakan pesawat nirawak (drone) [Slide 6]
@@ -182,7 +182,7 @@ export function AerialInspectionForm({ submissionId, onSuccess }: AerialInspecti
             <div className="p-3.5 bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-[10px] space-y-1.5 leading-relaxed">
                 <span className="font-bold uppercase text-slate-800 flex items-center gap-1.5">
                     <HelpCircle size={13} className="text-slate-500" />
-                    Ketentuan Sidak Udara:
+                    Ketentuan Verifikasi Lapangan Udara:
                 </span>
                 <ol className="list-decimal pl-4 space-y-1 text-slate-500">
                     <li>Pengunggahan video drone diwajibkan secara mutlak bagi permohonan kategori <strong>PERUMAHAN</strong> dan <strong>INDUSTRI</strong> sebelum berkas diajukan ke Kabid.</li>
@@ -215,7 +215,7 @@ export function AerialInspectionForm({ submissionId, onSuccess }: AerialInspecti
                             <span className="font-bold text-slate-800">{existingLog.pilotName}</span>
                         </div>
                         <div>
-                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase tracking-wider">Tanggal Sidak Udara</span>
+                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase tracking-wider">Tanggal Verifikasi Lapangan Udara</span>
                             <span className="font-semibold text-slate-700">{new Date(existingLog.timestamp).toLocaleString('id-ID')}</span>
                         </div>
                         {existingLog.notes && (
@@ -241,7 +241,7 @@ export function AerialInspectionForm({ submissionId, onSuccess }: AerialInspecti
             ) : (
                 <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-[10px] flex items-start gap-2 text-justify">
                     <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5 animate-pulse" />
-                    <span>Dokumentasi sidak udara drone belum terdaftar untuk berkas permohonan ini. Silakan lakukan proses pengunggahan di bawah.</span>
+                    <span>Dokumentasi verifikasi lapangan udara drone belum terdaftar untuk berkas permohonan ini. Silakan lakukan proses pengunggahan di bawah.</span>
                 </div>
             )}
 

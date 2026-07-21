@@ -128,7 +128,6 @@ export default function SubmissionDetailPage() {
     queryFn: () => SubmissionService.getAerialInspection(id || ''),
     enabled: !!id,
   });
-  const hasAerialLog = !!aerialInspectionRes?.data;
 
   // Pre-populate evaluasi checklist jika sudah ada di DB
   useEffect(() => {
@@ -411,8 +410,8 @@ export default function SubmissionDetailPage() {
                 foto: 'Foto Lapangan',
                 silsilah: 'Pemeriksaan Silsilah',
                 audit: 'Audit Trail',
-                'dokumen-sidak': 'Dokumentasi Sidak',
-                inspeksi: 'Input Sidak Lapangan'
+                'dokumen-sidak': 'Dokumentasi Verifikasi',
+                inspeksi: 'Input Verifikasi Lapangan'
               };
               return (
                 <button
@@ -762,7 +761,7 @@ export default function SubmissionDetailPage() {
                     className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 border-none transition-colors cursor-pointer shadow-md text-center"
                   >
                     <Camera size={14} className="text-teal-400" />
-                    <span>Ambil Foto Sidak Lapangan</span>
+                    <span>Ambil Foto Verifikasi Lapangan</span>
                   </button>
                 )}
 

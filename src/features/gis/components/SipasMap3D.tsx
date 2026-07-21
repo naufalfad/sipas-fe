@@ -528,6 +528,31 @@ export default function SipasMap3D() {
       'fill-opacity': 0.45 * opacity
     });
 
+    // ─── 3D BIM & BANGUNAN EXTRUSION LAYER (LAYER-3D-BIM) ───
+    const showBim3D = activeLayers.includes('layer-3d-bim');
+    if (showBim3D && mapData.pemukimanData) {
+      if (!map.getSource('bim-3d-source')) {
+        map.addSource('bim-3d-source', { type: 'geojson', data: mapData.pemukimanData });
+      }
+      if (!map.getLayer('bim-3d-extrusion-layer')) {
+        map.addLayer({
+          id: 'bim-3d-extrusion-layer',
+          type: 'fill-extrusion',
+          source: 'bim-3d-source',
+          paint: {
+            'fill-extrusion-color': '#0d9488',
+            'fill-extrusion-height': 24,
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': 0.85 * opacity
+          }
+        });
+      } else {
+        map.setLayoutProperty('bim-3d-extrusion-layer', 'visibility', 'visible');
+      }
+    } else if (map.getLayer('bim-3d-extrusion-layer')) {
+      map.setLayoutProperty('bim-3d-extrusion-layer', 'visibility', 'none');
+    }
+
     syncGeoJsonLayer('clash-layer', 'line', 'clash-source', mapData.clashGeoJSON, true, {
       'line-color': '#ff0000',
       'line-width': 3,

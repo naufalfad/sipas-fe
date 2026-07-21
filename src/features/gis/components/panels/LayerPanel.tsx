@@ -1,5 +1,6 @@
 import { useGisUIStore } from "@/app/store/useGisUIStore";
-import { Layers, Settings2, ShieldCheck, CheckSquare, Square } from "lucide-react";
+import { Layers, Settings2, ShieldCheck, CheckSquare, Square, Box, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 /**
@@ -156,11 +157,14 @@ const SPATIAL_LAYERS: LayerDef[] = [
 const SPATIAL_LAYER_IDS = SPATIAL_LAYERS.map((l) => l.id);
 
 export default function LayerPanel() {
+    const navigate = useNavigate();
     const activeLayers = useGisUIStore((s) => s.activeLayers);
     const toggleLayer = useGisUIStore((s) => s.toggleLayer);
     const mapOpacity = useGisUIStore((s) => s.mapOpacity);
     const setMapOpacity = useGisUIStore((s) => s.setMapOpacity);
     const mapZoom = useGisUIStore((s) => s.mapZoom);
+
+    const isBim3dActive = activeLayers.includes("layer-3d-bim");
 
     const allSpatialActive = SPATIAL_LAYER_IDS.every((id) =>
         activeLayers.includes(id)
@@ -274,6 +278,55 @@ export default function LayerPanel() {
 
     return (
         <div className="flex flex-col h-full bg-white pb-12 font-sans text-slate-800 overflow-y-auto">
+
+            {/* ── KAT. 0: FEATURED 3D BIM REVIEWER TOGGLE CARD ── */}
+            <div className="p-3.5 bg-gradient-to-br from-slate-900 via-slate-850 to-teal-950 text-white border-b border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded bg-teal-500/20 border border-teal-500/40 flex items-center justify-center">
+                            <Box size={14} className="text-teal-400" />
+                        </div>
+                        <div>
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-teal-300">
+                                Model Bangunan 3D BIM
+                            </h4>
+                            <p className="text-[9px] text-slate-400">RTC 3D Tiles Streaming Bogor</p>
+                        </div>
+                    </div>
+
+                    {/* Toggle switch 3D */}
+                    <button
+                        type="button"
+                        onClick={() => toggleLayer("layer-3d-bim")}
+                        className={cn(
+                            "relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors duration-200 border cursor-pointer",
+                            isBim3dActive
+                                ? "bg-teal-500 border-teal-400"
+                                : "bg-slate-800 border-slate-700"
+                        )}
+                        title="Toggle Layer 3D BIM di Peta"
+                    >
+                        <span
+                            className={cn(
+                                "inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200",
+                                isBim3dActive ? "translate-x-4" : "translate-x-0.5"
+                            )}
+                        />
+                    </button>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => navigate("/gis/bim-reviewer")}
+                    className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded transition flex items-center justify-between shadow cursor-pointer border-none"
+                >
+                    <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider">
+                        <Box size={13} />
+                        Buka Viewport 3D BIM Reviewer
+                    </span>
+                    <ArrowRight size={13} />
+                </button>
+            </div>
 
             {/* ── KAT. 1: SKALA PENGAJUAN ── */}
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 select-none sticky top-0 z-10">

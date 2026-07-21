@@ -17,6 +17,7 @@ import SitePlanListPage from '@/features/siteplan/pages/SitePlanListPage';
 import SitePlanDetailPage from '@/features/siteplan/pages/SitePlanDetailPage';
 import VerificationPage from '@/features/verification/pages/VerificationPage';
 import GISPage from '@/features/gis/pages/GISPage';
+import BimReviewerPage from '@/features/gis/pages/BimReviewerPage';
 
 import ReportsPage from '@/features/approval/pages/ReportsPage';
 import ApprovalQueuePage from '@/features/approval/pages/ApprovalQueuePage';
@@ -283,6 +284,22 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin']}>
         <GISPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/gis/bim-reviewer',
+    element: (
+      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin']}>
+        <BimReviewerPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/gis/bim-reviewer/:parcelId',
+    element: (
+      <ProtectedRoute allowedRoles={['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis', 'Super Admin']}>
+        <BimReviewerPage />
       </ProtectedRoute>
     ),
   },

@@ -75,7 +75,7 @@ export function InspectionLogsGallery({ submissionId, polygon }: InspectionLogsG
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400 font-sans">
         <Loader2 size={28} className="animate-spin text-primary" />
-        <span className="text-xs font-semibold uppercase tracking-wider">Memuat berkas dokumentasi sidak lapangan...</span>
+        <span className="text-xs font-semibold uppercase tracking-wider">Memuat berkas dokumentasi verifikasi lapangan...</span>
       </div>
     );
   }
@@ -100,7 +100,7 @@ export function InspectionLogsGallery({ submissionId, polygon }: InspectionLogsG
         <div className="flex items-center gap-2">
           <Camera size={16} className="text-primary" />
           <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">
-            Dokumentasi Sidak Lapangan
+            Dokumentasi Verifikasi Lapangan
           </h4>
         </div>
         <div className="flex items-center gap-3 ml-auto flex-wrap">
@@ -222,7 +222,7 @@ export function InspectionLogsGallery({ submissionId, polygon }: InspectionLogsG
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 bg-white border border-slate-200 select-none">
           <ImageOff size={28} className="text-slate-300" />
           <div className="text-center">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Belum Ada Titik Sidak Darat</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Belum Ada Titik Verifikasi Lapangan Darat</p>
             <p className="text-[10px] text-slate-400 mt-1">Gunakan perangkat mobile PWA untuk mendaftarkan koordinat foto darat.</p>
           </div>
         </div>
@@ -236,7 +236,7 @@ export function InspectionLogsGallery({ submissionId, polygon }: InspectionLogsG
                   {log.photoUrl ? (
                     <img
                       src={log.photoUrl}
-                      alt={`Dokumentasi sidak #${idx + 1}`}
+                      alt={`Dokumentasi verifikasi lapangan #${idx + 1}`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = '';

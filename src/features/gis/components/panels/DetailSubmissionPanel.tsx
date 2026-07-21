@@ -43,12 +43,18 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
     const flyTo = useGisUIStore((s) => s.flyTo);
     const is3DActive = pitch > 10;
 
+    const activeLayers = useGisUIStore((s) => s.activeLayers);
+    const toggleLayer = useGisUIStore((s) => s.toggleLayer);
+
     const handleToggle3DView = () => {
         if (!submissionData) return;
         const markerLng = submissionData.centroidLng ?? (submissionData.location?.longitude || submissionData.location?.lng || 106.8560);
         const markerLat = submissionData.centroidLat ?? (submissionData.location?.latitude || submissionData.location?.lat || -6.4816);
         
         if (is3DActive) {
+            if (activeLayers.includes('layer-3d-bim')) {
+                toggleLayer('layer-3d-bim');
+            }
             flyTo({
                 longitude: markerLng,
                 latitude: markerLat,
@@ -58,6 +64,9 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
             });
             toast.info("Tampilan peta diubah ke 2D (Tegak Lurus).");
         } else {
+            if (!activeLayers.includes('layer-3d-bim')) {
+                toggleLayer('layer-3d-bim');
+            }
             flyTo({
                 longitude: markerLng,
                 latitude: markerLat,
@@ -541,7 +550,7 @@ export default function DetailSubmissionPanel({ submissionData }: DetailSubmissi
                             {aerialLog && (
                                 <div className="p-3 bg-teal-50/20 border border-teal-200 space-y-2 text-xs">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[8px] font-black text-teal-700 uppercase tracking-widest block leading-none">🎥 Sidak Udara Drone</span>
+                                        <span className="text-[8px] font-black text-teal-700 uppercase tracking-widest block leading-none">🎥 Verifikasi Lapangan Udara Drone</span>
                                         <span className="px-1 py-0.5 text-[7px] font-black text-teal-800 bg-teal-50 border border-teal-200 rounded-none leading-none">AKTIF</span>
                                     </div>
                                     <div className="relative bg-black aspect-video overflow-hidden border border-slate-200">

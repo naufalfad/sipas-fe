@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Minus, Maximize2, Mountain, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Minus, Maximize2, Mountain, ChevronDown, ChevronUp, Box } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
 
@@ -120,12 +120,26 @@ export default function ZoningHorizontalLegend() {
                         ))}
                     </div>
 
-                    {/* Tombol Control Peta (Zoom) */}
-                    <div className="hidden md:flex bg-slate-900 text-slate-300 select-none divide-x divide-white/10 shrink-0 border-l border-slate-700">
-                        <button onClick={triggerZoomIn} className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Plus size={13} strokeWidth={3} /></button>
-                        <button onClick={triggerResetView} className="w-11 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Maximize2 size={11} strokeWidth={3} /></button>
-                        <button onClick={triggerZoomOut} className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Minus size={13} strokeWidth={3} /></button>
-
+                    {/* Tombol Control Peta (Zoom, 3D, & BIM Reviewer) */}
+                    <div className="flex bg-slate-900 text-slate-300 select-none divide-x divide-white/10 shrink-0 border-l border-slate-700">
+                        <button onClick={triggerZoomIn} title="Perbesar (Zoom In)" className="w-9 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Plus size={13} strokeWidth={3} /></button>
+                        <button onClick={triggerResetView} title="Fit Zoom" className="w-9 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Maximize2 size={11} strokeWidth={3} /></button>
+                        <button 
+                            onClick={() => window.dispatchEvent(new Event("map-toggle-3d"))} 
+                            title="Ubah Tampilan 2D / 3D Pitch" 
+                            className="w-10 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none text-[10px] font-black text-teal-400"
+                        >
+                            3D
+                        </button>
+                        <button 
+                            onClick={() => window.location.href = "/gis/bim-reviewer"} 
+                            title="Buka Viewport 3D BIM Reviewer" 
+                            className="px-2 h-full flex items-center gap-1 bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-150 outline-none cursor-pointer rounded-none text-[9px] font-black uppercase tracking-wider"
+                        >
+                            <Box size={11} />
+                            <span>BIM 3D</span>
+                        </button>
+                        <button onClick={triggerZoomOut} title="Perkecil (Zoom Out)" className="w-9 h-full flex items-center justify-center hover:bg-teal-600 hover:text-white transition-colors duration-150 outline-none cursor-pointer rounded-none"><Minus size={13} strokeWidth={3} /></button>
                     </div>
                 </div>
             )}

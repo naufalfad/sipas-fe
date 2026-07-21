@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
     Plus, Minus, Maximize2, Map as MapIcon,
-    ChevronDown, ChevronUp, Crosshair, Navigation, Mountain
+    ChevronDown, ChevronUp, Crosshair, Navigation, Mountain, Box
 } from "lucide-react";
 import { useGisUIStore } from "@/app/store/useGisUIStore";
 import { cn } from "@/lib/utils";
@@ -38,9 +38,16 @@ export default function MapHUD() {
             }
         };
         handleResize();
+
+        const handleToggle3DEvent = () => toggle3D();
         window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
+        window.addEventListener("map-toggle-3d", handleToggle3DEvent);
+
+        return () => {
+            window.removeEventListener("resize", handleResize);
+            window.removeEventListener("map-toggle-3d", handleToggle3DEvent);
+        };
+    }, [pitch, mapCenter, mapZoom]);
 
     type LegendItem = {
         label: string;
@@ -78,6 +85,9 @@ export default function MapHUD() {
     const toggle3D = () => {
         if (is3D) {
             // Kembali ke 2D (Pitch 0, Bearing 0)
+            if (activeLayers.includes('layer-3d-bim')) {
+                toggleLayer('layer-3d-bim');
+            }
             flyTo({
                 longitude: mapCenter[1],
                 latitude: mapCenter[0],
@@ -87,6 +97,9 @@ export default function MapHUD() {
             });
         } else {
             // Masuk ke 3D (Pitch 60)
+            if (!activeLayers.includes('layer-3d-bim')) {
+                toggleLayer('layer-3d-bim');
+            }
             flyTo({
                 longitude: mapCenter[1],
                 latitude: mapCenter[0],
@@ -262,8 +275,8 @@ export default function MapHUD() {
             </div>
             )}
 
-            {/* ── KOLOM KANAN: Tombol Kontrol Vertikal ── */}
-            <div className="hidden md:flex flex-col bg-white/95 backdrop-blur border border-slate-200 shadow-xl rounded-none overflow-hidden divide-y divide-slate-100 shrink-0">
+            {/* ── KOLOM KANAN: Tombol Kontrol Vertikal (Always Visible) ── */}
+            <div className="flex flex-col bg-white/95 backdrop-blur border border-slate-200 shadow-xl rounded-none overflow-hidden divide-y divide-slate-100 shrink-0">
                 <button
                     onClick={triggerZoomIn}
                     className="w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:text-teal-700 transition-colors active:bg-slate-200 rounded-none outline-none cursor-pointer"
@@ -284,9 +297,17 @@ export default function MapHUD() {
                         "w-10 h-10 flex items-center justify-center transition-colors rounded-none outline-none cursor-pointer",
                         is3D ? "bg-teal-600 text-white hover:bg-teal-700" : "text-slate-600 hover:bg-slate-50 hover:text-teal-700"
                     )}
-                    title={is3D ? "Ubah ke Tampilan 2D" : "Ubah ke Tampilan 3D"}
+                    title={is3D ? "Ubah ke Tampilan 2D (Pitch 0°)" : "Ubah ke Tampilan 3D (Pitch 60°)"}
                 >
                     <span className="text-[10px] font-black">{is3D ? "2D" : "3D"}</span>
+                </button>
+                <button
+                    onClick={() => window.location.href = "/gis/bim-reviewer"}
+                    className="w-10 h-10 flex flex-col items-center justify-center bg-teal-950 text-teal-300 hover:bg-teal-900 transition-colors rounded-none outline-none cursor-pointer border-none"
+                    title="Buka Viewport 3D BIM Reviewer Real-Time"
+                >
+                    <Box size={14} />
+                    <span className="text-[7px] font-black uppercase tracking-tighter">BIM</span>
                 </button>
                 <button
                     onClick={handleToggleTerrainAndContours}

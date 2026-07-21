@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Layers, ClipboardList, Map as MapIcon, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Layers, ClipboardList, Map as MapIcon, Box, Info } from 'lucide-react';
 import { useGisUIStore } from '@/app/store/useGisUIStore';
 import type { GisPanelType } from '@/app/store/useGisUIStore';
 
@@ -8,9 +9,12 @@ interface NavigationItem {
     label: string;
     icon: React.ComponentType<any>;
     title: string;
+    isDirectRoute?: boolean;
+    routePath?: string;
 }
 
 export default function GisSidebar() {
+    const navigate = useNavigate();
     const openPanel = useGisUIStore((s) => s.openPanel);
     const activePanels = useGisUIStore((s) => s.activePanels);
     const closePanelsToTheRight = useGisUIStore((s) => s.closePanelsToTheRight);
@@ -21,7 +25,15 @@ export default function GisSidebar() {
             type: 'layer-kewajiban',
             label: 'Layers',
             icon: Layers,
-            title: 'Konfigurasi Layer Regulasi',
+            title: 'Konfigurasi Layer Regulasi & 3D BIM',
+        },
+        {
+            type: 'bim-reviewer',
+            label: '3D BIM',
+            icon: Box,
+            title: 'BIM Reviewer 3D Real-Time',
+            isDirectRoute: true,
+            routePath: '/gis/bim-reviewer',
         },
         {
             type: 'basemap-gallery',
@@ -42,6 +54,11 @@ export default function GisSidebar() {
     };
 
     const handleNavClick = (item: NavigationItem) => {
+        if (item.isDirectRoute && item.routePath) {
+            navigate(item.routePath);
+            return;
+        }
+
         if (isPanelActive(item.type)) {
             closePanelsToTheRight(-1);
         } else {

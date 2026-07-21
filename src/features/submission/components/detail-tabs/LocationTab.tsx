@@ -379,7 +379,7 @@ export const LocationTab = ({ sub, inspectionLogs = [] }: LocationTabProps) => {
                           <Popup>
                             <div className="p-1 space-y-1.5 text-xs text-slate-800 text-left" style={{ fontFamily: 'sans-serif', minWidth: '160px' }}>
                               <div className="flex justify-between items-center gap-2">
-                                <span className="font-extrabold text-[11px] text-slate-900 uppercase">Sidak #{index + 1}</span>
+                                <span className="font-extrabold text-[11px] text-slate-900 uppercase">Verifikasi #{index + 1}</span>
                                 <span
                                   className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider border leading-none"
                                   style={{
@@ -394,7 +394,7 @@ export const LocationTab = ({ sub, inspectionLogs = [] }: LocationTabProps) => {
 
                               {log.photoUrl && (
                                 <div className="w-full aspect-video overflow-hidden border border-slate-100 bg-slate-50">
-                                  <img src={log.photoUrl} alt={`Foto Sidak #${index + 1}`} className="w-full h-full object-cover" />
+                                  <img src={log.photoUrl} alt={`Foto Verifikasi #${index + 1}`} className="w-full h-full object-cover" />
                                 </div>
                               )}
 
@@ -449,11 +449,11 @@ export const LocationTab = ({ sub, inspectionLogs = [] }: LocationTabProps) => {
             </div>
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 bg-[#0d9488] border border-white rounded-full block shrink-0 shadow-sm"></span>
-              Sidak Lapangan (Sesuai)
+              Verifikasi Lapangan (Sesuai)
             </div>
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 bg-[#e11d48] border border-white rounded-full block shrink-0 shadow-sm"></span>
-              Sidak Lapangan (Luar Lokasi)
+              Verifikasi Lapangan (Luar Lokasi)
             </div>
           </div>
         </div>

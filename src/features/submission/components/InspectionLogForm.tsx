@@ -484,7 +484,7 @@ export function InspectionLogForm({ submissionId, onSuccess }: InspectionLogForm
             Bukti Darat Dikunci
           </span>
           <p className="leading-relaxed text-slate-500 text-[9.5px]">
-            Dokumentasi rona darat lapangan geotagged telah terunggah dengan aman ke server. Silakan lengkapi juga ulasan **Sidak Udara Drone** (jika diwajibkan untuk kategori perumahan/industri) sebelum mengajukan draf ulasan Telaah Staf ke Kepala Bidang.
+            Dokumentasi rona darat lapangan geotagged telah terunggah dengan aman ke server. Silakan lengkapi juga ulasan **Verifikasi Lapangan Udara Drone** (jika diwajibkan untuk kategori perumahan/industri) sebelum mengajukan draf ulasan Telaah Staf ke Kepala Bidang.
           </p>
         </div>
       )}

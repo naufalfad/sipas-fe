@@ -533,7 +533,7 @@ export default function SubmissionVerificationPage() {
               <span className="uppercase">Input Dimensi Fisik Riil Terverifikasi</span>
               <span className="text-[11px] font-semibold text-slate-400 lowercase">(m² / meter)</span>
             </h2>
-            <p className="text-[10px] text-slate-500 mt-0.5">Kunci luasan fisik riil hasil sidak spasial Anda. Perbandingan galat langsung dideklarasikan di bawah input.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Kunci luasan fisik riil hasil verifikasi lapangan spasial Anda. Perbandingan galat langsung dideklarasikan di bawah input.</p>
           </div>
         </div>
 
@@ -834,7 +834,7 @@ export default function SubmissionVerificationPage() {
               <div>
                 <p className="font-bold uppercase tracking-wider text-[10px]">Peringatan Keras: Belum Ada Log Kunjungan Lapangan</p>
                 <p className="mt-1 text-slate-500">
-                  Sistem mendeteksi bahwa berkas ini belum memiliki dokumentasi survei sidak lapangan darat (Ground Inspection). Berdasarkan Perbup Bogor, Tim Teknis <strong>diwajibkan mengunggah sekurangnya 1 bukti foto geotagged</strong> di lokasi proyek sebelum dapat mengesahkan matriks verifikasi dan menerbitkan draf Telaah Staf.
+                  Sistem mendeteksi bahwa berkas ini belum memiliki dokumentasi survei verifikasi lapangan darat (Ground Inspection). Berdasarkan Perbup Bogor, Tim Teknis <strong>diwajibkan mengunggah sekurangnya 1 bukti foto geotagged</strong> di lokasi proyek sebelum dapat mengesahkan matriks verifikasi dan menerbitkan draf Telaah Staf.
                 </p>
               </div>
             </div>

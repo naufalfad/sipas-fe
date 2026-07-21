@@ -145,7 +145,7 @@ export default function ConflictPinControl() {
                     <div className="border-b border-slate-800 pb-2.5 flex justify-between items-center">
                         <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1.5 leading-none">
                             <AlertTriangle size={12} className="animate-pulse" />
-                            Sidak: Catat Konflik Spasial
+                            Verifikasi Lapangan: Catat Konflik Spasial
                         </span>
                         <button
                             type="button"
