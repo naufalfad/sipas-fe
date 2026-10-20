@@ -32,7 +32,7 @@ const INITIAL_ZOOM = 11;
 function getBasemapUrl(activeBaseMap: string): string {
   switch (activeBaseMap) {
     case 'dark':
-      return 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
     case 'satellite':
       return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
     case 'street':
@@ -41,7 +41,7 @@ function getBasemapUrl(activeBaseMap: string): string {
       return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     case 'voyager':
     default:
-      return 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
   }
 }
 
@@ -49,7 +49,7 @@ function getBasemapAttribution(activeBaseMap: string): string {
   switch (activeBaseMap) {
     case 'dark':
     case 'voyager':
-      return '&copy; <a href="https://carto.com/">CartoDB</a>';
+      return '&copy; <a href="https://www.esri.com/">Esri</a>';
     case 'satellite':
       return '&copy; <a href="https://www.esri.com/">Esri</a>';
     case 'street':
@@ -57,7 +57,7 @@ function getBasemapAttribution(activeBaseMap: string): string {
     case 'osm':
       return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
     default:
-      return '&copy; CartoDB';
+      return '&copy; <a href="https://www.esri.com/">Esri</a>';
   }
 }
 

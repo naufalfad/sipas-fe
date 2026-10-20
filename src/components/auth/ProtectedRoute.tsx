@@ -32,8 +32,10 @@ export const normalizeRole = (role: string, username?: string): string => {
   const r = role.toUpperCase();
   if (r === 'PEMOHON') return 'Pemohon';
   if (r === 'ADMIN' || r === 'ADMIN SIPAS') return 'Admin SIPAS';
-  if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') return 'Tim Teknis';
+  if (r === 'KASI' || r === 'KEPALA SEKSI') return 'Kepala Seksi';
+  if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS' || r === 'KETUA TIM TEKNIS') return 'Ketua Tim Teknis';
   if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') return 'Kepala Bidang';
+  if (r === 'SEKDIS' || r === 'SEKRETARIS DINAS') return 'Sekretaris Dinas';
   if (r === 'KADIS' || r === 'KEPALA DINAS') return 'Kadis';
   if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') return 'Super Admin';
   return role;

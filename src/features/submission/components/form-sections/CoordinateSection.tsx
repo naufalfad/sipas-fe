@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { CheckCircle2, RefreshCw, FileUp, Loader2 } from 'lucide-react';
+import { CheckCircle2, RefreshCw, FileUp, Loader2, ShieldCheck, Search, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { LabelWithInfo } from './LabelWithInfo';
@@ -8,6 +8,9 @@ import { CADGeoreferenceWizard } from './CADGeoreferenceWizard';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
 import { uploadFileToBackend } from '../../utils/upload';
+import { MOCK_SITE_BOUNDS } from '@/mock/siteplan/mockSiteConfig';
+import { pkkprApi } from '@/features/pkkpr/api/pkkprApi';
+import type { ValidatePhasedSitePlanResponse } from '@/features/pkkpr/types/pkkpr.types';
 
 export const CoordinateSection = () => {
   const { register, setValue, watch } = useFormContext<FullSubmissionFormValues>();
@@ -17,6 +20,64 @@ export const CoordinateSection = () => {
   // State untuk kontrol modal Wizard Georeferencing CAD
   const [isCadWizardOpen, setIsCadWizardOpen] = useState(false);
   const cadFileName = watch('coordinate.cadFileName') || '';
+  const landPolygon = watch('coordinate.polygon') as [number, number][] | undefined;
+  const pkkprId = watch('spatial.pkkprId');
+  const landArea = watch('location.landArea') || 0;
+
+  // State Pre-Flight Boundary Inspector
+  const [isValidatingBoundary, setIsValidatingBoundary] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidatePhasedSitePlanResponse | null>(null);
+
+  const handleValidatePhasedBoundary = async () => {
+    if (!pkkprId) {
+      toast.warning('Pilih SK PKKPR terlebih dahulu pada Tahap 5 (Kesesuaian Tata Ruang).');
+      return;
+    }
+
+    // Ekstrak geometri poligon yang tersedia
+    let coords = landPolygon;
+    if (!coords && uploadedGeoJson) {
+      const feat = uploadedGeoJson.features?.[0] || uploadedGeoJson;
+      if (feat?.geometry?.coordinates?.[0]) {
+        coords = feat.geometry.coordinates[0];
+      }
+    }
+
+    if (!coords || coords.length < 3) {
+      toast.error('Batas poligon belum digambar atau diunggah di atas peta!');
+      return;
+    }
+
+    const closedCoords = [...coords];
+    if (closedCoords[0][0] !== closedCoords[closedCoords.length - 1][0] ||
+        closedCoords[0][1] !== closedCoords[closedCoords.length - 1][1]) {
+      closedCoords.push(closedCoords[0]);
+    }
+
+    const geomPayload = {
+      type: 'Polygon',
+      coordinates: [closedCoords]
+    };
+
+    setIsValidatingBoundary(true);
+    try {
+      const res = await pkkprApi.validatePhasedSitePlan({
+        pkkpr_id: pkkprId,
+        new_area_m2: Number(landArea) || 0,
+        siteplan_geometry: geomPayload
+      });
+      setValidationResult(res);
+      if (res.is_valid) {
+        toast.success('Validasi Spasial Sukses: Denah Site Plan 100% berada di dalam batas izin PKKPR!');
+      } else {
+        toast.error(res.error || 'Terdeteksi ketidaksesuaian batas spasial atau kuota.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal memvalidasi kepatuhan spasial dengan server.');
+    } finally {
+      setIsValidatingBoundary(false);
+    }
+  };
 
   const handleSpatialFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,26 +122,10 @@ export const CoordinateSection = () => {
             features: [
               {
                 type: 'Feature',
-                properties: {},
+                properties: { label: 'Batas Lahan BPN Resmi (EPSG:4326)' },
                 geometry: {
                   type: 'Polygon',
-                  coordinates: [
-                    [
-                      [106.8400, -6.4800],
-                      [106.8413, -6.4798],
-                      [106.8414, -6.4804],
-                      [106.8422, -6.4802],
-                      [106.8420, -6.4793],
-                      [106.8426, -6.4789],
-                      [106.8417, -6.4785],
-                      [106.8410, -6.4789],
-                      [106.8407, -6.4787],
-                      [106.8396, -6.4791],
-                      [106.8398, -6.4795],
-                      [106.8394, -6.4797],
-                      [106.8400, -6.4800]
-                    ]
-                  ]
+                  coordinates: [MOCK_SITE_BOUNDS.polygonLngLat]
                 }
               }
             ]
@@ -90,7 +135,7 @@ export const CoordinateSection = () => {
           setValue('coordinate.coordinatesText', JSON.stringify(mockGeoJson.features[0].geometry.coordinates, null, 2));
           setSpatialLoading(false);
           toast.success('File Shapefile BPN berhasil diekstrak!');
-        }, 1500);
+        }, 1200);
       };
       reader.readAsArrayBuffer(file);
     } else {
@@ -113,12 +158,13 @@ export const CoordinateSection = () => {
 
     if (file.name.endsWith('.dwg') || file.name.endsWith('.dxf')) {
       setValue('coordinate.cadFileName', file.name);
-      setIsCadWizardOpen(true);
 
       try {
         setSpatialLoading(true);
         const res = await uploadFileToBackend(file);
         setValue('document.cadDoc', `${res.file_url}?name=${encodeURIComponent(file.name)}`);
+        setValue('coordinate.cadFilePath', res.file_path);
+        setIsCadWizardOpen(true);
         toast.success(`Berkas CAD berhasil diunggah ke server: ${file.name}`);
       } catch (err) {
         toast.error('Gagal mengunggah berkas CAD ke server.');
@@ -130,17 +176,16 @@ export const CoordinateSection = () => {
     }
   };
 
-  // Hasil Sinkronisasi Matriks Helmert 2D dari Wizard Aligner
+  // Simpan titik kontrol yang digunakan backend untuk kalibrasi Helmert.
   const handleGeoreferenceComplete = (params: {
-    A: number; B: number; Tx: number; Ty: number;
-    scale: number; rotation: number; polygon: [number, number][];
+    polygon: [number, number][];
+    anchorCad1: [number, number]; anchorCad2: [number, number];
+    anchorMap1: [number, number]; anchorMap2: [number, number];
   }) => {
-    setValue('coordinate.cadParamA', params.A);
-    setValue('coordinate.cadParamB', params.B);
-    setValue('coordinate.cadParamTx', params.Tx);
-    setValue('coordinate.cadParamTy', params.Ty);
-    setValue('coordinate.cadScale', params.scale);
-    setValue('coordinate.cadRotation', params.rotation);
+    setValue('coordinate.anchorCad1', params.anchorCad1);
+    setValue('coordinate.anchorCad2', params.anchorCad2);
+    setValue('coordinate.anchorMap1', params.anchorMap1);
+    setValue('coordinate.anchorMap2', params.anchorMap2);
     setValue('coordinate.polygon', params.polygon);
     setValue('coordinate.coordinatesText', JSON.stringify([params.polygon], null, 2));
 
@@ -235,6 +280,11 @@ export const CoordinateSection = () => {
     setValue('coordinate.polygon', undefined);
     setValue('coordinate.coordinatesText', '');
     setValue('coordinate.cadFileName', undefined);
+    setValue('coordinate.cadFilePath', undefined);
+    setValue('coordinate.anchorCad1', undefined);
+    setValue('coordinate.anchorCad2', undefined);
+    setValue('coordinate.anchorMap1', undefined);
+    setValue('coordinate.anchorMap2', undefined);
     setValue('coordinate.cadParamA', undefined);
     setValue('coordinate.cadParamB', undefined);
     setValue('coordinate.cadParamTx', undefined);
@@ -333,6 +383,68 @@ export const CoordinateSection = () => {
         </GISMapContainer>
       </div>
 
+      {/* ─── PRE-FLIGHT BOUNDARY & QUOTA INSPECTOR (Socio-Engineering) ──── */}
+      {pkkprId && (
+        <div className="p-4 bg-gradient-to-r from-emerald-50/80 via-white to-slate-50 border border-emerald-200 rounded-xl space-y-3 text-left shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <div className="p-2 rounded-lg bg-emerald-600 text-white shrink-0">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">
+                  Uji Keselarasan Spasial dengan SK PKKPR Induk (Perbup Bogor No. 4/2025)
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Verifikasi apakah poligon denah berada 100% di dalam izin PKKPR dan bebas tumpang tindih tahap sebelumnya.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={isValidatingBoundary}
+              onClick={handleValidatePhasedBoundary}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 text-white text-xs font-bold rounded-lg shadow-xs transition-all cursor-pointer shrink-0"
+            >
+              {isValidatingBoundary ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Memeriksa PostGIS...</span>
+                </>
+              ) : (
+                <>
+                  <Search className="w-3.5 h-3.5" />
+                  <span>Uji Kepatuhan Batas Sekarang</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Hasil Uji Validasi Real-time */}
+          {validationResult && (
+            <div className="pt-2 border-t border-emerald-100">
+              {validationResult.is_valid ? (
+                <div className="p-3 bg-emerald-100/70 border border-emerald-300 rounded-lg flex items-center gap-2.5 text-xs text-emerald-900 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>
+                    Validasi Sempurna: Denah Site Plan Anda 100% berada di dalam batas izin SK PKKPR dan alokasi kuota luas lahan memenuhi syarat.
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-lg flex items-start gap-2.5 text-xs text-rose-900 font-medium">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-rose-950">Pelanggaran Terdeteksi:</span>
+                    <p className="mt-0.5 text-rose-800 leading-relaxed">{validationResult.error}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="text-left">
         <LabelWithInfo label="Data Koordinat Spasial GeoJSON (Terekam Otomatis)" helpText="Koordinat poligon spasial akan terisi secara otomatis di sini saat Anda menyelesaikan gambar bidang tanah di atas peta..." />
         <textarea
@@ -348,6 +460,7 @@ export const CoordinateSection = () => {
       <CADGeoreferenceWizard
         isOpen={isCadWizardOpen}
         cadFileName={cadFileName}
+        landPolygon={landPolygon}
         onClose={() => setIsCadWizardOpen(false)}
         onComplete={handleGeoreferenceComplete}
       />

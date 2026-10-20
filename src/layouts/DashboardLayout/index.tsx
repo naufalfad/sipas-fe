@@ -46,24 +46,43 @@ const menuItems: MenuItem[] = [
     title: 'Dashboard',
     path: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
+  },
+  {
+    title: 'Layanan PKKPR',
+    icon: Map,
+    roles: ['Pemohon', 'Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
+    submenu: [
+      {
+        title: 'Daftar PKKPR',
+        path: '/pkkpr',
+        icon: Map,
+        roles: ['Pemohon', 'Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
+      },
+      {
+        title: 'Pengajuan Baru',
+        path: '/pkkpr/create',
+        icon: ClipboardList,
+        roles: ['Pemohon'],
+      },
+    ],
   },
   {
     title: 'Pengajuan Site Plan',
     icon: ClipboardList,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
     submenu: [
       {
         title: 'Daftar Pengajuan',
         path: '/pengajuan/daftar',
         icon: ClipboardList,
-        roles: ['Pemohon', 'Kepala Bidang', 'Kadis'],
+        roles: ['Pemohon', 'Kepala Seksi', 'Ketua Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
       },
       {
         title: 'Verifikasi Saya',
         path: '/pengajuan/verifikasi-saya',
         icon: ClipboardList,
-        roles: ['Admin SIPAS', 'Tim Teknis'],
+        roles: ['Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis'],
       },
       {
         title: 'Pengajuan Baru',
@@ -76,13 +95,13 @@ const menuItems: MenuItem[] = [
   {
     title: 'Site Plan',
     icon: Layers,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
     submenu: [
       {
         title: 'Daftar Site Plan',
         path: '/siteplan/daftar',
         icon: Layers,
-        roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
+        roles: ['Pemohon', 'Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
       },
     ],
   },
@@ -90,27 +109,25 @@ const menuItems: MenuItem[] = [
     title: 'Verifikasi',
     path: '/verifikasi',
     icon: ShieldAlert,
-    // SOD: Hanya pejabat operasional penilai (Admin SIPAS dan Tim Teknis) yang berwenang.
-    roles: ['Admin SIPAS', 'Tim Teknis'],
+    roles: ['Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis'],
   },
   {
     title: 'Persetujuan TTE',
     path: '/persetujuan',
     icon: ShieldCheck,
-    // SOD: Pembubuhan TTE adalah kewenangan eksklusif Kepala Dinas (Kadis).
-    roles: ['Kadis'],
+    roles: ['Sekretaris Dinas', 'Kadis'],
   },
   {
     title: 'GIS Viewer',
     path: '/gis',
     icon: Map,
-    roles: ['Pemohon', 'Admin SIPAS', 'Tim Teknis', 'Kepala Bidang', 'Kadis'],
+    roles: ['Pemohon', 'Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
   },
   {
     title: 'Laporan',
     path: '/laporan',
     icon: FileBarChart2,
-    roles: ['Admin SIPAS', 'Kepala Bidang', 'Kadis'],
+    roles: ['Admin SIPAS', 'Kepala Seksi', 'Ketua Tim Teknis', 'Kepala Bidang', 'Sekretaris Dinas', 'Kadis', 'Super Admin'],
   },
   {
     title: 'Master Data',

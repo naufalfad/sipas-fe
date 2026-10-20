@@ -70,6 +70,7 @@ export default function BimReviewerPage() {
   const activeParcelName = useBimStore((s) => s.activeParcelName);
   const activeParcelNop = useBimStore((s) => s.activeParcelNop);
   const activeParcelZone = useBimStore((s) => s.activeParcelZone);
+  const isFallbackMode = useBimStore((s) => s.isFallbackMode);
 
   const [isExporting, setIsExporting] = useState(false);
 
@@ -104,9 +105,15 @@ export default function BimReviewerPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold text-slate-100">BIM Reviewer 3D Real-Time</h1>
-                <span className="text-[9px] bg-teal-950 text-teal-300 border border-teal-800 px-1.5 py-0.2 rounded font-mono">
-                  OGC 3D Tiles RTC
-                </span>
+                {isFallbackMode ? (
+                  <span className="text-[9px] bg-amber-950 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+                    ⚠️ Mode Simulasi Sementara: Berkas CAD Tidak Standar
+                  </span>
+                ) : (
+                  <span className="text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+                    ✅ Data Original Terkalibrasi (CAD/IFC Extracted)
+                  </span>
+                )}
               </div>
               <p className="text-[10px] text-slate-400 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-teal-400" />

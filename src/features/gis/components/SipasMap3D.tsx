@@ -26,8 +26,8 @@ function getMapStyle(activeBaseMap: string): any {
 
   switch (activeBaseMap) {
     case 'dark':
-      tileUrl = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
-      attribution = '&copy; CartoDB';
+      tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
+      attribution = '&copy; Esri';
       break;
     case 'satellite':
       tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -43,8 +43,8 @@ function getMapStyle(activeBaseMap: string): any {
       break;
     case 'voyager':
     default:
-      tileUrl = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
-      attribution = '&copy; CartoDB';
+      tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+      attribution = '&copy; Esri';
       break;
   }
 
@@ -100,6 +100,7 @@ export default function SipasMap3D() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   const [localZoom, setLocalZoom] = useState(mapZoom || INITIAL_ZOOM);
 
@@ -166,6 +167,8 @@ export default function SipasMap3D() {
     map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
 
     map.on('load', () => {
+      setMapReady(true);
+
       // Setup Terrain API from public Mapzen S3 (Free, no API key required)
       map.addSource('terrain-dem', {
         type: 'raster-dem',
@@ -267,15 +270,16 @@ export default function SipasMap3D() {
   // 2. Sync basemap changes
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapReady) return;
 
     const style = getMapStyle(activeBaseMap);
     // Replace basemap source tile URL
     const source = map.getSource('raster-basemap') as maplibregl.RasterTileSource;
     if (source) {
       source.setTiles(style.sources['raster-basemap'].tiles);
+      map.triggerRepaint();
     }
-  }, [activeBaseMap]);
+  }, [activeBaseMap, mapReady]);
 
   // 3. Sync drone layer opacity and visibility
   useEffect(() => {
@@ -379,7 +383,7 @@ export default function SipasMap3D() {
   // 5. Sync reference layers (river, contours, aqi, etc.)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapReady || !map.isStyleLoaded()) return;
 
     const syncGeoJsonLayer = (layerId: string, type: 'fill' | 'line', sourceId: string, data: any, isVisible: boolean, paintConfig: any) => {
       if (!data) {
@@ -560,7 +564,7 @@ export default function SipasMap3D() {
       'line-opacity': 1.0,
       'line-dasharray': [4, 3]
     });
-  }, [activeLayers, localZoom, opacity, mapData]);
+  }, [activeLayers, localZoom, opacity, mapData, mapReady]);
 
   // 6. Sync active submissions GeoJSON (Non-MVT selected layer)
   useEffect(() => {

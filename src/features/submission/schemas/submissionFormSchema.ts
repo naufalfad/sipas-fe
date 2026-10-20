@@ -61,6 +61,11 @@ export const coordinateSchema = z.object({
 
   // Parameter Kalibrasi Helmert 2D terhitung
   cadFileName: z.string().optional(),       // Nama file CAD (.dwg / .dxf) asal
+  cadFilePath: z.string().optional(),
+  anchorCad1: z.tuple([z.number(), z.number()]).optional(),
+  anchorCad2: z.tuple([z.number(), z.number()]).optional(),
+  anchorMap1: z.tuple([z.number(), z.number()]).optional(),
+  anchorMap2: z.tuple([z.number(), z.number()]).optional(),
   cadParamA: z.number().optional(),         // Nilai parameter A = s * cos(theta)
   cadParamB: z.number().optional(),         // Nilai parameter B = s * sin(theta)
   cadParamTx: z.number().optional(),        // Nilai pergeseran sumbu X (Translasi X)
@@ -71,6 +76,8 @@ export const coordinateSchema = z.object({
 
 // ─── TAHAP 5: DATA INFORMASI TATA RUANG (SPATIAL INFO) ──────────────────────
 export const spatialSchema = z.object({
+  pkkprId: z.string().optional(),
+  pkkprOrigin: z.enum(['INTERNAL', 'LEGACY_EXTERNAL_OSS']).default('INTERNAL'),
   kkprNumber: z.string().min(3, 'Nomor KKPR wajib diisi'),
   landUse: z.string().min(3, 'Peruntukan lahan wajib diisi'),
   greenArea: z.preprocess(
@@ -278,6 +285,16 @@ export const fullSubmissionSchema = z.object({
 }, {
   message: "Proses revisi dibatalkan. Bukti dan data rujukan SK lama mutlak diperlukan.",
   path: ["baseline_source"]
+}).refine((data) => {
+  // PENEGAKAN REGULASI PERUMAHAN: Pengajuan Perumahan wajib Badan Usaha
+  const isHousing = data.submission?.category === 'PERUMAHAN';
+  if (isHousing && !data.is_draft) {
+    return data.applicant?.type === 'BADAN_USAHA';
+  }
+  return true;
+}, {
+  message: "Sesuai regulasi Kabupaten Bogor, permohonan kategori Perumahan wajib mengatasnamakan Badan Usaha / Perusahaan.",
+  path: ["applicant", "type"]
 });
 
 export type FullSubmissionFormValues = z.infer<typeof fullSubmissionSchema>;

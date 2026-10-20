@@ -1,4 +1,4 @@
-const CACHE_NAME = 'geosipas-cache-v1';
+const CACHE_NAME = 'geosipas-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -33,32 +33,21 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests
   if (event.request.method !== 'GET') return;
 
-  // Bypass cache for APIs or hot reloads
-  if (event.request.url.includes('/api/v1/') || event.request.url.includes('chrome-extension')) {
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith('/api/')) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
+    fetch(event.request).catch(async () => {
+      const cachedResponse = await caches.match(event.request);
+      if (cachedResponse) return cachedResponse;
+      if (event.request.mode === 'navigate') {
+        return (await caches.match('/index.html')) || Response.error();
       }
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-        return response;
-      }).catch(() => {
-        // Offline fallback
-        return caches.match('/index.html');
-      });
+      return Response.error();
     })
   );
 });

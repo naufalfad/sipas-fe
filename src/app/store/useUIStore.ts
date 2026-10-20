@@ -7,9 +7,12 @@ import { API_BASE_URL } from '@/config';
 export type UserRole =
   | 'Pemohon'
   | 'Admin SIPAS'
+  | 'Kepala Seksi'
+  | 'Ketua Tim Teknis'
   | 'Tim Teknis'
   | 'Kepala Bidang'
-  | 'Kadis'          // Peran Baru: Otoritas Utama Penandatangan Elektronik (TTE) SK Resmi
+  | 'Sekretaris Dinas'
+  | 'Kadis'
   | 'Super Admin';
 
 export interface UserProfile {
@@ -34,6 +37,7 @@ export interface AuditTrailEntry {
   | 'REGISTER_DISPENSASI'          // Pendaftaran jaminan kompensasi oleh petugas
   | 'KABID_ENDORSE_APPROVE'        // Draft SK Persetujuan Siteplan (Disetujui Kabid)
   | 'KABID_OVERRIDE_VETO'          // Draft SK Persetujuan Siteplan (Override Veto Kabid)
+  | 'PARAF_SEKDIS'                 // Paraf Koordinasi Administrasi Sekdis
   | 'APPROVE_KADIS_TTE'            // Permohonan Disetujui (SK Terbit oleh Kadis via BSrE)
   | 'FORCE_BYPASS_WARNING'         // Jejak audit jika petugas menimpa peringatan sistem
   | 'UNKNOWN';
@@ -74,9 +78,19 @@ const roleProfiles: Record<UserRole, UserProfile> = {
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
   },
   'Admin SIPAS': {
-    name: 'Siti Rahma (Admin SIPAS)',
+    name: 'Siti Rahma (Verifikator Administrasi)',
     email: 'siti.rahma@sipas.go.id',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=faces',
+  },
+  'Kepala Seksi': {
+    name: 'Rahmat Hidayat, ST. (Kasi)',
+    email: 'rahmat.kasi@sipas.go.id',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=faces',
+  },
+  'Ketua Tim Teknis': {
+    name: 'Ir. Budi Santoso (Ketua Tim Teknis)',
+    email: 'budi.teknis@sipas.go.id',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=faces',
   },
   'Tim Teknis': {
     name: 'Ir. Budi Santoso (Tim Teknis)',
@@ -87,6 +101,11 @@ const roleProfiles: Record<UserRole, UserProfile> = {
     name: 'Dr. Hendra Wijaya (Kabid)',
     email: 'hendra.kabid@sipas.go.id',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=faces',
+  },
+  'Sekretaris Dinas': {
+    name: 'Dra. Hj. Nurlaela, M.Si. (Sekdis)',
+    email: 'nurlaela.sekdis@sipas.go.id',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop&crop=faces',
   },
   'Kadis': {
     name: 'Drs. H. Mulyana, M.Si. (Kadis)',
@@ -111,8 +130,11 @@ const getInitialUIState = (): { activeRole: UserRole; userProfile: UserProfile }
       if (user.username === 'superadmin@geocitra.com') activeRole = 'Super Admin';
       else if (r === 'PEMOHON') activeRole = 'Pemohon';
       else if (r === 'ADMIN' || r === 'ADMIN SIPAS' || r === 'ADMIN_SIPAS') activeRole = 'Admin SIPAS';
-      else if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') activeRole = 'Tim Teknis';
+      else if (r === 'KASI' || r === 'KEPALA SEKSI') activeRole = 'Kepala Seksi';
+      else if (r === 'KETUA TIM TEKNIS') activeRole = 'Ketua Tim Teknis';
+      else if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') activeRole = 'Ketua Tim Teknis';
       else if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') activeRole = 'Kepala Bidang';
+      else if (r === 'SEKDIS' || r === 'SEKRETARIS DINAS') activeRole = 'Sekretaris Dinas';
       else if (r === 'KADIS' || r === 'KEPALA DINAS') activeRole = 'Kadis';
       else if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') activeRole = 'Super Admin';
 
@@ -184,8 +206,10 @@ export const useUIStore = create<UIState>((set) => ({
       let username = 'kabid@geocitra.com';
       if (role === 'Pemohon') username = 'pemohon@geocitra.com';
       else if (role === 'Admin SIPAS') username = 'admin@geocitra.com';
-      else if (role === 'Tim Teknis') username = 'tim_teknis@geocitra.com';
+      else if (role === 'Kepala Seksi') username = 'admin@geocitra.com';
+      else if (role === 'Ketua Tim Teknis' || role === 'Tim Teknis') username = 'tim_teknis@geocitra.com';
       else if (role === 'Kepala Bidang') username = 'kabid@geocitra.com';
+      else if (role === 'Sekretaris Dinas') username = 'kabid@geocitra.com';
       else if (role === 'Kadis') username = 'kadis@geocitra.com'; // Sinkronisasi ke kredensial KADIS di seeder
       else if (role === 'Super Admin') username = 'superadmin@geocitra.com';
 

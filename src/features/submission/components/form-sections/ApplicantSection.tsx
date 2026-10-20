@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { UploadCloud, Loader2, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { LabelWithInfo } from './LabelWithInfo';
@@ -10,7 +10,17 @@ import { uploadFileToBackend } from '../../utils/upload';
 export const ApplicantSection = () => {
   const { register, watch, setValue, formState: { errors } } = useFormContext<FullSubmissionFormValues>();
   const applicantType = watch('applicant.type');
+  const submissionCategory = watch('submission.category');
+  const isHousingCategory = submissionCategory === 'PERUMAHAN';
   const [ocrLoading, setOcrLoading] = useState<'KTP' | 'NIB' | null>(null);
+
+  // Auto-lock pemohon ke BADAN_USAHA jika kategori perumahan
+  useEffect(() => {
+    if (isHousingCategory && applicantType !== 'BADAN_USAHA') {
+      setValue('applicant.type', 'BADAN_USAHA');
+      toast.info('Kategori Perumahan wajib diajukan atas nama Badan Usaha / Perusahaan.');
+    }
+  }, [isHousingCategory, applicantType, setValue]);
 
   const ktpDoc = watch('document.ktpDoc');
   const nibDoc = watch('document.nibDoc');
@@ -181,10 +191,20 @@ export const ApplicantSection = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
         <div className="md:col-span-2">
           <LabelWithInfo label="Jenis Pemohon" helpText="Pilih klasifikasi pemohon, apakah mengajukan atas nama perorangan atau badan hukum/perusahaan." />
-          <select {...register('applicant.type')} className={inputClass}>
-            <option value="PERORANGAN">Perorangan (Individu)</option>
-            <option value="BADAN_USAHA">Badan Usaha / Perusahaan</option>
+          <select {...register('applicant.type')} className={inputClass} disabled={isHousingCategory}>
+            <option value="PERORANGAN" disabled={isHousingCategory}>
+              {isHousingCategory ? 'Perorangan (Tidak Diizinkan untuk Perumahan)' : 'Perorangan (Individu)'}
+            </option>
+            <option value="BADAN_USAHA">Badan Usaha / Perusahaan (PT, CV, Koperasi)</option>
           </select>
+          {isHousingCategory && (
+            <div className="mt-2 p-2.5 bg-amber-50/70 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Ketentuan Perizinan Kabupaten Bogor:</strong> Pengajuan rencana tapak kategori <strong>Perumahan</strong> wajib diajukan atas nama <strong>Badan Usaha / Perusahaan</strong> yang berizin resmi. Opsi perorangan dinonaktifkan otomatis.
+              </span>
+            </div>
+          )}
         </div>
 
         <div>

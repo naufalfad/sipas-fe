@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, Fragment } from 'react';
-import { Landmark, MapPin } from 'lucide-react';
+import { Landmark, MapPin, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { GeoJSON, Marker, Popup, Polyline, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -188,19 +189,46 @@ export const LocationTab = ({ sub, inspectionLogs = [] }: LocationTabProps) => {
         </div>
 
         <div className="pt-4 border-t border-slate-100">
-          <h3 className="text-xs font-bold text-slate-800 border-b border-border pb-2 uppercase tracking-wide mb-4">
-            Kesesuaian Tata Ruang Otoritas
-          </h3>
+          <div className="flex items-center justify-between border-b border-border pb-2 mb-4">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+              Kesesuaian Tata Ruang Otoritas (PKKPR)
+            </h3>
+            {sub.pkkpr_origin && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border border-emerald-200 bg-emerald-50 text-emerald-800">
+                <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                {sub.pkkpr_origin === 'INTERNAL' ? 'Digital GEOSIPAS' : 'Dokumen Fisik / OSS'}
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6 text-xs">
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Nomor SK KKPR BPN / Dinas</span>
-              <span className="text-xs font-mono font-bold text-slate-700 block">{sub.spatial?.kkprNumber || '-'}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-slate-700 block">
+                  {sub.spatial?.pkkprNumber || sub.spatial?.kkprNumber || (sub.pkkpr_id ? `ID: ${sub.pkkpr_id}` : '-')}
+                </span>
+                {(sub.pkkpr_id || sub.spatial?.pkkprId) && (
+                  <Link
+                    to={`/pkkpr/${sub.pkkpr_id || sub.spatial?.pkkprId}`}
+                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline inline-flex items-center gap-0.5"
+                    title="Buka detail PKKPR Induk"
+                  >
+                    <ExternalLink className="h-2.5 w-2.5" /> Detail
+                  </Link>
+                )}
+              </div>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Zoning Peruntukan Rencana Tata Ruang</span>
               <span className="text-xs font-bold text-slate-700 block">{sub.spatial?.landUse || '-'}</span>
             </div>
-            <div className="md:col-span-2">
+            {sub.spatial?.pkkprDate && (
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Tanggal Terbit SK PKKPR</span>
+                <span className="text-xs font-bold text-slate-700 block">{sub.spatial.pkkprDate}</span>
+              </div>
+            )}
+            <div className={sub.spatial?.pkkprDate ? "" : "md:col-span-2"}>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Luas Alokasi PSU & RTH (m²)</span>
               <span className="text-xs font-bold text-slate-700 block">
                 {sub.spatial?.greenArea ? `${sub.spatial.greenArea.toLocaleString('id-ID')} m²` : '-'}

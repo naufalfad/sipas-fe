@@ -156,6 +156,77 @@ const SPATIAL_LAYERS: LayerDef[] = [
 
 const SPATIAL_LAYER_IDS = SPATIAL_LAYERS.map((l) => l.id);
 
+function LayerItem({
+    layer,
+    isActive,
+    mapZoom,
+    onToggle,
+}: {
+    layer: LayerDef;
+    isActive: boolean;
+    mapZoom: number;
+    onToggle: (layerId: string) => void;
+}) {
+    const needsZoom =
+        isActive && layer.minZoom !== undefined && mapZoom < layer.minZoom;
+
+    return (
+        <button
+            type="button"
+            onClick={() => onToggle(layer.id)}
+            className={cn(
+                "group flex items-center gap-3 px-4 py-3 border-b border-slate-100 transition-colors text-left w-full outline-none cursor-pointer rounded-none",
+                isActive
+                    ? "bg-teal-50/60 hover:bg-teal-50"
+                    : "bg-white hover:bg-slate-50"
+            )}
+        >
+            <div
+                className={cn(
+                    "relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-none transition-colors duration-200 border",
+                    isActive
+                        ? "bg-teal-600 border-teal-600"
+                        : "bg-slate-100 border-slate-300"
+                )}
+            >
+                <span
+                    className={cn(
+                        "inline-block h-2.5 w-2.5 transform rounded-none bg-white shadow-sm transition duration-200",
+                        isActive ? "translate-x-3.5" : "translate-x-0.5"
+                    )}
+                />
+            </div>
+
+            <span
+                className={cn(
+                    "w-2.5 h-2.5 shrink-0 border border-white/30 shadow-sm",
+                    layer.dotColor
+                )}
+            />
+
+            <div className="flex flex-col leading-none flex-1 min-w-0">
+                <span
+                    className={cn(
+                        "text-[11px] font-semibold truncate",
+                        isActive ? "text-slate-800" : "text-slate-600"
+                    )}
+                >
+                    {layer.label}
+                </span>
+                <span className="text-[9px] font-medium text-slate-400 mt-0.5 truncate">
+                    {layer.desc}
+                </span>
+            </div>
+
+            {needsZoom && (
+                <span className="shrink-0 text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 leading-none">
+                    zoom≥{layer.minZoom}
+                </span>
+            )}
+        </button>
+    );
+}
+
 export default function LayerPanel() {
     const navigate = useNavigate();
     const activeLayers = useGisUIStore((s) => s.activeLayers);
@@ -208,73 +279,6 @@ export default function LayerPanel() {
             dotColor: "bg-emerald-500",
         },
     ];
-
-    // ── Komponen toggle item ───────────────────────────────────────────────────
-    const LayerItem = ({ layer }: { layer: LayerDef }) => {
-        const isActive = activeLayers.includes(layer.id);
-        const needsZoom =
-            isActive && layer.minZoom !== undefined && mapZoom < layer.minZoom;
-
-        return (
-            <button
-                type="button"
-                onClick={() => toggleLayer(layer.id)}
-                className={cn(
-                    "group flex items-center gap-3 px-4 py-3 border-b border-slate-100 transition-colors text-left w-full outline-none cursor-pointer rounded-none",
-                    isActive
-                        ? "bg-teal-50/60 hover:bg-teal-50"
-                        : "bg-white hover:bg-slate-50"
-                )}
-            >
-                {/* Toggle pill */}
-                <div
-                    className={cn(
-                        "relative inline-flex h-3.5 w-7 shrink-0 items-center rounded-none transition-colors duration-200 border",
-                        isActive
-                            ? "bg-teal-600 border-teal-600"
-                            : "bg-slate-100 border-slate-300"
-                    )}
-                >
-                    <span
-                        className={cn(
-                            "inline-block h-2.5 w-2.5 transform rounded-none bg-white shadow-sm transition duration-200",
-                            isActive ? "translate-x-3.5" : "translate-x-0.5"
-                        )}
-                    />
-                </div>
-
-                {/* Color dot */}
-                <span
-                    className={cn(
-                        "w-2.5 h-2.5 shrink-0 border border-white/30 shadow-sm",
-                        layer.dotColor
-                    )}
-                />
-
-                {/* Label + desc */}
-                <div className="flex flex-col leading-none flex-1 min-w-0">
-                    <span
-                        className={cn(
-                            "text-[11px] font-semibold truncate",
-                            isActive ? "text-slate-800" : "text-slate-600"
-                        )}
-                    >
-                        {layer.label}
-                    </span>
-                    <span className="text-[9px] font-medium text-slate-400 mt-0.5 truncate">
-                        {layer.desc}
-                    </span>
-                </div>
-
-                {/* Zoom badge */}
-                {needsZoom && (
-                    <span className="shrink-0 text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 leading-none">
-                        zoom≥{layer.minZoom}
-                    </span>
-                )}
-            </button>
-        );
-    };
 
     return (
         <div className="flex flex-col h-full bg-white pb-12 font-sans text-slate-800 overflow-y-auto">
@@ -337,7 +341,13 @@ export default function LayerPanel() {
             </div>
             <div className="flex flex-col border-b border-slate-200">
                 {riskLayers.map((l) => (
-                    <LayerItem key={l.id} layer={l} />
+                    <LayerItem
+                        key={l.id}
+                        layer={l}
+                        isActive={activeLayers.includes(l.id)}
+                        mapZoom={mapZoom}
+                        onToggle={toggleLayer}
+                    />
                 ))}
             </div>
 
@@ -375,7 +385,13 @@ export default function LayerPanel() {
             </div>
             <div className="flex flex-col border-b border-slate-200">
                 {SPATIAL_LAYERS.map((l) => (
-                    <LayerItem key={l.id} layer={l} />
+                    <LayerItem
+                        key={l.id}
+                        layer={l}
+                        isActive={activeLayers.includes(l.id)}
+                        mapZoom={mapZoom}
+                        onToggle={toggleLayer}
+                    />
                 ))}
             </div>
 

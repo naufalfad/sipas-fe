@@ -6,8 +6,10 @@ import { create } from 'zustand';
 export const AppPermission = {
   CAN_CREATE_SUBMISSION: 'CAN_CREATE_SUBMISSION',
   CAN_VERIFY_ADMIN: 'CAN_VERIFY_ADMIN',
+  CAN_VERIFY_KASI: 'CAN_VERIFY_KASI',
   CAN_VERIFY_TECHNICAL: 'CAN_VERIFY_TECHNICAL',
   CAN_ENDORSE_KABID: 'CAN_ENDORSE_KABID',
+  CAN_PARAF_SEKDIS: 'CAN_PARAF_SEKDIS',
   CAN_SIGN_KADIS: 'CAN_SIGN_KADIS',
 } as const;
 
@@ -23,11 +25,18 @@ const ROLE_PERMISSIONS: Record<string, AppPermission[]> = {
   'ADMIN': [
     AppPermission.CAN_VERIFY_ADMIN
   ],
+  'KASI': [
+    AppPermission.CAN_VERIFY_ADMIN,
+    AppPermission.CAN_VERIFY_KASI
+  ],
   'TIM_TEKNIS': [
     AppPermission.CAN_VERIFY_TECHNICAL
   ],
   'KABID_PUPR': [
     AppPermission.CAN_ENDORSE_KABID
+  ],
+  'SEKDIS': [
+    AppPermission.CAN_PARAF_SEKDIS
   ],
   'KADIS': [
     AppPermission.CAN_SIGN_KADIS
@@ -35,8 +44,10 @@ const ROLE_PERMISSIONS: Record<string, AppPermission[]> = {
   'SUPER_ADMIN': [
     AppPermission.CAN_CREATE_SUBMISSION,
     AppPermission.CAN_VERIFY_ADMIN,
+    AppPermission.CAN_VERIFY_KASI,
     AppPermission.CAN_VERIFY_TECHNICAL,
     AppPermission.CAN_ENDORSE_KABID,
+    AppPermission.CAN_PARAF_SEKDIS,
     AppPermission.CAN_SIGN_KADIS,
   ],
 };
@@ -48,8 +59,10 @@ const normalizeRoleForCheck = (role: string): string => {
   const r = role.toUpperCase().trim();
   if (r === 'PEMOHON') return 'PEMOHON';
   if (r === 'ADMIN' || r === 'ADMIN SIPAS' || r === 'ADMIN_SIPAS') return 'ADMIN';
-  if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS') return 'TIM_TEKNIS';
+  if (r === 'KASI' || r === 'KEPALA SEKSI') return 'KASI';
+  if (r === 'TIM_TEKNIS' || r === 'TIM TEKNIS' || r === 'KETUA TIM TEKNIS') return 'TIM_TEKNIS';
   if (r === 'KABID_PUPR' || r === 'KEPALA BIDANG' || r === 'KABID') return 'KABID_PUPR';
+  if (r === 'SEKDIS' || r === 'SEKRETARIS DINAS') return 'SEKDIS';
   if (r === 'KADIS' || r === 'KEPALA DINAS') return 'KADIS';
   if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') return 'SUPER_ADMIN';
   return r;

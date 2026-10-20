@@ -29,6 +29,7 @@ const getPanelCategoryLabel = (type: GisPanelType): string => {
         'sensor-management': 'Manajemen sensor',
         'compensation-manager': 'Manajemen Kompensasi',
         'conflict-inspector': 'Inspeksi Konflik Lapangan',
+        'bim-reviewer': 'BIM Reviewer 3D',
     };
     return labels[type] || type.replace('-', ' ');
 };
@@ -149,7 +150,7 @@ export default function PanelOrchestrator() {
                                     }
                                     : {
                                         left: 0,
-                                        top: isMobile ? '25vh' : 0,
+                                        top: isMobile ? '10vh' : 0,
                                         bottom: 0,
                                         width: isMobile ? '100%' : `${currentWidth}px`,
                                         transform: isMobile ? 'none' : `translateX(${dockedOffset}px)`,

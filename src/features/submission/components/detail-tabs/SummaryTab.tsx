@@ -8,8 +8,10 @@
  * ============================================================================
  */
 
-import { File, MapPin, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { File, MapPin, ChevronDown, ChevronUp, Download, Layers, ExternalLink, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { PKKPRQuotaCard } from '@/features/pkkpr/components/PKKPRQuotaCard';
 
 const resolveDocUrl = (url?: string | null) => {
   if (!url) return '';
@@ -42,7 +44,8 @@ interface SummaryTabProps {
 
 export const SummaryTab = ({ sub }: SummaryTabProps) => {
   const [openInfo, setOpenInfo] = useState(true);
-  const [openSilsilah, setOpenSilsilah] = useState(true); // State baru untuk collapsible silsilah
+  const [openPkkpr, setOpenPkkpr] = useState(true);
+  const [openSilsilah, setOpenSilsilah] = useState(true); // State untuk collapsible silsilah
   const [openDocs, setOpenDocs] = useState(true);
 
   return (
@@ -141,6 +144,96 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
                     <span className="text-xs text-slate-400 block mt-1 font-semibold">Tidak ada lampiran berkas</span>
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ─── SEKSI 1.6: RUJUKAN PERSETUJUAN TATA RUANG (PKKPR HULU) ─── */}
+      {(() => {
+        const pkkprId = sub.pkkpr_id || sub.spatial?.pkkprId;
+        const pkkprOrigin = sub.pkkpr_origin || sub.spatial?.pkkprOrigin || (pkkprId ? 'INTERNAL' : 'LEGACY_EXTERNAL_OSS');
+        const pkkprNumber = sub.spatial?.pkkprNumber || sub.spatial?.kkprNumber;
+        const pkkprDate = sub.spatial?.pkkprDate;
+
+        if (!pkkprId && !pkkprNumber) return null;
+
+        return (
+          <div>
+            <div className="flex items-center justify-between border-b border-border pb-2 mb-4 select-none">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-emerald-600" />
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                  Rujukan Persetujuan Tata Ruang (PKKPR)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenPkkpr((v) => !v)}
+                className="text-slate-500 cursor-pointer outline-none border-none bg-transparent hover:text-slate-800"
+              >
+                {openPkkpr ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+            </div>
+
+            {openPkkpr && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="p-4 border-l-2 border-emerald-500 bg-[#f7faf8] grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-left">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                      Asal Dokumen PKKPR
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-none border border-emerald-200 bg-white text-emerald-800">
+                      <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                      {pkkprOrigin === 'INTERNAL' ? 'Terbitan Digital GEOSIPAS' : 'Dokumen Fisik (OSS / BPN)'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                      Nomor SK PKKPR Induk
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-800 block">
+                      {pkkprNumber || (pkkprId ? `ID: ${pkkprId}` : '-')}
+                    </span>
+                    {pkkprDate && (
+                      <span className="text-[11px] text-slate-500 block mt-0.5">
+                        Tgl Terbit: {pkkprDate}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                      Aksi & Tautan Berkas
+                    </span>
+                    {pkkprId ? (
+                      <Link
+                        to={`/pkkpr/${pkkprId}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold uppercase tracking-wider shadow-sm rounded-none decoration-none"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Buka Detail Berkas PKKPR
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-slate-400 block font-semibold">
+                        SK Eksternal terdaftar di lampiran berkas
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Kartu Kuota Pembangunan Bertahap (jika terbitan internal) */}
+                {pkkprId && (
+                  <div className="pt-2">
+                    <PKKPRQuotaCard
+                      pkkprId={pkkprId}
+                      proposedArea={sub.landArea}
+                      className="shadow-sm"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

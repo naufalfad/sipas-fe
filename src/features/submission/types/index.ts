@@ -92,6 +92,9 @@ export interface SpatialDetails {
   kkprNumber: string;
   landUse: string;
   greenArea: number;
+  pkkprId?: string;
+  pkkprOrigin?: 'INTERNAL' | 'LEGACY_EXTERNAL_OSS';
+  pkkprDate?: string;
 }
 
 export interface TechnicalDetails {
@@ -396,6 +399,10 @@ export interface Submission {
   baseline_source?: 'DIGITAL' | 'LEGACY' | null;
   parent_id_permohonan?: string | null;
   legacy_metadata?: LegacyMetadata | null;
+
+  // ─── INTEGRASI PKKPR HULU (Perbup Bogor No. 4/2025) ───
+  pkkpr_id?: string | null;
+  pkkpr_origin?: 'INTERNAL' | 'LEGACY_EXTERNAL_OSS' | null;
 
   // SINKRONISASI ROOT LEVEL PROPERTIES UNTUK DETAIL QUERY REVISI (GET HOOK)
   replaced_sk_number?: string | null;

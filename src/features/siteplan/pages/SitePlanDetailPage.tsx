@@ -408,8 +408,8 @@ export default function SitePlanDetailPage() {
                 zoomControl={true}
               >
                 <TileLayer
-                  url="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+                  attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
                 />
 
                 {/* Bounds Controller to automatically focus boundary */}

@@ -23,10 +23,16 @@ export default function BasemapPanel() {
     // Katalog Peta Dasar (Basemaps) yang Didukung oleh GEOSIPAS
     const baseMaps: BaseMapItem[] = [
         {
+            id: 'satellite',
+            label: 'Citra Satelit (Esri World Imagery)',
+            icon: Sun,
+            desc: 'Citra permukaan bumi, alternatif citra satelit tanpa API key'
+        },
+        {
             id: 'voyager',
-            label: 'CartoDB Voyager (Terang)',
+            label: 'Esri World Street Map',
             icon: Compass,
-            desc: 'Visualisasi jalan minimalis berwarna terang untuk verifikasi administrasi siang hari'
+            desc: 'Peta jalan dan fasilitas umum untuk verifikasi administrasi'
         },
         {
             id: 'street',
@@ -41,16 +47,10 @@ export default function BasemapPanel() {
             desc: 'Peta jalan komunitas global dengan batas administrasi dasar yang ringan'
         },
         {
-            id: 'satellite',
-            label: 'Google Satellite / Esri',
-            icon: Sun,
-            desc: 'Citra satelit resolusi tinggi untuk memverifikasi kondisi vegetasi & bangunan riil'
-        },
-        {
             id: 'dark',
-            label: 'CartoDB Dark Matter',
+            label: 'Esri Topographic',
             icon: Moon,
-            desc: 'Visualisasi kontras tinggi dengan latar belakang gelap untuk overlay zonasi'
+            desc: 'Peta topografi dengan kontur dan fitur fisik wilayah'
         },
     ];
 
@@ -69,8 +69,9 @@ export default function BasemapPanel() {
             <div className="px-5 py-4 bg-teal-50/40 border-b border-slate-200 flex items-start gap-3">
                 <Info size={14} className="text-teal-600 mt-0.5 shrink-0" />
                 <p className="text-[10px] text-slate-500 leading-relaxed font-semibold uppercase tracking-wide">
-                    Pilih peta dasar yang sesuai dengan jenis analisis Anda.
-                    <strong className="text-slate-800 font-black"> CartoDB Dark</strong> sangat disarankan saat Anda menguji kesesuaian tumpang-tindih (overlay) poligon site plan.
+                    Pilih satu peta dasar. Untuk melihat citra seperti Google Earth, pilih
+                    <strong className="text-slate-800 font-black"> Citra Satelit (Esri World Imagery)</strong>.
+                    Layer tematik dapat diatur terpisah melalui menu Layers.
                 </p>
             </div>
 
@@ -90,6 +91,8 @@ export default function BasemapPanel() {
                                 key={map.id}
                                 type="button"
                                 onClick={() => handleSelectBasemap(map.id)}
+                                role="radio"
+                                aria-checked={isActive}
                                 className="group flex items-center justify-between px-5 py-3.5 bg-white hover:bg-slate-50 transition-all text-left w-full outline-none rounded-none border-none cursor-pointer"
                             >
                                 <div className="flex items-center gap-3.5 min-w-0">

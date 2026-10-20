@@ -1,22 +1,28 @@
 import { useState } from 'react';
 import { Settings2, Compass, Loader2, RefreshCw } from 'lucide-react';
+import { Polygon as LeafletPolygon } from 'react-leaflet';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import GISMapContainer from '@/components/maps/GISMapContainer';
+
+import { MOCK_SITE_BOUNDS, MOCK_SITEPLAN_CONTROL_POINTS } from '@/mock/siteplan/mockSiteConfig';
 
 export const CADGeoreferenceWizard = ({
   isOpen,
   onClose,
   onComplete,
   cadFileName,
+  landPolygon,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onComplete: (params: {
-    A: number; B: number; Tx: number; Ty: number;
-    scale: number; rotation: number; polygon: [number, number][]
+    polygon: [number, number][];
+    anchorCad1: [number, number]; anchorCad2: [number, number];
+    anchorMap1: [number, number]; anchorMap2: [number, number];
   }) => void;
   cadFileName: string;
+  landPolygon?: [number, number][];
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [point1Mapped, setPoint1Mapped] = useState(false);
@@ -25,53 +31,74 @@ export const CADGeoreferenceWizard = ({
 
   if (!isOpen) return null;
 
+  // Temukan konfigurasi titik kontrol berdasarkan nama berkas CAD
+  const activeControlConfig = MOCK_SITEPLAN_CONTROL_POINTS[cadFileName];
+  const normalizedLandPolygon = landPolygon?.map(([first, second]) =>
+    first < 20 && second > 90 ? [second, first] as [number, number] : [first, second] as [number, number]
+  );
+  const targetPolygon = normalizedLandPolygon?.length
+    ? normalizedLandPolygon
+    : activeControlConfig?.polygon;
+  const openTargetPolygon = targetPolygon?.length && targetPolygon.length > 1 &&
+    targetPolygon[0][0] === targetPolygon[targetPolygon.length - 1][0] &&
+    targetPolygon[0][1] === targetPolygon[targetPolygon.length - 1][1]
+    ? targetPolygon.slice(0, -1)
+    : targetPolygon;
+  const targetControlPoints = openTargetPolygon && openTargetPolygon.length >= 3
+    ? [
+        openTargetPolygon.reduce((northWest, point) => point[0] - point[1] < northWest[0] - northWest[1] ? point : northWest),
+        openTargetPolygon.reduce((southEast, point) => point[0] - point[1] > southEast[0] - southEast[1] ? point : southEast),
+      ] as [[number, number], [number, number]]
+    : undefined;
+  const mapCenter: [number, number] = openTargetPolygon?.length
+    ? [
+        openTargetPolygon.reduce((sum, point) => sum + point[1], 0) / openTargetPolygon.length,
+        openTargetPolygon.reduce((sum, point) => sum + point[0], 0) / openTargetPolygon.length,
+      ]
+    : MOCK_SITE_BOUNDS.center;
+
   const handleMapPoint1 = () => {
+    if (!activeControlConfig) {
+      toast.error('File CAD ini belum memiliki titik kontrol georeferensi.');
+      return;
+    }
     setPoint1Mapped(true);
-    toast.success('Titik Kontrol 1 berhasil dikunci!');
+    toast.success('Titik Kontrol 1 (Barat Laut) berhasil dikunci!');
     setStep(2);
   };
 
   const handleMapPoint2 = () => {
+    if (!activeControlConfig) {
+      toast.error('File CAD ini belum memiliki titik kontrol georeferensi.');
+      return;
+    }
     setPoint2Mapped(true);
-    toast.success('Titik Kontrol 2 berhasil dikunci!');
+    toast.success('Titik Kontrol 2 (Tenggara) berhasil dikunci!');
     setStep(3);
   };
 
   const handleRunCalibration = () => {
+    if (!activeControlConfig) {
+      toast.error('File CAD ini belum memiliki titik kontrol georeferensi.');
+      return;
+    }
     setIsCalibrating(true);
     setTimeout(() => {
-      // Simulasi perhitungan parameter matriks Helmert 2D [Jakarta 5]
-      const scale = 1.0024;
-      const rotation = 0.4812; // rad (~27.5 derajat)
-      const Tx = 106.8400;
-      const Ty = -6.4800;
-      const A = scale * Math.cos(rotation);
-      const B = scale * Math.sin(rotation);
+      const transformedPolygon = targetPolygon ?? activeControlConfig.polygon;
+      const anchorMap1 = targetControlPoints?.[0] ?? activeControlConfig.anchor_map_1;
+      const anchorMap2 = targetControlPoints?.[1] ?? activeControlConfig.anchor_map_2;
 
-      // Hasil poligon georeferenced bumi nyata [Longitude, Latitude]
-      const transformedPolygon: [number, number][] = [
-        [106.8400, -6.4800],
-        [106.8413, -6.4798],
-        [106.8414, -6.4804],
-        [106.8422, -6.4802],
-        [106.8420, -6.4793],
-        [106.8426, -6.4789],
-        [106.8417, -6.4785],
-        [106.8410, -6.4789],
-        [106.8407, -6.4787],
-        [106.8396, -6.4791],
-        [106.8398, -6.4795],
-        [106.8394, -6.4797],
-        [106.8400, -6.4800]
-      ];
-
-      onComplete({ A, B, Tx, Ty, scale, rotation, polygon: transformedPolygon });
-      setIsCalibrating(false);
-      toast.success('Kalibrasi Helmert 2D Berhasil!', {
-        description: `Skala: ${scale.toFixed(4)} | Rotasi: ${(rotation * (180 / Math.PI)).toFixed(1)}°`,
+      onComplete({
+        polygon: transformedPolygon,
+        anchorCad1: activeControlConfig.anchor_cad_1,
+        anchorCad2: activeControlConfig.anchor_cad_2,
+        anchorMap1,
+        anchorMap2,
       });
+      setIsCalibrating(false);
+      toast.success('Titik kontrol tersimpan. Geometri DXF akan diproses saat pengajuan dikirim.');
       onClose();
-    }, 2000);
+    }, 1500);
   };
 
   return (
@@ -99,9 +126,10 @@ export const CADGeoreferenceWizard = ({
         <div className="px-5 py-3.5 bg-amber-50 border-b border-amber-200 text-left text-[11px] font-semibold text-amber-800 leading-relaxed flex items-center gap-2.5 shrink-0">
           <Settings2 className="h-4.5 w-4.5 shrink-0 text-amber-500 animate-spin" style={{ animationDuration: '6s' }} />
           <p>
-            {step === 1 && 'Langkah 1: Klik Titik Batas Tanah Barat Laut di layar CAD kanan, lalu klik posisi yang cocok di Peta Spasial kiri.'}
-            {step === 2 && 'Langkah 2: Klik Titik Batas Tanah Tenggara di layar CAD kanan, lalu klik posisi yang cocok di Peta Spasial kiri.'}
-            {step === 3 && 'Langkah 3: Koordinat kontrol terkunci. Jalankan kalkulasi matriks Helmert untuk mentranslasikan denah CAD.'}
+            {!activeControlConfig && 'File ini belum mempunyai konfigurasi titik kontrol. Kalibrasi otomatis hanya tersedia untuk file siteplan yang dikenali.'}
+            {activeControlConfig && step === 1 && 'Langkah 1: Klik Titik Batas Tanah Barat Laut di layar CAD kanan, lalu klik posisi yang cocok di Peta Spasial kiri.'}
+            {activeControlConfig && step === 2 && 'Langkah 2: Klik Titik Batas Tanah Tenggara di layar CAD kanan, lalu klik posisi yang cocok di Peta Spasial kiri.'}
+            {activeControlConfig && step === 3 && 'Langkah 3: Koordinat kontrol terkunci. Jalankan kalkulasi matriks Helmert untuk mentranslasikan denah CAD.'}
           </p>
         </div>
 
@@ -113,7 +141,13 @@ export const CADGeoreferenceWizard = ({
             <div className="absolute top-3 left-3 z-10 bg-white border border-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-700 uppercase tracking-widest leading-none">
               Peta Spasial Target (GIS)
             </div>
-            <GISMapContainer center={[-6.4800, 106.8400]} zoom={16}>
+            <GISMapContainer center={mapCenter} zoom={MOCK_SITE_BOUNDS.zoom}>
+              {openTargetPolygon && (
+                <LeafletPolygon
+                  positions={openTargetPolygon.map(([longitude, latitude]) => [latitude, longitude])}
+                  pathOptions={{ color: '#0d9488', weight: 2, fillOpacity: 0.15 }}
+                />
+              )}
               {/* Titik Jangkar Peta */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-2 pointer-events-none">
                 {step === 1 && (
@@ -194,7 +228,7 @@ export const CADGeoreferenceWizard = ({
 
           <button
             type="button"
-            disabled={step !== 3 || isCalibrating}
+            disabled={step !== 3 || isCalibrating || !activeControlConfig}
             onClick={handleRunCalibration}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 disabled:bg-slate-200 hover:bg-teal-600 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-widest rounded-none transition-colors border-none outline-none cursor-pointer"
           >

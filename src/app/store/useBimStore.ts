@@ -35,11 +35,16 @@ interface BimState {
   sunConfig: SunSimulationConfig;
   envLayers: EnvironmentalSimLayers;
 
+  // ── Graceful Degradation & Fallback State ──────────────────────────────
+  isFallbackMode: boolean;
+  dataLoadError: string | null;
+
   // ── Actions ─────────────────────────────────────────────────────────────
   setActiveParcel: (parcel: { id: string; name: string; nop: string; areaM2: number; zone: string; cadFileName?: string }) => void;
   setActiveTileset: (tileset: TileSet3DSpec | null) => void;
   setRtcAnchor: (anchor: RtcAnchorPoint | null) => void;
   setIsLoadingTileset: (isLoading: boolean) => void;
+  setIsFallbackMode: (isFallback: boolean, errorMsg?: string | null) => void;
 
   setSelectedElement: (metadata: BimElementMetadata | null) => void;
   clearSelection: () => void;
@@ -92,6 +97,9 @@ export const useBimStore = create<BimState>((set) => ({
   sunConfig: initialSunConfig,
   envLayers: initialEnvLayers,
 
+  isFallbackMode: false,
+  dataLoadError: null,
+
   setActiveParcel: (parcel) =>
     set({
       activeParcelId: parcel.id,
@@ -105,6 +113,7 @@ export const useBimStore = create<BimState>((set) => ({
   setActiveTileset: (activeTileset) => set({ activeTileset }),
   setRtcAnchor: (rtcAnchor) => set({ rtcAnchor }),
   setIsLoadingTileset: (isLoadingTileset) => set({ isLoadingTileset }),
+  setIsFallbackMode: (isFallbackMode, dataLoadError = null) => set({ isFallbackMode, dataLoadError }),
 
   setSelectedElement: (metadata) =>
     set({

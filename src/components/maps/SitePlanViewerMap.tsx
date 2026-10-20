@@ -228,7 +228,7 @@ export default function SitePlanViewerMap({
                 preferCanvas={true}
             >
                 <TileLayer
-                    attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 

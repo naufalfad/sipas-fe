@@ -173,7 +173,7 @@ export const useGisUIStore = create<GisUIState>((set) => ({
     pitch: 0,
     bearing: 0,
     cursorCoords: null,
-    activeBaseMap: 'voyager',
+    activeBaseMap: 'satellite',
     activePanels: [],
     flyToTarget: null,
     spatialConflicts: [

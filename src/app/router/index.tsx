@@ -34,6 +34,9 @@ import MaintenancePage from '@/features/auth/pages/MaintenancePage';
 import KaryawanPage from '@/features/users/pages/KaryawanPage';
 import ConfigPage from '@/features/users/pages/ConfigPage';
 import ActivityLogPage from '@/features/users/pages/ActivityLogPage';
+import { PKKPRListPage } from '@/features/pkkpr/pages/PKKPRListPage';
+import { PKKPRCreateWizard } from '@/features/pkkpr/pages/PKKPRCreateWizard';
+import { PKKPRDetailPage } from '@/features/pkkpr/pages/PKKPRDetailPage';
 
 /**
  * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
@@ -77,6 +80,23 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <DashboardPage />,
+      },
+      {
+        path: 'pkkpr',
+        children: [
+          {
+            index: true,
+            element: <PKKPRListPage />,
+          },
+          {
+            path: 'create',
+            element: <PKKPRCreateWizard />,
+          },
+          {
+            path: ':id',
+            element: <PKKPRDetailPage />,
+          },
+        ],
       },
       {
         path: 'pengajuan',
