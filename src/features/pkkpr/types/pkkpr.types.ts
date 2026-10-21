@@ -31,12 +31,40 @@ export type FPRRecommendation =
 export type PKKPRFileType =
   | 'KTP'
   | 'NIB'
+  | 'NIB_AKTA'
   | 'BUKTI_TANAH'
+  | 'BUKTI_HAK_TANAH'
   | 'PROPOSAL'
+  | 'PROPOSAL_TEKNIS'
   | 'REKOM_TEKNIS'
   | 'NOTULA_FPR'
   | 'PTP_BPN'
+  | 'LAMPIRAN'
   | 'LAINNYA';
+
+export interface KBLIItem {
+  code: string;
+  name: string;
+  category: string;
+  description: string;
+}
+
+export interface PKKPRFileItemPayload {
+  file_type: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  mime_type: string;
+}
+
+export interface PKKPRUploadFileResult {
+  file_name: string;
+  file_path: string;
+  file_url: string;
+  file_size: number;
+  mime_type: string;
+  file_type: string;
+}
 
 export interface GeoJSONPolygon {
   type: 'Polygon' | 'MultiPolygon';
@@ -119,6 +147,10 @@ export interface PKKPRDetail {
   location_district: string;
   location_city: string;
 
+  land_ownership_status?: string | null;
+  certificate_number?: string | null;
+  certificate_owner?: string | null;
+
   proposed_land_area_m2: number;
   approved_land_area_m2?: number | null;
 
@@ -168,8 +200,12 @@ export interface SubmitPKKPRPayload {
   location_village: string;
   location_district: string;
   location_city: string;
+  land_ownership_status?: string;
+  certificate_number?: string;
+  certificate_owner?: string;
   proposed_land_area_m2: number;
   geometry: GeoJSONPolygon;
+  files?: PKKPRFileItemPayload[];
 }
 
 export interface EvaluateSpatialPayload {

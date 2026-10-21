@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { useNavigate, Link, useParams } from 'react-router-dom';
+import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, Save, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SubmissionService } from '@/features/submission/services/submission.service';
@@ -28,9 +28,13 @@ const steps = [
 
 export default function SubmissionCreatePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
   const [currentStep, setCurrentStep] = useState(1);
+
+  const preselectedPkkprId = (location.state as any)?.preselected_pkkpr_id;
+  const preselectedPkkprNo = (location.state as any)?.preselected_pkkpr_no;
 
   const methods = useForm<FullSubmissionFormValues>({
     resolver: zodResolver(fullSubmissionSchema) as Resolver<FullSubmissionFormValues>,
@@ -38,9 +42,23 @@ export default function SubmissionCreatePage() {
       applicant: { type: 'PERORANGAN' },
       submission: { submissionType: 'BARU', category: 'PERUMAHAN' },
       location: { ownershipStatus: 'SHM' },
+      spatial: {
+        pkkprId: preselectedPkkprId || undefined,
+        kkprNumber: preselectedPkkprNo || '',
+      }
     },
     mode: 'onTouched',
   });
+
+  useEffect(() => {
+    if (preselectedPkkprId) {
+      methods.setValue('spatial.pkkprId', preselectedPkkprId);
+    }
+    if (preselectedPkkprNo) {
+      methods.setValue('spatial.kkprNumber', preselectedPkkprNo);
+    }
+  }, [preselectedPkkprId, preselectedPkkprNo, methods]);
+
 
   const { handleSubmit, trigger } = methods;
 

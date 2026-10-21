@@ -1,16 +1,56 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import {
+  FileText,
+  Compass,
+  CheckCircle2,
+  Clock,
+  Lock,
+  ExternalLink,
+  Download,
+  Printer,
+  FileCheck
+} from 'lucide-react';
+import { GeoJSON } from 'react-leaflet';
+
 import { pkkprApi } from '../api/pkkprApi';
 import type { PKKPRDetail } from '../types/pkkpr.types';
 import { PKKPRStatusBadge } from '../components/PKKPRStatusBadge';
+import { PKKPRQuotaCard } from '../components/PKKPRQuotaCard';
+import { useAuthStore } from '@/app/store/useAuthStore';
+import GISMapContainer from '@/components/maps/GISMapContainer';
+import { API_BASE_URL } from '@/config';
+
+const getFileUrl = (filePath: string) => {
+  if (!filePath) return '#';
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    return filePath;
+  }
+  const cleanPath = filePath.replace(/^\/+/, '');
+  return `${API_BASE_URL}/${cleanPath}`;
+};
 
 export const PKKPRDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuthStore();
+
+  const justSubmitted = Boolean((location.state as any)?.justSubmitted);
+  const [showSuccessBanner, setShowSuccessBanner] = useState(justSubmitted);
+
+  const userRole = (user?.role || '').toUpperCase().replace(/\s+/g, '_');
+  const isAdmin = userRole.includes('ADMIN') || userRole.includes('SUPER');
+  const isTimTeknis = userRole.includes('TEKNIS') || userRole.includes('SUPER');
+  const isKabid = userRole.includes('KABID') || userRole.includes('SUPER');
+  const isKadis = userRole.includes('KADIS') || userRole.includes('SUPER');
+  const isPemohon = userRole.includes('PEMOHON') && !isAdmin && !isTimTeknis && !isKabid && !isKadis;
+
   const [detail, setDetail] = useState<PKKPRDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
 
   // Modal / Form States
   const [showSpatialModal, setShowSpatialModal] = useState(false);
@@ -186,12 +226,47 @@ export const PKKPRDetailPage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Banner Notifikasi Pasca-Pendaftaran Berhasil */}
+      {showSuccessBanner && (
+        <div className="bg-emerald-900 text-white p-5 rounded-2xl shadow-lg border border-emerald-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 bg-emerald-800 rounded-xl flex-shrink-0 text-xl shadow-inner">🎉</div>
+            <div>
+              <h3 className="font-bold text-base text-emerald-100 flex items-center gap-2">
+                Pendaftaran Permohonan PKKPR Berhasil Diterima!
+              </h3>
+              <p className="text-xs text-emerald-200 mt-1 leading-relaxed">
+                Nomor registrasi resmi Anda: <span className="font-mono font-bold text-white bg-emerald-800/90 px-2 py-0.5 rounded border border-emerald-600">{detail.submission_no}</span>. Berkas telah masuk ke antrean digital dinas Kabupaten Bogor (SLA 12 hari kerja).
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <a
+              href={pkkprApi.getReceiptUrl(detail.id)}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2.5 bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs rounded-xl shadow-md flex items-center gap-2 transition-transform active:scale-95"
+            >
+              <Printer className="w-4 h-4 text-emerald-700" />
+              <span>Cetak Lembar Tanda Terima (PDF)</span>
+            </a>
+            <button
+              onClick={() => setShowSuccessBanner(false)}
+              className="p-2 text-emerald-300 hover:text-white rounded-lg hover:bg-emerald-800/60 text-xs transition-colors"
+              title="Tutup pemberitahuan"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <button
             onClick={() => navigate('/pkkpr')}
-            className="text-xs font-semibold text-gray-400 hover:text-emerald-700 flex items-center gap-1 mb-1"
+            className="text-xs font-semibold text-gray-400 hover:text-emerald-700 flex items-center gap-1 mb-1 transition-colors"
           >
             ← Kembali ke Antrean PKKPR
           </button>
@@ -209,20 +284,44 @@ export const PKKPRDetailPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Action Button Jembatan ke Site Plan jika SK sudah Terbit */}
-        {detail.status === 'DISETUJUI' && (
-          <div className="flex flex-col items-end gap-2">
-            <button
-              onClick={() => navigate('/submissions/create', { state: { preselected_pkkpr_id: detail.id } })}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-sm shadow-md flex items-center gap-2 transition-transform active:scale-95"
+        {/* Action Buttons: Download SK & Receipt & Bridging to Site Plan */}
+        <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+          {/* Tanda Terima Registrasi Online (Bisa dicetak kapan pun oleh pemohon/petugas) */}
+          <a
+            href={pkkprApi.getReceiptUrl(detail.id)}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3.5 py-2.5 border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 rounded-xl font-medium text-xs shadow-sm flex items-center gap-2 transition-all"
+            title="Cetak Bukti Tanda Terima Registrasi PKKPR Online (PDF)"
+          >
+            <Printer className="w-4 h-4 text-slate-600" />
+            <span>Tanda Terima (PDF)</span>
+          </a>
+
+          {/* Unduh SK Resmi PKKPR jika status DISETUJUI */}
+          {detail.status === 'DISETUJUI' && (
+            <a
+              href={pkkprApi.getDownloadSKUrl(detail.id)}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs shadow-md flex items-center gap-2 transition-transform active:scale-95"
+              title="Unduh Salinan Sah Surat Keputusan (SK) PKKPR Resmi Berformat PDF"
             >
-              <span>📐</span> Ajukan Pengesahan Site Plan
+              <Download className="w-4 h-4" />
+              <span>Unduh SK PKKPR Resmi</span>
+            </a>
+          )}
+
+          {/* Action Button Jembatan ke Site Plan jika SK sudah Terbit */}
+          {detail.status === 'DISETUJUI' && (
+            <button
+              onClick={() => navigate('/pengajuan/tambah', { state: { preselected_pkkpr_id: detail.id, preselected_pkkpr_no: detail.sk_number } })}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs shadow-md flex items-center gap-2 transition-transform active:scale-95"
+            >
+              <span>📐</span> Ajukan Site Plan
             </button>
-            <span className="text-xs text-emerald-800 font-mono">
-              SK Terbit: {detail.sk_number}
-            </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Grid Informasi Utama */}
@@ -231,7 +330,7 @@ export const PKKPRDetailPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
             <h2 className="text-base font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
-              <span>📍</span> Informasi Lokasi & Rencana Kegiatan
+              <span>📍</span> Informasi Lokasi, Hak Tanah & Rencana Kegiatan
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -270,6 +369,29 @@ export const PKKPRDetailPage: React.FC = () => {
                 <p className="text-xs text-gray-400 uppercase font-medium">Alamat Lengkap</p>
                 <p className="text-gray-800 mt-0.5">{detail.location_address}</p>
               </div>
+
+              <div>
+                <p className="text-xs text-gray-400 uppercase font-medium">Status Hak Atas Tanah</p>
+                <p className="font-semibold text-emerald-800 mt-0.5">
+                  {detail.land_ownership_status || 'SHM'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-400 uppercase font-medium">Nomor Sertifikat / Bukti Hak</p>
+                <p className="font-semibold text-gray-900 mt-0.5 font-mono">
+                  {detail.certificate_number || '-'}
+                </p>
+              </div>
+
+              {detail.certificate_owner && (
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-gray-400 uppercase font-medium">Atas Nama Pemilik Sertifikat</p>
+                  <p className="font-semibold text-gray-800 mt-0.5">
+                    {detail.certificate_owner}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <p className="text-xs text-gray-400 uppercase font-medium">Luas Lahan Dimohon</p>
@@ -328,6 +450,13 @@ export const PKKPRDetailPage: React.FC = () => {
             )}
           </div>
 
+          {/* Kuota Pemanfaatan Lahan Site Plan Bertahap (Perbup Bogor No. 4/2025) */}
+          {detail.status === 'DISETUJUI' && (
+            <div className="space-y-3">
+              <PKKPRQuotaCard pkkprId={detail.id} />
+            </div>
+          )}
+
           {/* Riwayat Sidang Forum Penataan Ruang (FPR) */}
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
             <h2 className="text-base font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
@@ -357,48 +486,199 @@ export const PKKPRDetailPage: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
 
-        {/* Kolom Kanan: Panel Tindakan Petugas Berdasarkan Tahapan */}
-        <div className="space-y-6">
+          {/* Peta Poligon Lahan WGS84 */}
+          {detail.geometry && (
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-emerald-600" /> Batas Spasial Poligon Lahan
+                </h2>
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded">
+                  GeoJSON PostGIS (SRID 4326)
+                </span>
+              </div>
+
+              <div className="h-72 w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
+                <GISMapContainer
+                  center={[-6.597, 106.800]}
+                  zoom={14}
+                  className="h-full w-full"
+                >
+                  <GeoJSON
+                    data={detail.geometry as any}
+                    style={{
+                      color: '#059669',
+                      weight: 3,
+                      fillColor: '#10b981',
+                      fillOpacity: 0.25
+                    }}
+                  />
+                </GISMapContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Dokumen Persyaratan & Terbitan Resmi Sistem */}
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
-            <h2 className="text-base font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
-              <span>⚙️</span> Panel Otoritas Petugas
+            <h2 className="text-base font-bold text-gray-900 border-b pb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-600" /> Dokumen & Output Pelayanan
+              </span>
+              <span className="text-xs text-gray-400 font-normal">Format Resmi PDF</span>
             </h2>
 
-            {/* Tahap 1: Verifikasi Administrasi (Admin) */}
+            {/* Dokumen Hasil Pelayanan Daring (Deliverables) */}
+            <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2.5">
+              <p className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                <FileCheck className="w-4 h-4 text-emerald-700" /> Dokumen Resmi Hasil Pelayanan Sistem:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* 1. Tanda Terima Pendaftaran */}
+                <a
+                  href={pkkprApi.getReceiptUrl(detail.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-3 bg-white border border-emerald-200 hover:border-emerald-400 rounded-lg flex items-center justify-between hover:bg-emerald-50/40 transition-all shadow-sm group"
+                >
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <div className="p-2 bg-emerald-100/60 rounded-lg text-emerald-800 group-hover:bg-emerald-200 transition-colors">
+                      <Printer className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-emerald-950">Tanda Terima Pendaftaran</div>
+                      <div className="text-[10px] text-gray-500 font-mono">Bukti Registrasi & Info SLA</div>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                </a>
+
+                {/* 2. Surat Keputusan (SK) PKKPR Resmi */}
+                {detail.status === 'DISETUJUI' ? (
+                  <a
+                    href={pkkprApi.getDownloadSKUrl(detail.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-3 bg-white border border-emerald-300 hover:border-emerald-500 rounded-lg flex items-center justify-between hover:bg-emerald-50 transition-all shadow-sm group"
+                  >
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <div className="p-2 bg-emerald-600 rounded-lg text-white group-hover:bg-emerald-700 transition-colors">
+                        <Download className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-emerald-950">Surat Keputusan (SK) PKKPR</div>
+                        <div className="text-[10px] text-emerald-700 font-mono">{detail.sk_number}</div>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  </a>
+                ) : (
+                  <div className="p-3 bg-slate-100/70 border border-dashed border-slate-300 rounded-lg flex items-center gap-2.5 text-slate-400">
+                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium text-[11px] text-slate-600">Surat Keputusan (SK) PKKPR</div>
+                      <div className="text-[10px]">Tersedia otomatis setelah persetujuan akhir Kepala Dinas</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Dokumen Persyaratan yang Dilampirkan Pemohon */}
+            <div className="pt-2">
+              <p className="text-xs font-semibold text-gray-700 mb-2.5">Lampiran Berkas Pemohon:</p>
+              {detail.files.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">Belum ada dokumen persyaratan yang diunggah.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {detail.files.map((file) => (
+                    <div
+                      key={file.id}
+                      className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs hover:border-emerald-300 transition-all"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden pr-2">
+                        <FileText className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <div className="truncate">
+                          <div className="font-semibold text-gray-800 truncate">
+                            [{file.file_type}] {file.file_name}
+                          </div>
+                          <div className="text-[10px] text-gray-400">
+                            {(file.file_size / 1024).toFixed(1)} KB • {file.mime_type}
+                          </div>
+                        </div>
+                      </div>
+                      <a
+                        href={getFileUrl(file.file_path)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 text-emerald-700 hover:bg-emerald-100 rounded transition-colors flex-shrink-0"
+                        title="Buka / Unduh Dokumen"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Kolom Kanan: Panel Tindakan Petugas Berdasarkan Tahapan & Role SoD */}
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+            <h2 className="text-base font-bold text-gray-900 border-b pb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span>⚙️</span> Panel Otoritas Petugas
+              </span>
+              <span className="text-[10px] font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                Peran: {user?.role || 'Guest'}
+              </span>
+            </h2>
+
+            {/* Tahap 1: Verifikasi Administrasi (Admin SIPAS) */}
             {detail.status === 'PENGAJUAN_BERKAS' && (
               <div className="space-y-2">
                 <p className="text-xs text-gray-500">Berkas baru masuk. Silakan kunci berkas untuk memulai verifikasi formal.</p>
-                <button
-                  disabled={actionLoading}
-                  onClick={handleClaimAdmin}
-                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded-lg shadow-sm"
-                >
-                  🔒 Kunci Berkas Administrasi (Claim)
-                </button>
+                {isAdmin ? (
+                  <button
+                    disabled={actionLoading}
+                    onClick={handleClaimAdmin}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded-lg shadow-sm"
+                  >
+                    🔒 Kunci Berkas Administrasi (Claim)
+                  </button>
+                ) : (
+                  <RoleLockedNotice targetRole="Admin SIPAS" />
+                )}
               </div>
             )}
 
             {detail.status === 'VERIFIKASI_ADMINISTRASI' && (
               <div className="space-y-2">
-                <p className="text-xs text-amber-700 font-medium">Sedang dalam peninjauan administrasi.</p>
-                <div className="flex gap-2">
-                  <button
-                    disabled={actionLoading}
-                    onClick={() => handleVerifyAdmin('APPROVE')}
-                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm"
-                  >
-                    ✓ Loloskan Formal
-                  </button>
-                  <button
-                    disabled={actionLoading}
-                    onClick={() => handleVerifyAdmin('REJECT')}
-                    className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg shadow-sm"
-                  >
-                    ✕ Tolak Berkas
-                  </button>
-                </div>
+                <p className="text-xs text-amber-700 font-medium">
+                  Sedang dalam peninjauan administrasi{detail.admin_lock_name ? ` oleh ${detail.admin_lock_name}` : ''}.
+                </p>
+                {isAdmin ? (
+                  <div className="flex gap-2">
+                    <button
+                      disabled={actionLoading}
+                      onClick={() => handleVerifyAdmin('APPROVE')}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm"
+                    >
+                      ✓ Loloskan Formal
+                    </button>
+                    <button
+                      disabled={actionLoading}
+                      onClick={() => handleVerifyAdmin('REJECT')}
+                      className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg shadow-sm"
+                    >
+                      ✕ Tolak Berkas
+                    </button>
+                  </div>
+                ) : (
+                  <RoleLockedNotice targetRole="Admin SIPAS" />
+                )}
               </div>
             )}
 
@@ -406,22 +686,26 @@ export const PKKPRDetailPage: React.FC = () => {
             {detail.status === 'KAJIAN_TEKNIS_SPASIAL' && (
               <div className="space-y-2">
                 <p className="text-xs text-indigo-700 font-medium">Tahap analisis spasial GIS oleh Tim Teknis PUPR.</p>
-                {!detail.technical_lock_id ? (
-                  <button
-                    disabled={actionLoading}
-                    onClick={handleClaimTechnical}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shadow-sm"
-                  >
-                    🔒 Kunci Berkas Teknis (Claim)
-                  </button>
+                {isTimTeknis ? (
+                  !detail.technical_lock_id ? (
+                    <button
+                      disabled={actionLoading}
+                      onClick={handleClaimTechnical}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg shadow-sm"
+                    >
+                      🔒 Kunci Berkas Teknis (Claim)
+                    </button>
+                  ) : (
+                    <button
+                      disabled={actionLoading}
+                      onClick={() => setShowSpatialModal(true)}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm"
+                    >
+                      📐 Input Hasil Kajian Spasial & Parameter Ruang
+                    </button>
+                  )
                 ) : (
-                  <button
-                    disabled={actionLoading}
-                    onClick={() => setShowSpatialModal(true)}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm"
-                  >
-                    📐 Input Hasil Kajian Spasial & Parameter Ruang
-                  </button>
+                  <RoleLockedNotice targetRole="Tim Teknis PUPR" />
                 )}
               </div>
             )}
@@ -430,13 +714,17 @@ export const PKKPRDetailPage: React.FC = () => {
             {detail.status === 'SIDANG_FPR' && (
               <div className="space-y-2">
                 <p className="text-xs text-purple-700 font-medium">Kajian spasial selesai. Berkas siap dibahas dalam Sidang Komite FPR.</p>
-                <button
-                  disabled={actionLoading}
-                  onClick={() => setShowFPRModal(true)}
-                  className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-lg shadow-sm"
-                >
-                  📝 Catat Notula Sidang & Rekomendasi FPR
-                </button>
+                {isTimTeknis || isKabid ? (
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => setShowFPRModal(true)}
+                    className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-lg shadow-sm"
+                  >
+                    📝 Catat Notula Sidang & Rekomendasi FPR
+                  </button>
+                ) : (
+                  <RoleLockedNotice targetRole="Tim Teknis / Sekretariat FPR" />
+                )}
               </div>
             )}
 
@@ -444,13 +732,17 @@ export const PKKPRDetailPage: React.FC = () => {
             {detail.status === 'MENUNGGU_REKOMENDASI_KABID' && (
               <div className="space-y-2">
                 <p className="text-xs text-cyan-800 font-medium">Rekomendasi FPR selesai. Kabid merumuskan draf SK.</p>
-                <button
-                  disabled={actionLoading}
-                  onClick={() => setShowDraftSKModal(true)}
-                  className="w-full py-2 bg-cyan-700 hover:bg-cyan-800 text-white font-semibold text-xs rounded-lg shadow-sm"
-                >
-                  ✍️ Rumuskan & Paraf Draf SK (Kabid)
-                </button>
+                {isKabid ? (
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => setShowDraftSKModal(true)}
+                    className="w-full py-2 bg-cyan-700 hover:bg-cyan-800 text-white font-semibold text-xs rounded-lg shadow-sm"
+                  >
+                    ✍️ Rumuskan & Paraf Draf SK (Kabid)
+                  </button>
+                ) : (
+                  <RoleLockedNotice targetRole="Kepala Bidang (Kabid)" />
+                )}
               </div>
             )}
 
@@ -458,23 +750,58 @@ export const PKKPRDetailPage: React.FC = () => {
             {detail.status === 'MENUNGGU_TTE_KADIS' && (
               <div className="space-y-2">
                 <p className="text-xs text-yellow-800 font-medium">Draf SK telah diparaf Kabid. Menunggu TTE resmi Kadis DPMPTSP.</p>
-                <button
-                  disabled={actionLoading}
-                  onClick={() => setShowTTEModal(true)}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-md"
-                >
-                  🔏 Tandatangani TTE BSrE (Kepala Dinas)
-                </button>
+                {isKadis ? (
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => setShowTTEModal(true)}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-md"
+                  >
+                    🔏 Tandatangani TTE BSrE (Kepala Dinas)
+                  </button>
+                ) : (
+                  <RoleLockedNotice targetRole="Kepala Dinas (Kadis)" />
+                )}
               </div>
             )}
 
             {detail.status === 'DISETUJUI' && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 space-y-1">
-                <p className="font-bold flex items-center gap-1">
-                  <span>✓</span> SK PKKPR Resmi Aktif
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 space-y-3 shadow-sm">
+                <div className="flex items-center gap-2 border-b border-emerald-200 pb-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-sm text-emerald-950">SK PKKPR Resmi Aktif</p>
+                    <p className="text-[11px] text-emerald-700 font-mono">No: {detail.sk_number}</p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100 text-[11px] space-y-1">
+                  <p><strong>Penerbit:</strong> Kepala DPMPTSP Kab. Bogor</p>
+                  <p><strong>Otorisasi:</strong> TTE Digital BSrE BSSN</p>
+                  <p className="truncate font-mono text-[10px] text-gray-500">Hash: {detail.qr_code_hash}</p>
+                </div>
+
+                <a
+                  href={pkkprApi.getDownloadSKUrl(detail.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors block text-center"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh SK Resmi (PDF)</span>
+                </a>
+              </div>
+            )}
+
+            {/* Info Status untuk Pemohon */}
+            {isPemohon && detail.status !== 'DISETUJUI' && (
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1 text-slate-700">
+                <div className="font-bold flex items-center gap-1 text-slate-800">
+                  <Clock className="w-3.5 h-3.5 text-emerald-600" /> Informasi Pemohon:
+                </div>
+                <p className="leading-relaxed">
+                  Permohonan Anda saat ini berada dalam tahap{' '}
+                  <strong className="text-emerald-700">{detail.status.replace(/_/g, ' ')}</strong>. Seluruh proses verifikasi dan telaah dilakukan secara berjenjang oleh dinas teknis terkait.
                 </p>
-                <p>Nomor: {detail.sk_number}</p>
-                <p>QR Integritas: {detail.qr_code_hash?.substring(0, 16)}...</p>
               </div>
             )}
           </div>
@@ -690,3 +1017,17 @@ export const PKKPRDetailPage: React.FC = () => {
     </div>
   );
 };
+
+const RoleLockedNotice: React.FC<{ targetRole: string }> = ({ targetRole }) => {
+  return (
+    <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs space-y-1 text-amber-900">
+      <div className="font-semibold flex items-center gap-1.5 text-amber-950">
+        <Lock className="w-3.5 h-3.5 text-amber-700" /> Wewenang Dibatasi
+      </div>
+      <p className="text-[11px] leading-relaxed text-amber-800">
+        Tindakan pada tahapan ini khusus didelegasikan kepada peran <strong>{targetRole}</strong> sesuai prinsip Separation of Duties (SoD).
+      </p>
+    </div>
+  );
+};
+

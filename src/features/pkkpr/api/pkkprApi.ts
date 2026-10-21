@@ -13,20 +13,52 @@ import type {
   SubmitPKKPRPayload,
   EvaluateSpatialPayload,
   RecordFPRPayload,
-  DraftSKPayload
+  DraftSKPayload,
+  PKKPRUploadFileResult
 } from '../types/pkkpr.types';
 
 const PKKPR_BASE = `${BASE_URL}/api/pkkpr`;
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {})
   };
 }
 
+function parseApiError(err: any, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err.detail === 'string') return err.detail;
+  if (Array.isArray(err.detail)) {
+    return err.detail.map((e: any) => e.msg || `${e.loc?.join('.') || ''}: ${e.msg || 'Format tidak valid'}`).join(', ');
+  }
+  if (typeof err.message === 'string') return err.message;
+  return fallback;
+}
+
 export const pkkprApi = {
+  /** Mengunggah berkas persyaratan PKKPR (KTP, NIB, Sertifikat Tanah, Proposal Teknis) */
+  async uploadFile(file: File, file_type: string = 'LAMPIRAN'): Promise<PKKPRUploadFileResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('file_type', file_type);
+
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const res = await fetch(`${PKKPR_BASE}/upload-file`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(err, 'Gagal mengunggah berkas persyaratan.'));
+    }
+    return res.json();
+  },
+
   /** Pemohon mengajukan berkas permohonan PKKPR baru */
   async submit(payload: SubmitPKKPRPayload): Promise<PKKPRDetail> {
     const res = await fetch(`${PKKPR_BASE}/submit`, {
@@ -36,7 +68,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal mengajukan permohonan PKKPR.');
+      throw new Error(parseApiError(err, 'Gagal mengajukan permohonan PKKPR.'));
     }
     return res.json();
   },
@@ -52,7 +84,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal memuat daftar permohonan PKKPR.');
+      throw new Error(parseApiError(err, 'Gagal memuat daftar permohonan PKKPR.'));
     }
     return res.json();
   },
@@ -65,7 +97,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal memuat SK PKKPR aktif.');
+      throw new Error(parseApiError(err, 'Gagal memuat SK PKKPR aktif.'));
     }
     return res.json();
   },
@@ -78,7 +110,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Gagal memuat detail permohonan ${id}.`);
+      throw new Error(parseApiError(err, `Gagal memuat detail permohonan ${id}.`));
     }
     return res.json();
   },
@@ -91,7 +123,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal mengunci berkas administrasi.');
+      throw new Error(parseApiError(err, 'Gagal mengunci berkas administrasi.'));
     }
     return res.json();
   },
@@ -104,7 +136,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal melepaskan kunci berkas.');
+      throw new Error(parseApiError(err, 'Gagal melepaskan kunci berkas.'));
     }
     return res.json();
   },
@@ -118,7 +150,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal memverifikasi dokumen.');
+      throw new Error(parseApiError(err, 'Gagal memverifikasi dokumen.'));
     }
     return res.json();
   },
@@ -131,7 +163,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal mengunci berkas teknis.');
+      throw new Error(parseApiError(err, 'Gagal mengunci berkas teknis.'));
     }
     return res.json();
   },
@@ -144,7 +176,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal melepaskan kunci teknis.');
+      throw new Error(parseApiError(err, 'Gagal melepaskan kunci teknis.'));
     }
     return res.json();
   },
@@ -158,7 +190,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal menyimpan hasil kajian spasial.');
+      throw new Error(parseApiError(err, 'Gagal menyimpan hasil kajian spasial.'));
     }
     return res.json();
   },
@@ -172,7 +204,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal mencatat notula sidang FPR.');
+      throw new Error(parseApiError(err, 'Gagal mencatat notula sidang FPR.'));
     }
     return res.json();
   },
@@ -186,7 +218,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal merumuskan draf SK.');
+      throw new Error(parseApiError(err, 'Gagal merumuskan draf SK.'));
     }
     return res.json();
   },
@@ -200,7 +232,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal menandatangani TTE SK.');
+      throw new Error(parseApiError(err, 'Gagal menandatangani TTE SK.'));
     }
     return res.json();
   },
@@ -218,7 +250,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal memvalidasi kepatuhan spasial.');
+      throw new Error(parseApiError(err, 'Gagal memvalidasi kepatuhan spasial.'));
     }
     return res.json();
   },
@@ -231,7 +263,7 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal memuat ringkasan kuota PKKPR.');
+      throw new Error(parseApiError(err, 'Gagal memuat ringkasan kuota PKKPR.'));
     }
     return res.json();
   },
@@ -247,8 +279,18 @@ export const pkkprApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Gagal melakukan validasi site plan bertahap.');
+      throw new Error(parseApiError(err, 'Gagal melakukan validasi site plan bertahap.'));
     }
     return res.json();
+  },
+
+  /** Mengambil URL berkas Surat Keputusan (SK) PKKPR resmi berformat PDF */
+  getDownloadSKUrl(pkkpr_id: string): string {
+    return `${PKKPR_BASE}/${pkkpr_id}/download-sk`;
+  },
+
+  /** Mengambil URL berkas Lembar Tanda Terima Registrasi PKKPR berformat PDF */
+  getReceiptUrl(pkkpr_id: string): string {
+    return `${PKKPR_BASE}/${pkkpr_id}/receipt`;
   }
 };

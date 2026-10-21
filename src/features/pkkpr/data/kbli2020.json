@@ -1,0 +1,218 @@
+[
+  {
+    "code": "68111",
+    "name": "Real Estat Yang Dimiliki Sendiri Atau Disewa",
+    "category": "L - Real Estat",
+    "description": "Mencakup kegiatan perolehan, pengembangan, penjualan, persewaan, dan pengoperasian real estat yang dimiliki sendiri atau disewa, seperti bangunan perumahan, perumahan klaster, ruko, dan kavling siap bangun."
+  },
+  {
+    "code": "68112",
+    "name": "Kawasan Pariwisata Dan Resor",
+    "category": "L - Real Estat",
+    "description": "Pembangunan dan pengoperasian kawasan pariwisata terpadu, vila komersial, resort, dan taman rekreasi tematik."
+  },
+  {
+    "code": "68113",
+    "name": "Kawasan Industri",
+    "category": "L - Real Estat",
+    "description": "Pengembangan lahan dan infrastruktur kawasan industri terpadu lengkap dengan utilitas pendukung produksi pabrik."
+  },
+  {
+    "code": "68120",
+    "name": "Pengoperasian Real Estat Atas Dasar Kontrak / Pengelolaan",
+    "category": "L - Real Estat",
+    "description": "Pengelolaan gedung komersial, kondominium, dan sentra niaga atas dasar imbalan jasa atau kontrak pengelolaan."
+  },
+  {
+    "code": "41011",
+    "name": "Konstruksi Gedung Hunian (Perumahan & Apartemen)",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan perumahan tapak, perumahan bersubsidi / komersial, town house, rumah susun, dan apartemen hunian."
+  },
+  {
+    "code": "41012",
+    "name": "Konstruksi Gedung Perkantoran",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan gedung perkantoran swasta, pusat administrasi bisnis, coworking space bertingkat, dan perkantoran dinas."
+  },
+  {
+    "code": "41013",
+    "name": "Konstruksi Gedung Industri & Pabrik",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan bangunan fisik pabrik manufaktur, bengkel perakitan, dan fasilitas produksi industri ringan/berat."
+  },
+  {
+    "code": "41014",
+    "name": "Konstruksi Gedung Perbelanjaan / Mall / Ruko",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan pusat perbelanjaan, pasar modern, deretan rumah toko (ruko), supermarket, dan pertokoan mandiri."
+  },
+  {
+    "code": "41015",
+    "name": "Konstruksi Gedung Kesehatan (Rumah Sakit & Klinik)",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan gedung rumah sakit umum/khusus, balai pengobatan medis, puskesmas rawat inap, dan laboratorium klinik."
+  },
+  {
+    "code": "41016",
+    "name": "Konstruksi Gedung Pendidikan (Sekolah & Kampus)",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan gedung sekolah, pondok pesantren, asrama pendidikan, akademi vokasi, dan gedung universitas."
+  },
+  {
+    "code": "41017",
+    "name": "Konstruksi Gedung Penginapan & Perhotelan",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan gedung hotel berbintang, resort alam, condotel, losmen komersial, dan motel peristirahatan."
+  },
+  {
+    "code": "41018",
+    "name": "Konstruksi Gedung Tempat Hiburan & Olahraga",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan stadion mini, gelanggang olahraga (GOR), bioskop, pusat kebugaran, dan gedung pertunjukan seni."
+  },
+  {
+    "code": "41019",
+    "name": "Konstruksi Gedung Lainnya (Gudang & Logistik)",
+    "category": "F - Konstruksi",
+    "description": "Pembangunan gudang distribusi barang, hanggar penyimpanan logistik, dan fasilitas pergudangan transit."
+  },
+  {
+    "code": "52101",
+    "name": "Pergudangan Dan Penyimpanan Non-Berpendingin",
+    "category": "H - Pengangkutan & Pergudangan",
+    "description": "Penyediaan fasilitas gudang kering untuk komoditas umum, bahan bangunan, barang dagangan, dan kargo ekspor-impor."
+  },
+  {
+    "code": "52102",
+    "name": "Pergudangan Dan Penyimpanan Berpendingin (Cold Storage)",
+    "category": "H - Pengangkutan & Pergudangan",
+    "description": "Pengoperasian fasilitas rantai dingin / gudang es penyimpanan daging, ikan, buah, sayuran, dan bahan farmasi."
+  },
+  {
+    "code": "55111",
+    "name": "Hotel Bintang",
+    "category": "I - Penyediaan Akomodasi & Makan Minum",
+    "description": "Penyediaan akomodasi hotel berbintang 1 sampai bintang 5 lengkap dengan fasilitas MICE, restoran, dan kolam renang."
+  },
+  {
+    "code": "55112",
+    "name": "Hotel Melati / Non Bintang",
+    "category": "I - Penyediaan Akomodasi & Makan Minum",
+    "description": "Penyediaan akomodasi penginapan harian skala menengah untuk pelancong dan tamu bisnis."
+  },
+  {
+    "code": "55120",
+    "name": "Pondok Wisata / Homestay / Vila Komersial",
+    "category": "I - Penyediaan Akomodasi & Makan Minum",
+    "description": "Penyewaan vila, pondok alam pedesaan, dan homestay wisata khas kawasan Puncak dan sentra wisata alam Bogor."
+  },
+  {
+    "code": "55130",
+    "name": "Bumi Perkemahan & Glamping (Glamour Camping)",
+    "category": "I - Penyediaan Akomodasi & Makan Minum",
+    "description": "Penyediaan akomodasi tenda mewah, camper van spot, dan sarana camping komersial berwawasan alam."
+  },
+  {
+    "code": "56101",
+    "name": "Restoran Dan Rumah Makan Mandiri",
+    "category": "I - Penyediaan Akomodasi & Makan Minum",
+    "description": "Penyediaan makanan santap di tempat skala besar dengan konsep restoran keluarga, saung sunda, atau casual dining."
+  },
+  {
+    "code": "56301",
+    "name": "Kafe / Coffee Shop / Resto Alam",
+    "category": "I - Penyediaan Akomodasi & Makan Minum",
+    "description": "Penyediaan minuman kopi, santapan ringan, dan ruang rekreasi santai terbuka khas dataran tinggi Bogor."
+  },
+  {
+    "code": "86101",
+    "name": "Aktivitas Rumah Sakit Pemerintah & Swasta",
+    "category": "Q - Aktivitas Kesehatan Manusia",
+    "description": "Pelayanan medis rawat jalan dan rawat inap dengan fasilitas dokter spesialis, bedah, ICU, dan farmasi komprehensif."
+  },
+  {
+    "code": "86103",
+    "name": "Aktivitas Klinik Swasta Rawat Inap & Jalan",
+    "category": "Q - Aktivitas Kesehatan Manusia",
+    "description": "Penyelenggaraan klinik pratama dan utama dengan fasilitas ruang tindakan dan instalasi farmasi mandiri."
+  },
+  {
+    "code": "85121",
+    "name": "Pendidikan Dasar & Menengah Terpadu (Sekolah Swasta)",
+    "category": "P - Pendidikan",
+    "description": "Penyelenggaraan sekolah terpadu swasta (SD/SMP/SMA/SMK) lengkap dengan sarana laboratorium dan olahraga."
+  },
+  {
+    "code": "85311",
+    "name": "Pendidikan Tinggi / Kampus Swasta",
+    "category": "P - Pendidikan",
+    "description": "Penyelenggaraan universitas, politeknik, institut sains, atau sekolah tinggi akademik terpadu."
+  },
+  {
+    "code": "47111",
+    "name": "Perdagangan Eceran Berbagai Macam Barang Di Supermarket / Hypermarket",
+    "category": "G - Perdagangan Besar & Eceran",
+    "description": "Toko swalayan besar yang menjual kebutuhan pokok, makanan, elektronik, pakaian, dan perlengkapan rumah tangga."
+  },
+  {
+    "code": "47301",
+    "name": "Stasiun Pengisian Bahan Bakar Umum (SPBU / SPKLU)",
+    "category": "G - Perdagangan Besar & Eceran",
+    "description": "Penyediaan bahan bakar minyak komersial (bensin, solar) dan instalasi pengisian daya kendaraan listrik umum."
+  },
+  {
+    "code": "10792",
+    "name": "Industri Pengolahan Kopi, Teh, Dan Minuman Herbal",
+    "category": "C - Industri Pengolahan",
+    "description": "Pabrik pengolahan biji kopi sangrai, ekstraksi teh kemasan, dan pengemasan produk minuman serbuk herbal."
+  },
+  {
+    "code": "10799",
+    "name": "Industri Produk Makanan Olahan Lainnya",
+    "category": "C - Industri Pengolahan",
+    "description": "Pabrik pembuatan produk makanan roti, biskuit, penganan ringan, dan bahan pangan olahan siap saji."
+  },
+  {
+    "code": "21012",
+    "name": "Industri Farmasi Dan Obat Tradisional",
+    "category": "C - Industri Pengolahan",
+    "description": "Fasilitas manufaktur formulasi obat-obatan kimia, vaksin, suplemen kesehatan, dan ekstrak jamu fitofarmaka."
+  },
+  {
+    "code": "13121",
+    "name": "Industri Tekstil, Garmen, Dan Pakaian Jadi",
+    "category": "C - Industri Pengolahan",
+    "description": "Pabrik pemintalan benang, pertenunan kain, bordir konveksi, dan pembuatan pakaian jadi siap ekspor."
+  },
+  {
+    "code": "22220",
+    "name": "Industri Barang Dari Plastik Untuk Pengemasan",
+    "category": "C - Industri Pengolahan",
+    "description": "Pabrik pembuatan kemasan plastik botol PET, kantong kemasan steril pangan, dan palet plastik logistik."
+  },
+  {
+    "code": "93211",
+    "name": "Aktivitas Taman Bertema Atau Rekreasi Hiburan",
+    "category": "R - Kesenian, Hiburan & Rekreasi",
+    "description": "Penyediaan wahana permainan keluarga, taman edukasi satwa, waterpark, dan sarana petualangan outbond."
+  },
+  {
+    "code": "01131",
+    "name": "Pertanian Tanaman Pangan & Hortikultura Skala Komersial",
+    "category": "A - Pertanian, Kehutanan & Perikanan",
+    "description": "Budidaya sayuran daun/buah bernilai ekonomis tinggi, tanaman pangan, dan perkebunan buah sistem greenhouse."
+  },
+  {
+    "code": "01411",
+    "name": "Peternakan Sapi Perah Dan Pengolahan Susu Terpadu",
+    "category": "A - Pertanian, Kehutanan & Perikanan",
+    "description": "Pengusahaan kandang sapi perah modern, penampungan pakan silase, dan sentra pendingin susu pasteurisasi."
+  },
+  {
+    "code": "01420",
+    "name": "Peternakan Unggas / Ayam Petelur & Pedaging Modern",
+    "category": "A - Pertanian, Kehutanan & Perikanan",
+    "description": "Pengusahaan kandang sistem tertutup (closed-house) ayam broiler atau petelur ramah lingkungan."
+  }
+]

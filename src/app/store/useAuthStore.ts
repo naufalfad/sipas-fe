@@ -93,10 +93,10 @@ interface AuthState {
   hasPermission: (permission: AppPermission) => boolean;
 }
 
-// Helper to safely parse user from sessionStorage
+// Helper to safely parse user from sessionStorage or localStorage
 const getSavedUser = (): UserAuthProfile | null => {
   try {
-    const saved = sessionStorage.getItem('user');
+    const saved = sessionStorage.getItem('user') || localStorage.getItem('user');
     if (!saved) return null;
     const parsed = JSON.parse(saved);
     if (parsed.username === 'superadmin@geocitra.com' || parsed.email === 'superadmin@geocitra.com') {
@@ -108,10 +108,14 @@ const getSavedUser = (): UserAuthProfile | null => {
   }
 };
 
+const getSavedToken = (): string | null => {
+  return sessionStorage.getItem('token') || localStorage.getItem('token');
+};
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: sessionStorage.getItem('token'),
+  token: getSavedToken(),
   user: getSavedUser(),
-  isAuthenticated: !!sessionStorage.getItem('token'),
+  isAuthenticated: !!getSavedToken(),
 
   login: (token, user) => {
     const normalizedUser = { ...user };
@@ -120,12 +124,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     sessionStorage.setItem('token', token);
     sessionStorage.setItem('user', JSON.stringify(normalizedUser));
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
     set({ token, user: normalizedUser, isAuthenticated: true });
   },
 
   logout: () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     sessionStorage.setItem('justLoggedOut', 'true');
     set({ token: null, user: null, isAuthenticated: false });
   },
@@ -138,6 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         newUser.role = 'SUPER_ADMIN';
       }
       sessionStorage.setItem('user', JSON.stringify(newUser));
+      localStorage.setItem('user', JSON.stringify(newUser));
       return { user: newUser };
     });
   },
