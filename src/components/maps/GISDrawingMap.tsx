@@ -176,6 +176,46 @@ export default function GISDrawingMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [map, allowMultiple, collectAndEmit]);
 
+    // ── Sinkronisasi initialValue jika layerGroup belum memiliki layer ──────────
+    useEffect(() => {
+        if (!map || !layerGroupRef.current || !initialValue || initialValue.length === 0) return;
+
+        let hasExistingLayers = false;
+        layerGroupRef.current.eachLayer(() => {
+            hasExistingLayers = true;
+        });
+
+        // Hanya sinkronisasi jika layer group saat ini kosong
+        if (!hasExistingLayers) {
+            try {
+                const addedLayers: L.Polygon[] = [];
+                initialValue.forEach((ring) => {
+                    if (!ring || ring.length < 3) return;
+                    const latlngs = ring.map(([lng, lat]) => L.latLng(lat, lng));
+                    const polygon = L.polygon(latlngs, {
+                        color: '#0d9488',
+                        fillColor: '#14b8a6',
+                        fillOpacity: 0.2,
+                        weight: 2,
+                    });
+                    polygon.addTo(layerGroupRef.current!);
+                    (polygon as any).pm?.enable?.();
+                    addedLayers.push(polygon);
+                });
+
+                if (addedLayers.length > 0) {
+                    const group = L.featureGroup(addedLayers);
+                    const bounds = group.getBounds();
+                    if (bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+                    }
+                }
+            } catch (err) {
+                console.warn('[GISDrawingMap] Gagal sinkronisasi nilai awal:', err);
+            }
+        }
+    }, [map, initialValue]);
+
     // ── Load GeoJSON baru saat initialGeoJson berubah ─────────────────────────
     useEffect(() => {
         if (!map || !layerGroupRef.current || !initialGeoJson) return;

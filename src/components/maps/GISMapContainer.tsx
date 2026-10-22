@@ -23,6 +23,10 @@ interface GISMapContainerProps {
     zoom?: number;
     children?: React.ReactNode;
     className?: string;
+    /** Slot kontrol tambahan untuk disematkan di navbar saat fullscreen (misal: pemilih PKKPR) */
+    headerExtra?: React.ReactNode;
+    /** Slot konten overlay (misal: legenda spasial) yang tampil di kanvas peta */
+    overlayExtra?: React.ReactNode;
 }
 
 
@@ -356,6 +360,8 @@ export default function GISMapContainer({
     zoom = 14,
     children,
     className = 'w-full h-full rounded-xl shadow-inner border border-slate-200',
+    headerExtra,
+    overlayExtra,
 }: GISMapContainerProps) {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [activeBaseMap, setActiveBaseMap] = useState<keyof typeof BASEMAPS>('osm');
@@ -447,11 +453,19 @@ export default function GISMapContainer({
         setIsLayerMenuOpen(false);
     };
 
-    // Mode Fullscreen dengan struktur navbar & sidebar terintegrasi
-    if (isFullscreen) {
-        return (
-            <div className="fixed inset-0 z-[9999] bg-slate-50 w-screen h-screen flex flex-col font-sans select-none antialiased text-slate-800">
-                {/* 1. NAVBAR ATAS TEMA GIS VIEWERS */}
+    // Render Peta Tunggal Persisten (Mencegah destroy/remount canvas saat toggle Fullscreen)
+    return (
+        <div
+            className={cn(
+                isFullscreen
+                    ? "fixed inset-0 z-[9999] bg-slate-50 w-screen h-screen flex flex-col font-sans select-none antialiased text-slate-800"
+                    : cn(className, "relative"),
+                "overflow-hidden"
+            )}
+            style={!isFullscreen ? { width: '100%', height: '100%' } : undefined}
+        >
+            {/* 1. NAVBAR ATAS TEMA GIS VIEWERS (Hanya tampil saat Fullscreen) */}
+            {isFullscreen && (
                 <header className="h-16 px-6 flex items-center justify-between bg-white border-b border-slate-200 shadow-sm shrink-0">
                     <div className="flex items-center gap-3 text-left">
                         <Globe size={22} className="text-teal-600 shrink-0" strokeWidth={2} />
@@ -465,6 +479,13 @@ export default function GISMapContainer({
                         </div>
                     </div>
 
+                    {/* Slot Kontrol Tambahan Header Fullscreen (e.g. Pemilih SK PKKPR) */}
+                    {headerExtra && (
+                        <div className="flex items-center gap-2">
+                            {headerExtra}
+                        </div>
+                    )}
+
                     <button
                         type="button"
                         onClick={() => setIsFullscreen(false)}
@@ -476,10 +497,12 @@ export default function GISMapContainer({
                         </span>
                     </button>
                 </header>
+            )}
 
-                {/* 2. AREA WORKSPACE UTAMA DENGAN SIDEBAR KIRI */}
-                <div className="flex flex-1 relative overflow-hidden">
-                    {/* SIDEBAR KIRI (Lebar 64px) TEMA BRIGHT COHESIVE */}
+            {/* 2. AREA WORKSPACE UTAMA */}
+            <div className={cn("relative overflow-hidden", isFullscreen ? "flex flex-1 h-[calc(100vh-64px)]" : "w-full h-full")}>
+                {/* SIDEBAR KIRI (Hanya tampil saat Fullscreen) */}
+                {isFullscreen && (
                     <aside className="w-16 h-full flex flex-col items-center bg-white border-r border-slate-200 shrink-0 z-[1000] py-0">
                         {/* Selector Basemap */}
                         <div className="relative group w-full flex justify-center h-16">
@@ -597,64 +620,78 @@ export default function GISMapContainer({
                             </span>
                         </button>
                     </aside>
+                )}
 
-                    {/* KANVAS PETA UTAMA */}
-                    <div className="flex-1 h-full relative">
-                        <MapContainer
-                            center={center}
-                            zoom={zoom}
-                            minZoom={4}
+                {/* KANVAS PETA UTAMA — TUNGGAL DAN PERSISTEN */}
+                <div className="flex-1 h-full w-full relative">
+                    <MapContainer
+                        center={center}
+                        zoom={zoom}
+                        minZoom={4}
+                        maxZoom={20}
+                        zoomControl={false}
+                        style={{ width: '100%', height: '100%' }}
+                        maxBounds={[[-15, 90], [15, 150]]}
+                        maxBoundsViscosity={1.0}
+                    >
+                        <TileLayer
+                            key={activeBaseMap}
+                            url={BASEMAPS[activeBaseMap].url}
+                            attribution={BASEMAPS[activeBaseMap].attribution}
                             maxZoom={20}
-                            zoomControl={false}
-                            style={{ width: '100%', height: '100%' }}
-                            maxBounds={[[-15, 90], [15, 150]]}
-                            maxBoundsViscosity={1.0}
-                        >
-                            <TileLayer
-                                key={activeBaseMap}
-                                url={BASEMAPS[activeBaseMap].url}
-                                attribution={BASEMAPS[activeBaseMap].attribution}
-                                maxZoom={20}
-                                maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
+                            maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
+                        />
+                        {/* Batas Administrasi Wilayah Kabupaten Bogor (dengan Mask Redup / Fokus Wilayah) */}
+                        {isMaskActive && maskRings.length > 0 && (
+                            <Polygon
+                                positions={maskRings}
+                                pathOptions={{
+                                    color: 'transparent',
+                                    weight: 0,
+                                    fillColor: '#090d16',
+                                    fillOpacity: maskOpacity / 100,
+                                    interactive: false
+                                }}
                             />
-                            {/* Batas Administrasi Wilayah Kabupaten Bogor (dengan Mask Redup / Fokus Wilayah) */}
-                            {isMaskActive && maskRings.length > 0 && (
-                                <Polygon
-                                    positions={maskRings}
-                                    pathOptions={{
-                                        color: 'transparent',
-                                        weight: 0,
-                                        fillColor: '#090d16',
-                                        fillOpacity: maskOpacity / 100,
-                                        interactive: false
-                                    }}
-                                />
-                            )}
-                            {/* Garis Batas Administrasi Terluar Resmi dari GeoJSON */}
-                            {isMaskActive && bogorOutlineGeoJson && (
-                                <GeoJSON
-                                    data={bogorOutlineGeoJson}
-                                    style={{
-                                        color: '#0f766e',
-                                        weight: 2,
-                                        fill: false,
-                                        interactive: false
-                                    }}
-                                />
-                            )}
-                            <MapSyncListener
-                                zoomInTrigger={zoomInTrigger}
-                                zoomOutTrigger={zoomOutTrigger}
-                                onZoomChange={setCurrentZoom}
+                        )}
+                        {/* Garis Batas Administrasi Terluar Resmi dari GeoJSON */}
+                        {isMaskActive && bogorOutlineGeoJson && (
+                            <GeoJSON
+                                data={bogorOutlineGeoJson}
+                                style={{
+                                    color: '#0f766e',
+                                    weight: 2,
+                                    fill: false,
+                                    interactive: false
+                                }}
+                            />
+                        )}
+                        <MapSyncListener
+                            zoomInTrigger={zoomInTrigger}
+                            zoomOutTrigger={zoomOutTrigger}
+                            onZoomChange={setCurrentZoom}
+                            isFullscreen={isFullscreen}
+                            onMouseMove={setCursorCoords}
+                            onAreaChange={setCalculatedArea}
+                            onCenterChange={setCenterPoint}
+                        />
+                        {!isFullscreen && (
+                            <MapControls
                                 isFullscreen={isFullscreen}
-                                onMouseMove={setCursorCoords}
-                                onAreaChange={setCalculatedArea}
-                                onCenterChange={setCenterPoint}
+                                setIsFullscreen={setIsFullscreen}
+                                activeBaseMap={activeBaseMap}
+                                setActiveBaseMap={setActiveBaseMap}
+                                isMaskActive={isMaskActive}
+                                setIsMaskActive={setIsMaskActive}
+                                maskOpacity={maskOpacity}
+                                setMaskOpacity={setMaskOpacity}
                             />
-                            {children}
-                        </MapContainer>
+                        )}
+                        {children}
+                    </MapContainer>
 
-                        {/* FLOATING MAP HUD / CARD INFORMASI SPASIAL DI KANAN BAWAH */}
+                    {/* FLOATING MAP HUD / CARD INFORMASI SPASIAL DI KANAN BAWAH (Hanya saat Fullscreen) */}
+                    {isFullscreen && (
                         <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm border border-slate-200 shadow-lg p-4 w-72 text-left text-xs z-[1000] flex flex-col gap-3 rounded-none">
                             <div className="border-b border-slate-100 pb-2">
                                 <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
@@ -696,84 +733,18 @@ export default function GISMapContainer({
                             <div className="border-t border-slate-100 pt-2 text-[9.5px] leading-relaxed text-slate-400">
                                 <span className="font-bold text-slate-500 uppercase block mb-1">Bantuan Menggambar:</span>
                                 <ul className="list-disc pl-3.5 space-y-0.5">
-                                    <li>Pilih alat gambar poligon di sudut kiri atas peta.</li>
+                                    <li>Pilih alat gambar poligon di sudut kanan atas peta.</li>
                                     <li>Klik peta untuk membuat batas bidang tanah baru.</li>
                                     <li>Gunakan tombol **Base Map** di sidebar untuk mengganti visualisasi satelit.</li>
                                 </ul>
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Konten Overlay Tambahan (e.g. Legenda di kiri bawah) */}
+                    {overlayExtra}
                 </div>
             </div>
-        );
-    }
-
-    // Tampilan default inline map
-    return (
-        <div className={cn(className, 'relative')} style={{ width: '100%', height: '100%' }}>
-            <MapContainer
-                center={center}
-                zoom={zoom}
-                minZoom={4}
-                maxZoom={20}
-                zoomControl={false}
-                style={{ width: '100%', height: '100%' }}
-                maxBounds={[[-15, 90], [15, 150]]}
-                maxBoundsViscosity={1.0}
-            >
-                <TileLayer
-                    key={activeBaseMap}
-                    url={BASEMAPS[activeBaseMap].url}
-                    attribution={BASEMAPS[activeBaseMap].attribution}
-                    maxZoom={20}
-                    maxNativeZoom={BASEMAPS[activeBaseMap].maxNativeZoom}
-                />
-                {/* Batas Administrasi Wilayah Kabupaten Bogor (dengan Mask Redup / Fokus Wilayah) */}
-                {isMaskActive && maskRings.length > 0 && (
-                    <Polygon
-                        positions={maskRings}
-                        pathOptions={{
-                            color: 'transparent',
-                            weight: 0,
-                            fillColor: '#090d16',
-                            fillOpacity: maskOpacity / 100,
-                            interactive: false
-                        }}
-                    />
-                )}
-                {/* Garis Batas Administrasi Terluar Resmi dari GeoJSON */}
-                {isMaskActive && bogorOutlineGeoJson && (
-                    <GeoJSON
-                        data={bogorOutlineGeoJson}
-                        style={{
-                            color: '#0f766e',
-                            weight: 2,
-                            fill: false,
-                            interactive: false
-                        }}
-                    />
-                )}
-                <MapSyncListener
-                    zoomInTrigger={zoomInTrigger}
-                    zoomOutTrigger={zoomOutTrigger}
-                    onZoomChange={setCurrentZoom}
-                    isFullscreen={isFullscreen}
-                    onMouseMove={setCursorCoords}
-                    onAreaChange={setCalculatedArea}
-                    onCenterChange={setCenterPoint}
-                />
-                <MapControls
-                    isFullscreen={isFullscreen}
-                    setIsFullscreen={setIsFullscreen}
-                    activeBaseMap={activeBaseMap}
-                    setActiveBaseMap={setActiveBaseMap}
-                    isMaskActive={isMaskActive}
-                    setIsMaskActive={setIsMaskActive}
-                    maskOpacity={maskOpacity}
-                    setMaskOpacity={setMaskOpacity}
-                />
-                {children}
-            </MapContainer>
         </div>
     );
 }

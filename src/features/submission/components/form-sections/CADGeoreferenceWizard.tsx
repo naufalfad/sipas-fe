@@ -31,8 +31,15 @@ export const CADGeoreferenceWizard = ({
 
   if (!isOpen) return null;
 
-  // Temukan konfigurasi titik kontrol berdasarkan nama berkas CAD
-  const activeControlConfig = MOCK_SITEPLAN_CONTROL_POINTS[cadFileName];
+  // Temukan konfigurasi titik kontrol berdasarkan nama berkas CAD dengan pencarian pintar
+  const activeControlConfig = 
+    MOCK_SITEPLAN_CONTROL_POINTS[cadFileName] ||
+    Object.entries(MOCK_SITEPLAN_CONTROL_POINTS).find(([k]) => 
+      cadFileName.toLowerCase().includes(k.toLowerCase().replace(/\.(dxf|dwg)$/, ''))
+    )?.[1] ||
+    (cadFileName.toLowerCase().includes('geocitra') 
+      ? MOCK_SITEPLAN_CONTROL_POINTS['CAD_Siteplan_Tahap1_Geocitra.dxf'] 
+      : MOCK_SITEPLAN_CONTROL_POINTS['sample_siteplan.dxf']);
   const normalizedLandPolygon = landPolygon?.map(([first, second]) =>
     first < 20 && second > 90 ? [second, first] as [number, number] : [first, second] as [number, number]
   );

@@ -102,6 +102,7 @@ export const PKKPRCreateWizard: React.FC = () => {
   // State Dokumen Persyaratan
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, UploadedDocState>>({});
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [uploadedGeoJson, setUploadedGeoJson] = useState<any>(null);
 
   // State Integritas
   const [agreementChecked, setAgreementChecked] = useState(false);
@@ -238,6 +239,7 @@ export const PKKPRCreateWizard: React.FC = () => {
           geometry: polygonForTurf,
           proposed_land_area_m2: areaM2 > 0 ? areaM2 : prev.proposed_land_area_m2
         }));
+        setUploadedGeoJson(polygonForTurf);
 
         toast.success(
           `Poligon spasial berhasil dimuat! Luas terhitung: ${areaM2.toLocaleString('id-ID')} m²`
@@ -952,6 +954,7 @@ export const PKKPRCreateWizard: React.FC = () => {
                   initialValue={
                     formData.geometry?.coordinates ? (formData.geometry.coordinates as any) : undefined
                   }
+                  initialGeoJson={uploadedGeoJson}
                 />
               </GISMapContainer>
             </div>

@@ -254,6 +254,7 @@ export interface PKKPRSitePlanItem {
   status: string;
   submission_date?: string | null;
   sk_number?: string | null;
+  geometry?: any | null;
 }
 
 export interface PKKPREnvelope {
@@ -279,6 +280,7 @@ export interface PKKPRQuotaSummary {
   utilization_percent: number;
   siteplans_count: number;
   siteplans: PKKPRSitePlanItem[];
+  pkkpr_geometry?: any | null;
   envelope?: PKKPREnvelope | null;
 }
 
