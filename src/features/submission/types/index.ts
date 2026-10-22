@@ -140,6 +140,14 @@ export interface TechnicalDetails {
   applicantBuildingArea?: number; // Luas bangunan dalam satuan m2
   applicantGsb?: number;          // GSB dalam satuan meter
   applicantRthArea?: number;      // Luas RTH rencana dalam satuan m2
+
+  // Sempadan Lengkap (Perbup Bogor No. 4/2025 & Permen PUPR 28/2015)
+  applicantGsbLocal?: number;
+  sempadanSungai?: number;
+  sempadanDanau?: number;
+  sempadanSaluranIrigasi?: number;
+  sempadanMataAir?: number;
+  sempadanKhususLainnya?: string;
 }
 
 export interface ConsultantDetails {

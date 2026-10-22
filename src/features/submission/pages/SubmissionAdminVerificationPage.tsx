@@ -196,7 +196,7 @@ export default function SubmissionAdminVerificationPage() {
       },
       {
         aspekCode: 'cadDoc',
-        aspekLabel: 'Validitas Peta Koordinat CAD (.dwg/.dxf)',
+        aspekLabel: 'Validitas Peta Koordinat CAD (.dxf)',
         statusKelayakan: 'Sesuai',
         catatanVerifikator: 'Berkas peta CAD koordinat valid.',
         verifiedById: user?.id,
@@ -371,7 +371,7 @@ export default function SubmissionAdminVerificationPage() {
               {/* Peta Koordinat CAD */}
               <div className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
                 <div className="space-y-0.5">
-                  <span className="font-bold text-slate-800 block">Berkas Peta Koordinat CAD (.dwg/.dxf)</span>
+                  <span className="font-bold text-slate-800 block">Berkas Peta Koordinat CAD (.dxf)</span>
                   <span className="text-[9px] text-slate-400 font-mono">{getDocName('cadDoc') || 'peta_siteplan.dxf'}</span>
                 </div>
                 {getDocUrl('cadDoc') ? (
@@ -554,7 +554,7 @@ export default function SubmissionAdminVerificationPage() {
                   onChange={(e) => setAdminChecks(prev => ({ ...prev, cad: e.target.checked }))}
                   className="mt-0.5 h-4.5 w-4.5 border-border rounded-none text-primary focus:ring-primary"
                 />
-                <span className="text-xs font-semibold text-slate-700">Berkas biner koordinat peta CAD (.dwg/.dxf) dapat dibuka</span>
+                <span className="text-xs font-semibold text-slate-700">Berkas koordinat peta CAD (.dxf) dapat dibuka</span>
               </label>
 
             </div>

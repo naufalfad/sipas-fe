@@ -60,7 +60,7 @@ export const coordinateSchema = z.object({
   coordinatesText: z.string().optional(), // Menyimpan penulisan manual teks GeoJSON koordinat
 
   // Parameter Kalibrasi Helmert 2D terhitung
-  cadFileName: z.string().optional(),       // Nama file CAD (.dwg / .dxf) asal
+  cadFileName: z.string().optional(),       // Nama file CAD (.dxf) asal
   cadFilePath: z.string().optional(),
   anchorCad1: z.tuple([z.number(), z.number()]).optional(),
   anchorCad2: z.tuple([z.number(), z.number()]).optional(),
@@ -110,15 +110,15 @@ export const technicalSchema = z.object({
   ),
   kdb: z.preprocess(
     numericPreprocess,
-    z.number().min(0).max(100, 'KDB maksimal 100%').optional()
+    z.number().min(0, 'KDB tidak boleh negatif').optional()
   ),
   klb: z.preprocess(
     numericPreprocess,
-    z.number().positive('KLB harus berupa angka positif').optional()
+    z.number().min(0, 'KLB tidak boleh negatif').optional()
   ),
   kdh: z.preprocess(
     numericPreprocess,
-    z.number().min(0).max(100, 'KDH maksimal 100%').optional()
+    z.number().min(0, 'KDH tidak boleh negatif').optional()
   ),
   parkingCapacity: z.preprocess(
     numericPreprocess,
@@ -165,19 +165,42 @@ export const technicalSchema = z.object({
   roadPlan: z.string().optional(),
   drainagePlan: z.string().optional(),
 
-  // Metrik Proposed Pengembang (Proposed)
+  // Metrik Proposed Pengembang (Proposed) - Opsional / Fleksibel
   applicantBuildingArea: z.preprocess(
     numericPreprocess,
-    z.number().positive("Luas bangunan wajib diisi")
+    z.number().positive("Luas bangunan harus bernilai positif").optional()
   ),
   applicantGsb: z.preprocess(
     numericPreprocess,
-    z.number().min(0, "GSB tidak boleh negatif")
+    z.number().min(0, "GSB tidak boleh negatif").optional()
   ),
   applicantRthArea: z.preprocess(
     numericPreprocess,
-    z.number().min(0, "Luas RTH tidak boleh negatif")
-  )
+    z.number().min(0, "Luas RTH tidak boleh negatif").optional()
+  ),
+
+  // Ketentuan Sempadan Lengkap (Perbup Bogor No. 4/2025 & Permen PUPR 28/2015)
+  applicantGsbLocal: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, "GSB Jalan Lingkungan tidak boleh negatif").optional()
+  ),
+  sempadanSungai: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, "Sempadan sungai tidak boleh negatif").optional()
+  ),
+  sempadanDanau: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, "Sempadan situ/danau tidak boleh negatif").optional()
+  ),
+  sempadanSaluranIrigasi: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, "Sempadan saluran irigasi tidak boleh negatif").optional()
+  ),
+  sempadanMataAir: z.preprocess(
+    numericPreprocess,
+    z.number().min(0, "Sempadan mata air/tebing tidak boleh negatif").optional()
+  ),
+  sempadanKhususLainnya: z.string().optional()
 });
 
 // ─── TAHAP 7: DATA KONSULTAN PERENCANA (CONSULTANT) ─────────────────────────

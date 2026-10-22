@@ -319,7 +319,7 @@ export const SpatialSection = () => {
 
               {/* Tampilkan Kartu Kuota Interaktif (PKKPRQuotaCard) */}
               {selectedQuota && !isLoadingQuota && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Informasi Kuota Bertahap & Parameter Terverifikasi:</span>
@@ -328,6 +328,25 @@ export const SpatialSection = () => {
                     summary={selectedQuota}
                     currentProposedAreaM2={landArea}
                   />
+
+                  {/* Penyesuaian / Verifikasi Luas Usulan Tahap Ini */}
+                  <div className="p-3.5 bg-white border border-emerald-200/90 rounded-xl shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">
+                        Luas Usulan Tahap Ini (m²)
+                      </span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">
+                        Tersinkronisasi otomatis dari luas gambar batas peta/CAD di Tahap 4. Anda tetap dapat menyesuaikan angka ini bila dibutuhkan.
+                      </span>
+                    </div>
+                    <div className="w-full sm:w-48 shrink-0">
+                      <FormattedInput
+                        name="location.landArea"
+                        placeholder="Luas usulan (m²)"
+                        unit="m²"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -9,9 +9,12 @@ import {
   ExternalLink,
   Download,
   Printer,
-  FileCheck
+  FileCheck,
+  Layers,
+  Loader2
 } from 'lucide-react';
-import { GeoJSON } from 'react-leaflet';
+import { GeoJSON, useMap } from 'react-leaflet';
+import L from 'leaflet';
 
 import { pkkprApi } from '../api/pkkprApi';
 import type { PKKPRDetail } from '../types/pkkpr.types';
@@ -29,6 +32,57 @@ const getFileUrl = (filePath: string) => {
   const cleanPath = filePath.replace(/^\/+/, '');
   return `${API_BASE_URL}/${cleanPath}`;
 };
+
+/**
+ * Controller kamera Leaflet: Otomatis mengarahkan (fitBounds) kamera peta
+ * langsung ke batas poligon SK PKKPR serta seluruh lapisan CAD Site Plan yang ada.
+ */
+function PKKPRMapController({
+  pkkprGeometry,
+  siteplansGeoJson
+}: {
+  pkkprGeometry?: any;
+  siteplansGeoJson?: any;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.invalidateSize();
+    try {
+      let combinedBounds: L.LatLngBounds | null = null;
+      if (pkkprGeometry) {
+        const pkkprLayer = L.geoJSON(pkkprGeometry);
+        const b = pkkprLayer.getBounds();
+        if (b.isValid()) {
+          combinedBounds = b;
+        }
+      }
+      if (siteplansGeoJson?.features?.length > 0) {
+        const cadLayer = L.geoJSON(siteplansGeoJson);
+        const cadBounds = cadLayer.getBounds();
+        if (cadBounds.isValid()) {
+          if (combinedBounds) {
+            combinedBounds.extend(cadBounds);
+          } else {
+            combinedBounds = cadBounds;
+          }
+        }
+      }
+      if (combinedBounds && combinedBounds.isValid()) {
+        map.fitBounds(combinedBounds, {
+          padding: [40, 40],
+          maxZoom: 18,
+          animate: true,
+          duration: 1.2
+        });
+      }
+    } catch (err) {
+      console.error('[PKKPRDetailPage] Gagal kalkulasi bounds Leaflet:', err);
+    }
+  }, [map, pkkprGeometry, siteplansGeoJson]);
+
+  return null;
+}
 
 export const PKKPRDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +105,9 @@ export const PKKPRDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Spasial & CAD Site Plan Terpadu
+  const [siteplansGeoJson, setSiteplansGeoJson] = useState<any>(null);
+  const [loadingSiteplansMap, setLoadingSiteplansMap] = useState(false);
 
   // Modal / Form States
   const [showSpatialModal, setShowSpatialModal] = useState(false);
@@ -106,7 +163,42 @@ export const PKKPRDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadDetail();
+    if (id) {
+      setLoadingSiteplansMap(true);
+      pkkprApi.getSiteplansGeoJson(id)
+        .then((data) => {
+          setSiteplansGeoJson(data);
+        })
+        .catch((err) => console.error('[PKKPRDetailPage] Gagal memuat CAD siteplans:', err))
+        .finally(() => {
+          setLoadingSiteplansMap(false);
+        });
+    }
   }, [id]);
+
+  const initialMapCenter = React.useMemo<[number, number]>(() => {
+    if (detail?.geometry) {
+      try {
+        const layer = L.geoJSON(detail.geometry as any);
+        const bounds = layer.getBounds();
+        if (bounds.isValid()) {
+          const center = bounds.getCenter();
+          return [center.lat, center.lng];
+        }
+      } catch {}
+    }
+    return [-6.4816, 106.8560];
+  }, [detail?.geometry]);
+
+  const distinctSitePlansCount = React.useMemo(() => {
+    if (!siteplansGeoJson?.features) return 0;
+    const subNos = new Set(
+      siteplansGeoJson.features
+        .map((f: any) => f?.properties?.submission_no)
+        .filter(Boolean)
+    );
+    return subNos.size;
+  }, [siteplansGeoJson]);
 
   const handleClaimAdmin = async () => {
     if (!id) return;
@@ -487,34 +579,145 @@ export const PKKPRDetailPage: React.FC = () => {
             )}
           </div>
 
-          {/* Peta Poligon Lahan WGS84 */}
+          {/* Peta Poligon Lahan WGS84 & CAD Site Plan Terpadu */}
           {detail.geometry && (
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-emerald-600" /> Batas Spasial Poligon Lahan
-                </h2>
-                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded">
-                  GeoJSON PostGIS (SRID 4326)
-                </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-2">
+                <div>
+                  <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <Compass className="w-5 h-5 text-emerald-600" /> Batas Spasial PKKPR & Rencana Tapak CAD
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Visualisasi batas SK PKKPR terpadu dengan poligon site plan (AutoCAD DXF) yang telah diajukan
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {loadingSiteplansMap ? (
+                    <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded flex items-center gap-1.5 shadow-xs">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> Memuat CAD Site Plan...
+                    </span>
+                  ) : distinctSitePlansCount > 0 ? (
+                    <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded flex items-center gap-1.5 shadow-xs">
+                      <Layers className="w-3.5 h-3.5 text-blue-600" /> Terisi {distinctSitePlansCount} Tahap Site Plan ({siteplansGeoJson?.features?.length || 0} Fitur CAD)
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded">
+                      SK PKKPR Induk (Belum Ada Site Plan)
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="h-72 w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
+              <div className="h-96 w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
                 <GISMapContainer
-                  center={[-6.597, 106.800]}
-                  zoom={14}
+                  center={initialMapCenter}
+                  zoom={16}
                   className="h-full w-full"
                 >
+                  <PKKPRMapController
+                    pkkprGeometry={detail.geometry}
+                    siteplansGeoJson={siteplansGeoJson}
+                  />
+
+                  {/* 1. Poligon Batas Izin SK PKKPR Induk */}
                   <GeoJSON
+                    key={`pkkpr-base-${detail.id}`}
                     data={detail.geometry as any}
                     style={{
                       color: '#059669',
                       weight: 3,
+                      dashArray: '6, 6',
                       fillColor: '#10b981',
-                      fillOpacity: 0.25
+                      fillOpacity: 0.12
+                    }}
+                    onEachFeature={(_feature, layer) => {
+                      layer.bindTooltip(
+                        `<div style="font-family: sans-serif; font-size: 11px; line-height: 1.4;">
+                           <strong style="color: #059669;">Batas Izin SK PKKPR Induk</strong><br/>
+                           <span>Nomor: <strong>${detail.sk_number || detail.submission_no}</strong></span><br/>
+                           <span>Luas Izin: <strong>${(detail.approved_land_area_m2 || detail.proposed_land_area_m2).toLocaleString('id-ID')} m²</strong></span>
+                         </div>`,
+                        { sticky: true }
+                      );
                     }}
                   />
+
+                  {/* 2. Fitur Geometri AutoCAD Site Plan Bertahap */}
+                  {siteplansGeoJson?.features?.length > 0 && (
+                    <GeoJSON
+                      key={`cad-features-${detail.id}-${siteplansGeoJson.features.length}`}
+                      data={siteplansGeoJson}
+                      style={(feature) => {
+                        const p = feature?.properties;
+                        const color = p?.color || '#0284c7';
+                        const isBoundary = p?.layer_name === 'PTSP_BATAS_LAHAN';
+                        return {
+                          color: isBoundary ? '#0284c7' : color,
+                          weight: isBoundary ? 2.5 : 1,
+                          dashArray: isBoundary ? '4, 4' : undefined,
+                          fillColor: color,
+                          fillOpacity: p?.fillOpacity || 0.65
+                        };
+                      }}
+                      onEachFeature={(feature, layer) => {
+                        const p = feature?.properties || {};
+                        const layerLabels: Record<string, string> = {
+                          PTSP_BATAS_LAHAN: 'Batas Kavling Tahap Site Plan',
+                          PTSP_KDB: 'Kaveling Hunian (KDB)',
+                          PTSP_PSU_JALAN: 'Jaringan Jalan Lingkungan (ROW)',
+                          PTSP_KDH: 'Ruang Terbuka Hijau / Taman (KDH)',
+                          PTSP_PSU_MAKAM: 'Alokasi Lahan Makam (PSU)'
+                        };
+                        const label = layerLabels[p.layer_name] || p.layer_name || 'Fitur CAD';
+                        layer.bindTooltip(
+                          `<div style="font-family: sans-serif; font-size: 11px; line-height: 1.4;">
+                             <strong style="color: #0369a1;">${p.submission_no || 'Site Plan'}</strong><br/>
+                             <span style="color: #334155;">${p.housing_name || ''}</span><br/>
+                             <span style="font-weight: 600; color: #475569;">${label}</span>
+                           </div>`,
+                          { sticky: true }
+                        );
+                      }}
+                    />
+                  )}
                 </GISMapContainer>
+              </div>
+
+              {/* Legenda Spasial Terpadu */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-2.5 rounded-xs border-2 border-dashed border-emerald-600 bg-emerald-100/50 inline-block" />
+                    <span className="font-medium text-slate-700">SK PKKPR Induk</span>
+                  </div>
+                  {distinctSitePlansCount > 0 && (
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-4 h-2.5 rounded-xs border-2 border-dashed border-sky-600 bg-sky-100/50 inline-block" />
+                        <span className="font-medium text-slate-700">Batas Tahap Site Plan</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded-xs bg-[#475569] inline-block" />
+                        <span className="font-medium text-slate-700">Kaveling (KDB)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded-xs bg-[#cbd5e1] border border-slate-300 inline-block" />
+                        <span className="font-medium text-slate-700">Jalan Lingkungan</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded-xs bg-[#10b981] inline-block" />
+                        <span className="font-medium text-slate-700">RTH / Taman (KDH)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded-xs bg-[#eab308] inline-block" />
+                        <span className="font-medium text-slate-700">Makam (PSU)</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  EPSG:4326 PostGIS | Auto-fit Bounds Aktif
+                </div>
               </div>
             </div>
           )}

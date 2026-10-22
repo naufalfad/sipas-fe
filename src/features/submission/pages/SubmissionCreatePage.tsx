@@ -3,9 +3,12 @@ import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, ChevronRight, ChevronLeft, CheckCircle2, ShieldCheck, FileCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { SubmissionService } from '@/features/submission/services/submission.service';
+import { pkkprApi } from '@/features/pkkpr/api/pkkprApi';
+import type { PKKPRListItem } from '@/features/pkkpr/types/pkkpr.types';
+import { PKKPRSelectionModal } from '../components/PKKPRSelectionModal';
 import { fullSubmissionSchema, type FullSubmissionFormValues } from '../schemas/submissionFormSchema';
 import {
   ApplicantSection, SubmissionSection, LocationSection, CoordinateSection,
@@ -36,28 +39,137 @@ export default function SubmissionCreatePage() {
   const preselectedPkkprId = (location.state as any)?.preselected_pkkpr_id;
   const preselectedPkkprNo = (location.state as any)?.preselected_pkkpr_no;
 
+  // STEP 0 PRE-FLIGHT MODAL: Muncul otomatis saat pengajuan baru (kecuali sudah ada preselected PKKPR atau sedang edit draf)
+  const [isPKKPRModalOpen, setIsPKKPRModalOpen] = useState<boolean>(!id && !preselectedPkkprId);
+  const [isAutoFilling, setIsAutoFilling] = useState<boolean>(false);
+
   const methods = useForm<FullSubmissionFormValues>({
     resolver: zodResolver(fullSubmissionSchema) as Resolver<FullSubmissionFormValues>,
     defaultValues: {
-      applicant: { type: 'PERORANGAN' },
+      applicant: { type: 'BADAN_USAHA' },
       submission: { submissionType: 'BARU', category: 'PERUMAHAN' },
-      location: { ownershipStatus: 'SHM' },
+      location: { ownershipStatus: 'HGB' },
       spatial: {
         pkkprId: preselectedPkkprId || undefined,
+        pkkprOrigin: 'INTERNAL',
         kkprNumber: preselectedPkkprNo || '',
       }
     },
     mode: 'onTouched',
   });
 
+  const connectedPkkprId = methods.watch('spatial.pkkprId');
+  const connectedKkprNo = methods.watch('spatial.kkprNumber');
+
+  // Ambil data kuota real-time jika SK PKKPR terpilih
+  const { data: activePkkprQuota } = useQuery({
+    queryKey: ['active-pkkpr-quota-summary', connectedPkkprId],
+    queryFn: () => pkkprApi.getQuotaSummary(connectedPkkprId!),
+    enabled: !!connectedPkkprId,
+    staleTime: 10000,
+  });
+
+  // FUNGSI UTAMA AUTO-FILL DARI SK PKKPR SAH:
+  // Mengisi identitas, lokasi, intensitas ruang, serta poligon tapak awal
+  // Seluruh kolom TETAP 100% EDITABLE sehingga pemohon dapat menyesuaikan bila ada perbedaan riil
+  const handleSelectPKKPR = async (pkkprItem: PKKPRListItem | { id: string }) => {
+    try {
+      setIsAutoFilling(true);
+      const [detail, quota] = await Promise.all([
+        pkkprApi.getDetail(pkkprItem.id),
+        pkkprApi.getQuotaSummary(pkkprItem.id).catch(() => null)
+      ]);
+
+      if (detail) {
+        // 1. Data Pemohon (Applicant) - 100% editable
+        const isHousing = detail.kbli_code?.startsWith('68') || methods.getValues('submission.category') === 'PERUMAHAN';
+        methods.setValue('applicant.type', isHousing ? 'BADAN_USAHA' : (detail.applicant_type || 'BADAN_USAHA'), { shouldDirty: true });
+        if (detail.applicant_name) methods.setValue('applicant.name', detail.applicant_name, { shouldDirty: true });
+        if (detail.applicant_nik) methods.setValue('applicant.nik', detail.applicant_nik, { shouldDirty: true });
+        if (detail.applicant_nib) methods.setValue('applicant.nib', detail.applicant_nib, { shouldDirty: true });
+        if (detail.applicant_npwp) methods.setValue('applicant.npwp', detail.applicant_npwp, { shouldDirty: true });
+        if (detail.applicant_phone) methods.setValue('applicant.phone', detail.applicant_phone, { shouldDirty: true });
+        if (detail.applicant_email) methods.setValue('applicant.email', detail.applicant_email, { shouldDirty: true });
+        if (detail.location_address) methods.setValue('applicant.address', detail.location_address, { shouldDirty: true });
+
+        // 2. Data Pengajuan (Submission) - 100% editable
+        if (detail.activity_description) {
+          methods.setValue('submission.activityName', detail.activity_description, { shouldDirty: true });
+        }
+        methods.setValue('submission.category', isHousing ? 'PERUMAHAN' : 'NON_PERUMAHAN', { shouldDirty: true });
+
+        // 3. Data Lokasi Administrasi (Location) - 100% editable
+        if (detail.activity_description) methods.setValue('location.locationName', detail.activity_description, { shouldDirty: true });
+        if (detail.location_village) methods.setValue('location.village', detail.location_village, { shouldDirty: true });
+        if (detail.location_district) methods.setValue('location.district', detail.location_district, { shouldDirty: true });
+        methods.setValue('location.city', detail.location_city || 'Kabupaten Bogor');
+        methods.setValue('location.province', 'Jawa Barat');
+        if (detail.location_address) methods.setValue('location.fullAddress', detail.location_address, { shouldDirty: true });
+
+        // Kuota Lahan / Luas Disetujui
+        const remainingLand = quota?.remaining_area_m2 ?? detail.approved_land_area_m2 ?? detail.proposed_land_area_m2 ?? 0;
+        if (remainingLand > 0) {
+          methods.setValue('location.landArea', remainingLand, { shouldDirty: true, shouldValidate: true });
+        }
+
+        if (detail.land_ownership_status) {
+          methods.setValue('location.ownershipStatus', (detail.land_ownership_status as any) || 'HGB', { shouldDirty: true });
+        }
+        if (detail.certificate_number) methods.setValue('location.certificateNumber', detail.certificate_number, { shouldDirty: true });
+        if (detail.certificate_owner) methods.setValue('location.certificateOwner', detail.certificate_owner, { shouldDirty: true });
+
+        // 4. Info Tata Ruang (Spatial)
+        methods.setValue('spatial.pkkprId', detail.id, { shouldDirty: true });
+        methods.setValue('spatial.pkkprOrigin', 'INTERNAL', { shouldDirty: true });
+        methods.setValue('spatial.kkprNumber', detail.sk_number || detail.submission_no, { shouldDirty: true });
+        if (detail.spatial_zone_name || quota?.envelope?.spatial_zone_name) {
+          methods.setValue('spatial.landUse', detail.spatial_zone_name || quota?.envelope?.spatial_zone_name || '', { shouldDirty: true });
+        }
+
+        // 5. Data Teknis / Intensitas Ruang (Technical) - 100% editable
+        const kdb = detail.approved_kdb_max ?? quota?.envelope?.approved_kdb_max;
+        if (kdb != null) methods.setValue('technical.kdb', kdb, { shouldDirty: true });
+
+        const klb = detail.approved_klb_max ?? quota?.envelope?.approved_klb_max;
+        if (klb != null) methods.setValue('technical.klb', klb, { shouldDirty: true });
+
+        const kdh = detail.approved_kdh_min ?? quota?.envelope?.approved_kdh_min;
+        if (kdh != null) methods.setValue('technical.kdh', kdh, { shouldDirty: true });
+
+        const gsb = detail.approved_gsb_min ?? quota?.envelope?.approved_gsb_min;
+        if (gsb != null) methods.setValue('technical.applicantGsb', gsb, { shouldDirty: true });
+
+        const maxFloors = detail.approved_max_floors ?? quota?.envelope?.approved_max_floors;
+        if (maxFloors != null) methods.setValue('technical.maxFloors', maxFloors, { shouldDirty: true });
+
+        // 6. Poligon Geometri Koordinat (Coordinate) - 100% editable
+        const hasExistingPhases = (quota?.siteplans_count ?? 0) > 0 || (quota?.used_area_m2 ?? 0) > 0;
+        if (!hasExistingPhases) {
+          const polyCoords = quota?.pkkpr_geometry?.coordinates?.[0] || detail.geometry?.coordinates?.[0];
+          if (polyCoords && Array.isArray(polyCoords) && polyCoords.length >= 3) {
+            methods.setValue('coordinate.polygon', polyCoords, { shouldDirty: true, shouldValidate: true });
+          }
+        } else {
+          // Bila sudah ada tahap site plan sebelumnya, biarkan area koordinat bersih agar pemohon dapat menggambar atau unggah CAD tahap lanjutan
+          methods.setValue('coordinate.polygon', undefined);
+        }
+
+        toast.success(`Data berhasil di-autofill dari SK PKKPR: ${detail.sk_number || detail.submission_no}. Semua kolom dapat Anda edit secara bebas.`);
+      }
+    } catch (err: any) {
+      console.error("Gagal auto-fill dari PKKPR:", err);
+      toast.error("Gagal memuat rincian data dari SK PKKPR terpilih.");
+    } finally {
+      setIsAutoFilling(false);
+    }
+  };
+
+  // Muat otomatis jika ada preselected PKKPR dari route navigation
   useEffect(() => {
-    if (preselectedPkkprId) {
-      methods.setValue('spatial.pkkprId', preselectedPkkprId);
+    if (preselectedPkkprId && !connectedPkkprId) {
+      handleSelectPKKPR({ id: preselectedPkkprId });
     }
-    if (preselectedPkkprNo) {
-      methods.setValue('spatial.kkprNumber', preselectedPkkprNo);
-    }
-  }, [preselectedPkkprId, preselectedPkkprNo, methods]);
+  }, [preselectedPkkprId]);
 
 
   const { handleSubmit, trigger } = methods;
@@ -148,6 +260,14 @@ export default function SubmissionCreatePage() {
           applicantBuildingArea: existingSub.technical?.applicantBuildingArea || undefined,
           applicantGsb: existingSub.technical?.applicantGsb || undefined,
           applicantRthArea: existingSub.technical?.applicantRthArea || undefined,
+
+          // Ketentuan Sempadan Lengkap
+          applicantGsbLocal: existingSub.technical?.applicantGsbLocal || undefined,
+          sempadanSungai: existingSub.technical?.sempadanSungai || undefined,
+          sempadanDanau: existingSub.technical?.sempadanDanau || undefined,
+          sempadanSaluranIrigasi: existingSub.technical?.sempadanSaluranIrigasi || undefined,
+          sempadanMataAir: existingSub.technical?.sempadanMataAir || undefined,
+          sempadanKhususLainnya: existingSub.technical?.sempadanKhususLainnya || undefined,
         },
         consultant: {
           consultantName: existingSub.consultant?.consultantName || '',
@@ -227,7 +347,7 @@ export default function SubmissionCreatePage() {
       case 3: fieldsToValidate = 'location'; break;
       case 4: fieldsToValidate = 'coordinate'; break;
       case 5: fieldsToValidate = 'spatial'; break;
-      case 6: fieldsToValidate = 'technical'; break;
+      case 6: fieldsToValidate = ['technical', 'tpu']; break;
       case 7: fieldsToValidate = 'consultant'; break;
       case 8: fieldsToValidate = 'document'; break;
       case 9: fieldsToValidate = 'photo'; break;
@@ -238,6 +358,33 @@ export default function SubmissionCreatePage() {
     if (isStepValid && currentStep < steps.length) {
       setCurrentStep(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (!isStepValid) {
+      // Ekstraksi pesan error spesifik agar pengguna tidak kebingungan
+      const errs = methods.formState.errors;
+      const errorMessages: string[] = [];
+      const checkKeys = Array.isArray(fieldsToValidate) ? fieldsToValidate : [fieldsToValidate];
+
+      checkKeys.forEach((key: string) => {
+        const sectionError = (errs as any)[key];
+        if (sectionError) {
+          if (typeof sectionError.message === 'string' && sectionError.message) {
+            errorMessages.push(sectionError.message);
+          } else if (typeof sectionError === 'object') {
+            Object.keys(sectionError).forEach((subKey) => {
+              const subErr = sectionError[subKey];
+              if (subErr?.message) {
+                errorMessages.push(subErr.message);
+              }
+            });
+          }
+        }
+      });
+
+      if (errorMessages.length > 0) {
+        toast.error(`Periksa isian yang belum lengkap atau tidak valid:\n• ${errorMessages.slice(0, 3).join('\n• ')}`);
+      } else {
+        toast.error('Mohon lengkapi seluruh isian wajib pada tahap ini sebelum melanjutkan.');
+      }
     }
   };
 
@@ -260,23 +407,91 @@ export default function SubmissionCreatePage() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto font-sans">
 
-      {/* ─── SEKSI 1: HEADER HALAMAN ─── */}
-      <div className="flex items-center gap-4 select-none">
-        <Link
-          to="/pengajuan/daftar"
-          className="p-2 hover:bg-slate-100 rounded-none text-slate-500 transition-colors cursor-pointer"
-          title="Kembali ke Daftar Pengajuan"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div className="text-left">
-          <h1 className="text-2xl font-bold text-[#111D13] leading-none">
-            Buat Pengajuan Baru
-          </h1>
-          <p className="text-xs text-slate-500 mt-2">
-            Lengkapi 10 tahapan formulir di bawah ini dengan mengunggah berkas yang valid.
-          </p>
+      {/* ─── SEKSI 1: HEADER HALAMAN & STATUS TERKONEKSI SK PKKPR ─── */}
+      <div className="flex flex-col gap-4 select-none">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/pengajuan/daftar"
+            className="p-2 hover:bg-slate-100 rounded-none text-slate-500 transition-colors cursor-pointer"
+            title="Kembali ke Daftar Pengajuan"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div className="text-left">
+            <h1 className="text-2xl font-bold text-[#111D13] leading-none">
+              Buat Pengajuan Baru
+            </h1>
+            <p className="text-xs text-slate-500 mt-2">
+              Lengkapi 10 tahapan formulir di bawah ini dengan mengunggah berkas yang valid.
+            </p>
+          </div>
         </div>
+
+        {/* ─── BANNER TERKONEKSI SK PKKPR (EARLY INTEGRATION STEP 0) ─── */}
+        {connectedPkkprId ? (
+          <div className="bg-[#e8f2ea] border border-[#A1CCA5] p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2 bg-primary text-white rounded-none shrink-0">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-primary">
+                    Terkoneksi SK PKKPR Sah
+                  </span>
+                  <span className="font-mono text-xs font-bold text-slate-800 bg-white px-2 py-0.5 border border-[#A1CCA5]">
+                    {connectedKkprNo || 'SK Terdaftar'}
+                  </span>
+                  <span className="text-[10px] text-emerald-800 bg-white/70 px-2 py-0.5 border border-[#A1CCA5]">
+                    ✓ Data Autofill Aktif & Editable
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1">
+                  {activePkkprQuota ? (
+                    <>
+                      Sisa Kuota Tapak: <strong className="font-mono text-primary font-bold">{activePkkprQuota.remaining_area_m2.toLocaleString('id-ID')} m²</strong> (dari total {activePkkprQuota.total_approved_area_m2.toLocaleString('id-ID')} m² disetujui) • Seluruh kolom data dapat disesuaikan secara bebas.
+                    </>
+                  ) : (
+                    'Data identitas, lokasi administrasi, luas, dan intensitas tata ruang telah dimuat dari PKKPR.'
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPKKPRModalOpen(true)}
+                className="text-xs font-bold text-primary hover:text-primary/80 bg-white border border-[#A1CCA5] px-3.5 py-1.5 transition-colors cursor-pointer"
+              >
+                Ganti SK PKKPR
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-50 border border-slate-200 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-slate-200 text-slate-700 rounded-none shrink-0">
+                <FileCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-800">
+                  Belum Memilih Dokumen SK PKKPR (Disarankan)
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Pilih SK PKKPR yang telah disahkan untuk auto-fill identitas pemohon, lokasi, dan intensitas tata ruang secara cepat.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPKKPRModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-primary hover:opacity-90 px-4 py-2 transition-all cursor-pointer shrink-0"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Pilih SK PKKPR Sah
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ─── SEKSI 2: GRID WORKSPACE (STEPPER VS FORM CONTENT) ─── */}
@@ -420,6 +635,15 @@ export default function SubmissionCreatePage() {
         </div>
 
       </div>
+
+      {/* ─── STEP 0 PRE-FLIGHT MODAL PEMILIHAN SK PKKPR SAH ─── */}
+      <PKKPRSelectionModal
+        isOpen={isPKKPRModalOpen}
+        onClose={() => setIsPKKPRModalOpen(false)}
+        onSelectPKKPR={handleSelectPKKPR}
+        currentSelectedPkkprId={connectedPkkprId}
+        isSelecting={isAutoFilling}
+      />
     </div>
   );
 }

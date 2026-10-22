@@ -1,7 +1,7 @@
 /* STREAMING_CHUNK:Configuring imports and schema types */
 import { useState, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { CheckCircle2, Layers } from 'lucide-react';
+import { CheckCircle2, Layers, Ruler } from 'lucide-react';
 import type { FullSubmissionFormValues } from '../../schemas/submissionFormSchema';
 import { LabelWithInfo } from './LabelWithInfo';
 import { FormattedInput } from './FormattedInput';
@@ -187,6 +187,7 @@ export const TechnicalSection = () => {
                 ) : (
                   <span className="text-slate-400 font-medium text-[11px]">-</span>
                 )}
+                {errors.technical?.kdb && <p className="text-[10px] text-rose-500 mt-1 font-normal">{errors.technical.kdb.message}</p>}
               </div>
             </div>
 
@@ -209,6 +210,7 @@ export const TechnicalSection = () => {
                 ) : (
                   <span className="text-slate-400 font-medium text-[11px]">-</span>
                 )}
+                {errors.technical?.klb && <p className="text-[10px] text-rose-500 mt-1 font-normal">{errors.technical.klb.message}</p>}
               </div>
             </div>
 
@@ -231,6 +233,7 @@ export const TechnicalSection = () => {
                 ) : (
                   <span className="text-slate-400 font-medium text-[11px]">-</span>
                 )}
+                {errors.technical?.kdh && <p className="text-[10px] text-rose-500 mt-1 font-normal">{errors.technical.kdh.message}</p>}
               </div>
             </div>
 
@@ -258,6 +261,128 @@ export const TechnicalSection = () => {
 
           </div>
         </div>
+      </div>
+
+      {/* ─── BLOK KETENTUAN GARIS SEMPADAN LENGKAP (KABUPATEN BOGOR) ─── */}
+      <div className="border border-slate-200 bg-white p-5 space-y-4 text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+          <div>
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <Ruler className="h-4 w-4 text-primary" />
+              Ketentuan Garis Sempadan (Regulasi Kab. Bogor)
+            </h4>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Standar jarak bebas minimal penarikan batas dinding bangunan terhadap koridor jalan, badan air, dan sempadan khusus (Perbup No. 4/2025 & Permen PUPR 28/2015).
+            </p>
+          </div>
+          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 shrink-0 self-start sm:self-auto">
+            Fitur Opsional (Kosongkan jika tidak berbatasan)
+          </span>
+        </div>
+
+        {/* 1. Sempadan Koridor Jalan */}
+        <div className="space-y-2">
+          <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+            A. Garis Sempadan Bangunan (GSB) Koridor Jalan
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col justify-between h-full text-left">
+              <LabelWithInfo
+                label="GSB Jalan Utama / Arteri / Akses Masuk"
+                subLabel="(meter)"
+                helpText="Jarak bebas minimum batas terdepan tapak bangunan terhadap as jalan utama/akses proyek (sesuai ketetapan PKKPR)."
+              />
+              <FormattedInput name="technical.applicantGsb" placeholder="Contoh: 5" unit="meter" />
+              {errors.technical?.applicantGsb && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantGsb.message}</p>}
+            </div>
+
+            <div className="flex flex-col justify-between h-full text-left">
+              <LabelWithInfo
+                label="GSB Jalan Lingkungan / Lokal"
+                subLabel="(meter - Opsional)"
+                helpText="Jarak bebas batas bangunan terhadap as jalan lingkungan perumahan/kawasan (standar Kab. Bogor 2.5 - 3.5 meter)."
+              />
+              <FormattedInput name="technical.applicantGsbLocal" placeholder="Contoh: 3" unit="meter" />
+              {errors.technical?.applicantGsbLocal && <p className="text-xs text-rose-500 mt-1">{errors.technical.applicantGsbLocal.message}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Sempadan Badan Air & Hidrologi (Permen PUPR No. 28/PRT/M/2015) */}
+        <div className="pt-3 border-t border-slate-100 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+              B. Sempadan Badan Air & Hidrologi (Permen PUPR 28/2015)
+            </span>
+            <span className="text-[9px] text-slate-400">Isi bila tapak berbatasan langsung dengan badan air</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-col justify-between h-full text-left">
+              <LabelWithInfo
+                label="Sempadan Sungai / Kali"
+                subLabel="(meter - Opsional)"
+                helpText="Jarak bebas sempadan sungai bertanggul/tidak bertanggul (Sungai kecil kedalaman <3m: min 10m; Sungai sedang: min 15m; Bertanggul: min 3m)."
+              />
+              <FormattedInput name="technical.sempadanSungai" placeholder="Kosongkan jika tidak ada" unit="meter" />
+              {errors.technical?.sempadanSungai && <p className="text-xs text-rose-500 mt-1">{errors.technical.sempadanSungai.message}</p>}
+            </div>
+
+            <div className="flex flex-col justify-between h-full text-left">
+              <LabelWithInfo
+                label="Sempadan Situ / Danau / Embung"
+                subLabel="(meter - Opsional)"
+                helpText="Jarak sempadan danau/situ alami di Kabupaten Bogor: minimal 50 meter dari titik pasang tertinggi air danau."
+              />
+              <FormattedInput name="technical.sempadanDanau" placeholder="Kosongkan jika tidak ada" unit="meter" />
+              {errors.technical?.sempadanDanau && <p className="text-xs text-rose-500 mt-1">{errors.technical.sempadanDanau.message}</p>}
+            </div>
+
+            <div className="flex flex-col justify-between h-full text-left">
+              <LabelWithInfo
+                label="Sempadan Saluran Irigasi Teknis"
+                subLabel="(meter - Opsional)"
+                helpText="Jarak sempadan saluran irigasi primer/sekunder (Permen PUPR 08/2015). Bertanggul: 1-2m; Tak bertanggul: min 5m."
+              />
+              <FormattedInput name="technical.sempadanSaluranIrigasi" placeholder="Kosongkan jika tidak ada" unit="meter" />
+              {errors.technical?.sempadanSaluranIrigasi && <p className="text-xs text-rose-500 mt-1">{errors.technical.sempadanSaluranIrigasi.message}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Sempadan Kawasan Khusus & Mitigasi Topografi */}
+        <div className="pt-3 border-t border-slate-100 space-y-2">
+          <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+            C. Sempadan Kawasan Khusus & Mitigasi Topografi
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col justify-between h-full text-left">
+              <LabelWithInfo
+                label="Sempadan Mata Air / Tebing Terjal"
+                subLabel="(meter - Opsional)"
+                helpText="Radius proteksi mata air (min 200m) atau jarak aman dari bibir lereng/tebing terjal berkemiringan >40%."
+              />
+              <FormattedInput name="technical.sempadanMataAir" placeholder="Kosongkan jika lahan datar" unit="meter" />
+              {errors.technical?.sempadanMataAir && <p className="text-xs text-rose-500 mt-1">{errors.technical.sempadanMataAir.message}</p>}
+            </div>
+
+            <div className="flex flex-col justify-between h-full text-left">
+              <LabelWithInfo
+                label="Sempadan Utilitas Khusus / Lainnya"
+                subLabel="(Opsional - Deskripsi/Jarak)"
+                helpText="Contoh: 'ROW Jalur SUTET 150kV (10m dari as kawat)', 'Sempadan Rel Kereta Api (20m)', atau 'Koridor Pipa Gas'."
+              />
+              <input
+                {...register('technical.sempadanKhususLainnya')}
+                type="text"
+                className={inputClass}
+                placeholder="Contoh: SUTET 150kV (10m) / Rel KA (20m)"
+              />
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* STREAMING_CHUNK:Rendering conditional fields based on submission category */}

@@ -38,14 +38,16 @@ export const CADGeoreferenceWizard = ({
       cadFileName.toLowerCase().includes(k.toLowerCase().replace(/\.(dxf|dwg)$/, ''))
     )?.[1] ||
     (cadFileName.toLowerCase().includes('geocitra') 
-      ? MOCK_SITEPLAN_CONTROL_POINTS['CAD_Siteplan_Tahap1_Geocitra.dxf'] 
+      ? (cadFileName.toLowerCase().includes('tahap2')
+          ? MOCK_SITEPLAN_CONTROL_POINTS['CAD_Siteplan_Tahap2_Geocitra.dxf']
+          : MOCK_SITEPLAN_CONTROL_POINTS['CAD_Siteplan_Tahap1_Geocitra.dxf'])
       : MOCK_SITEPLAN_CONTROL_POINTS['sample_siteplan.dxf']);
   const normalizedLandPolygon = landPolygon?.map(([first, second]) =>
     first < 20 && second > 90 ? [second, first] as [number, number] : [first, second] as [number, number]
   );
-  const targetPolygon = normalizedLandPolygon?.length
-    ? normalizedLandPolygon
-    : activeControlConfig?.polygon;
+  const targetPolygon = activeControlConfig?.polygon?.length
+    ? activeControlConfig.polygon
+    : (normalizedLandPolygon?.length ? normalizedLandPolygon : undefined);
   const openTargetPolygon = targetPolygon?.length && targetPolygon.length > 1 &&
     targetPolygon[0][0] === targetPolygon[targetPolygon.length - 1][0] &&
     targetPolygon[0][1] === targetPolygon[targetPolygon.length - 1][1]
@@ -91,9 +93,9 @@ export const CADGeoreferenceWizard = ({
     }
     setIsCalibrating(true);
     setTimeout(() => {
-      const transformedPolygon = targetPolygon ?? activeControlConfig.polygon;
-      const anchorMap1 = targetControlPoints?.[0] ?? activeControlConfig.anchor_map_1;
-      const anchorMap2 = targetControlPoints?.[1] ?? activeControlConfig.anchor_map_2;
+      const transformedPolygon = activeControlConfig?.polygon ?? targetPolygon ?? [];
+      const anchorMap1 = activeControlConfig.anchor_map_1 ?? targetControlPoints?.[0] ?? [0, 0];
+      const anchorMap2 = activeControlConfig.anchor_map_2 ?? targetControlPoints?.[1] ?? [0, 0];
 
       onComplete({
         polygon: transformedPolygon,
@@ -103,9 +105,9 @@ export const CADGeoreferenceWizard = ({
         anchorMap2,
       });
       setIsCalibrating(false);
-      toast.success('Titik kontrol tersimpan. Geometri DXF akan diproses saat pengajuan dikirim.');
+      toast.success('Titik kontrol tersimpan. Memuat preview CAD...');
       onClose();
-    }, 1500);
+    }, 1200);
   };
 
   return (

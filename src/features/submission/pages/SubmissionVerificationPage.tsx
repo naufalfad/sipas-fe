@@ -36,7 +36,7 @@ const getDocCategoryLabel = (key?: string) => {
   if (key === 'supportDoc') return 'SK KKPR Awal / IPPT';
   if (key === 'supportDoc2') return 'Andalalin / Persetujuan Teknis Limbah B3';
   if (key === 'skaDoc') return 'Scan Sertifikat Keahlian (SKA) Arsitek';
-  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dwg/.dxf)';
+  if (key === 'cadDoc') return 'File Peta Koordinat CAD (.dxf)';
   return 'Dokumen Lampiran Pendukung';
 };
 

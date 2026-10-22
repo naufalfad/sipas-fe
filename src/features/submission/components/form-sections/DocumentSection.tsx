@@ -62,7 +62,7 @@ export const DocumentSection = () => {
 
   // 3. Validasi Batas Spasial CAD (Langkah 4)
   docSummary.push({
-    name: 'File Peta Koordinat CAD Terkalibrasi (.dwg/.dxf)',
+    name: 'File Peta Koordinat CAD Terkalibrasi (.dxf)',
     value: cadDoc,
     mandatory: true
   });

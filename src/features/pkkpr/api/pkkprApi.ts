@@ -268,6 +268,18 @@ export const pkkprApi = {
     return res.json();
   },
 
+  /** Mengambil poligon CAD seluruh Site Plan yang berafiliasi dengan SK PKKPR ini */
+  async getSiteplansGeoJson(pkkpr_id: string): Promise<any> {
+    const res = await fetch(`${PKKPR_BASE}/${pkkpr_id}/siteplans-geojson`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    return res.json();
+  },
+
   /** Validasi pre-flight pengajuan Site Plan bertahap (kuota, batas, dan overlap) */
   async validatePhasedSitePlan(
     payload: import('../types/pkkpr.types').ValidatePhasedSitePlanPayload

@@ -435,5 +435,56 @@ export const SubmissionService = {
       throw new Error(errText || `Gagal memuat dokumentasi inspeksi udara drone (HTTP ${response.status})`);
     }
     return await response.json();
+  },
+
+  /**
+   * ─── PEMBARUAN: REAL-TIME CAD PREVIEW ───
+   * Mengirim parameter titik ikat georeferensi dan jalur file CAD untuk mendapatkan
+   * FeatureCollection GeoJSON riil hasil kalkulasi Helmert 2D di server.
+   */
+  previewCad: async (payload: CadPreviewPayload): Promise<CadPreviewResult> => {
+    const response = await fetch(`${API_BASE_URL}/preview-cad`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `Gagal memproses preview CAD (HTTP ${response.status})`);
+    }
+    return await response.json();
   }
 };
+
+export interface CadPreviewPayload {
+  cadFilePath?: string;
+  cadFileName?: string;
+  anchorCad1: [number, number];
+  anchorCad2: [number, number];
+  anchorMap1: [number, number];
+  anchorMap2: [number, number];
+}
+
+export interface CadPreviewResult {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    properties: {
+      layer_name: string;
+      label?: string;
+      color?: string;
+      fillOpacity?: number;
+    };
+    geometry: {
+      type: 'Polygon';
+      coordinates: number[][][];
+    };
+  }>;
+  extracted_boundary?: [number, number][];
+  transform_params?: {
+    scale: number;
+    rotation: number;
+    Tx: number;
+    Ty: number;
+  };
+}

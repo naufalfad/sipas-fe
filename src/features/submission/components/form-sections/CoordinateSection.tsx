@@ -20,13 +20,33 @@ import { CADGeoreferenceWizard } from './CADGeoreferenceWizard';
 import GISMapContainer from '@/components/maps/GISMapContainer';
 import GISDrawingMap from '@/components/maps/GISDrawingMap';
 import { uploadFileToBackend } from '../../utils/upload';
+import { SubmissionService } from '../../services/submission.service';
 import { MOCK_SITE_BOUNDS } from '@/mock/siteplan/mockSiteConfig';
 import { pkkprApi } from '@/features/pkkpr/api/pkkprApi';
 import type { 
   ValidatePhasedSitePlanResponse,
-  PKKPRQuotaSummary,
-  PKKPRListItem
+  PKKPRQuotaSummary
 } from '@/features/pkkpr/types/pkkpr.types';
+// @ts-ignore
+import * as turf from '@turf/turf';
+
+/** Menghitung luas poligon m² secara presisi berbasis Turf.js */
+const calculatePolygonAreaM2 = (ring: number[][]): number => {
+  if (!ring || ring.length < 3) return 0;
+  try {
+    const closedRing = [...ring];
+    const first = closedRing[0];
+    const last = closedRing[closedRing.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      closedRing.push(first);
+    }
+    const poly = turf.polygon([closedRing]);
+    return Math.round(turf.area(poly));
+  } catch (e) {
+    console.warn('Gagal menghitung luas polygon turf:', e);
+    return 0;
+  }
+};
 
 /** Subkomponen pembantu untuk otomatis memusatkan dan menyesuaikan batas pandang peta */
 const MapBoundsFitter: React.FC<{ geometry?: any }> = ({ geometry }) => {
@@ -47,7 +67,7 @@ const MapBoundsFitter: React.FC<{ geometry?: any }> = ({ geometry }) => {
 };
 
 export const CoordinateSection = () => {
-  const { register, setValue, watch } = useFormContext<FullSubmissionFormValues>();
+  const { register, setValue, watch, getValues } = useFormContext<FullSubmissionFormValues>();
   const [spatialLoading, setSpatialLoading] = useState(false);
   const [uploadedGeoJson, setUploadedGeoJson] = useState<any>(null);
 
@@ -61,23 +81,6 @@ export const CoordinateSection = () => {
 
   // State SK PKKPR Induk & Kuota Spasial Bertahap
   const [quotaSummary, setQuotaSummary] = useState<PKKPRQuotaSummary | null>(null);
-  const [approvedSKs, setApprovedSKs] = useState<PKKPRListItem[]>([]);
-  const [isLoadingSKs, setIsLoadingSKs] = useState(false);
-
-  // Ambil daftar SK PKKPR sah milik pemohon untuk referensi jika belum terpilih
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoadingSKs(true);
-    pkkprApi.getMyApprovedSK()
-      .then((items) => {
-        if (isMounted) setApprovedSKs(items || []);
-      })
-      .catch((err) => console.error('Gagal memuat SK PKKPR aktif:', err))
-      .finally(() => {
-        if (isMounted) setIsLoadingSKs(false);
-      });
-    return () => { isMounted = false; };
-  }, []);
 
   // Ambil ringkasan kuota dan geometri spasial SK PKKPR induk jika pkkprId terpilih
   useEffect(() => {
@@ -178,9 +181,13 @@ export const CoordinateSection = () => {
             const ringCoords = firstFeature.geometry.type === 'MultiPolygon'
               ? (rawCoords[0]?.[0] || rawCoords[0])
               : rawCoords[0];
-            setValue('coordinate.polygon', ringCoords);
+            setValue('coordinate.polygon', ringCoords, { shouldDirty: true, shouldValidate: true });
             setValue('coordinate.coordinatesText', JSON.stringify(rawCoords, null, 2));
-            toast.success('Batas spasial GeoJSON berhasil diunggah!');
+            const calculatedArea = calculatePolygonAreaM2(ringCoords);
+            if (calculatedArea > 0) {
+              setValue('location.landArea', calculatedArea, { shouldDirty: true, shouldValidate: true });
+            }
+            toast.success(`Batas spasial GeoJSON berhasil diunggah (${calculatedArea.toLocaleString('id-ID')} m²)!`);
           }
         } catch (err) {
           toast.error('Format GeoJSON tidak valid!');
@@ -206,6 +213,16 @@ export const CoordinateSection = () => {
                 [106.84020063, -6.59140008]
               ];
               labelText = 'Batas Site Plan Tahap 1 PT Geocitra Pembangunan Mandiri';
+            } else if (file.name.toLowerCase().includes('tahap2')) {
+              chosenCoords = [
+                [106.84025466, -6.59086579],
+                [106.84083402, -6.59107375],
+                [106.84076965, -6.59138834],
+                [106.84076889, -6.59139798],
+                [106.84020063, -6.59140008],
+                [106.84025466, -6.59086579]
+              ];
+              labelText = 'Batas Site Plan Tahap 2 PT Geocitra Pembangunan Mandiri';
             } else if (quotaSummary?.pkkpr_geometry?.coordinates?.[0]?.[0]) {
               chosenCoords = quotaSummary.pkkpr_geometry.coordinates[0][0];
               labelText = 'Batas Izin SK PKKPR PT Geocitra Pembangunan Mandiri';
@@ -236,10 +253,14 @@ export const CoordinateSection = () => {
             ]
           };
           setUploadedGeoJson(mockGeoJson);
-          setValue('coordinate.polygon', chosenCoords);
+          setValue('coordinate.polygon', chosenCoords, { shouldDirty: true, shouldValidate: true });
           setValue('coordinate.coordinatesText', JSON.stringify([chosenCoords], null, 2));
+          const calculatedArea = calculatePolygonAreaM2(chosenCoords);
+          if (calculatedArea > 0) {
+            setValue('location.landArea', calculatedArea, { shouldDirty: true, shouldValidate: true });
+          }
           setSpatialLoading(false);
-          toast.success(`Shapefile BPN (${labelText}) berhasil diekstrak!`);
+          toast.success(`Shapefile BPN (${labelText}) berhasil diekstrak (${calculatedArea.toLocaleString('id-ID')} m²)!`);
         }, 1000);
       };
       reader.readAsArrayBuffer(file);
@@ -249,7 +270,7 @@ export const CoordinateSection = () => {
     }
   };
 
-  // Handler Unggah CAD Kerja (.dwg/.dxf) -> Triggers Aligner Wizard [Jakarta 5]
+  // Handler Unggah CAD Kerja (.dxf) -> Triggers Aligner Wizard [Jakarta 5]
   const handleCadFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -261,7 +282,20 @@ export const CoordinateSection = () => {
       return;
     }
 
-    if (file.name.endsWith('.dwg') || file.name.endsWith('.dxf')) {
+    const fileNameLower = file.name.toLowerCase();
+
+    // Deteksi jika pemohon mengunggah file biner .dwg
+    if (fileNameLower.endsWith('.dwg')) {
+      toast.error(
+        'Format .dwg adalah format biner tertutup Autodesk yang tidak dapat diproses modul spasial. Silakan buka gambar Anda di AutoCAD, pilih "Save As" → format AutoCAD DXF (*.dxf), lalu unggah berkas .dxf tersebut.',
+        { duration: 8000 }
+      );
+      // Reset input agar dapat memilih ulang
+      e.target.value = '';
+      return;
+    }
+
+    if (fileNameLower.endsWith('.dxf')) {
       setValue('coordinate.cadFileName', file.name);
 
       try {
@@ -270,19 +304,19 @@ export const CoordinateSection = () => {
         setValue('document.cadDoc', `${res.file_url}?name=${encodeURIComponent(file.name)}`);
         setValue('coordinate.cadFilePath', res.file_path);
         setIsCadWizardOpen(true);
-        toast.success(`Berkas CAD berhasil diunggah ke server: ${file.name}`);
+        toast.success(`Berkas CAD DXF berhasil diunggah: ${file.name}`);
       } catch (err) {
         toast.error('Gagal mengunggah berkas CAD ke server.');
       } finally {
         setSpatialLoading(false);
       }
     } else {
-      toast.error('Format file salah! Harap pilih gambar kerja CAD berformat .dwg atau .dxf');
+      toast.error('Format berkas tidak valid! Harap pilih gambar kerja CAD berformat AutoCAD DXF (.dxf)');
     }
   };
 
-  // Simpan titik kontrol yang digunakan backend untuk kalibrasi Helmert.
-  const handleGeoreferenceComplete = (params: {
+  // Simpan titik kontrol yang digunakan backend untuk kalibrasi Helmert & minta preview real-time
+  const handleGeoreferenceComplete = async (params: {
     polygon: [number, number][];
     anchorCad1: [number, number]; anchorCad2: [number, number];
     anchorMap1: [number, number]; anchorMap2: [number, number];
@@ -291,87 +325,65 @@ export const CoordinateSection = () => {
     setValue('coordinate.anchorCad2', params.anchorCad2);
     setValue('coordinate.anchorMap1', params.anchorMap1);
     setValue('coordinate.anchorMap2', params.anchorMap2);
-    setValue('coordinate.polygon', params.polygon);
-    setValue('coordinate.coordinatesText', JSON.stringify([params.polygon], null, 2));
 
-    // Update GIS container render dengan overlapping site plan layout ar-ar polygon
-    const boundaryFeature = {
-      type: 'Feature',
-      properties: { label: 'Batas Lahan BPN' },
-      geometry: { type: 'Polygon', coordinates: [params.polygon] }
-    };
+    try {
+      setSpatialLoading(true);
+      const cadPath = getValues('coordinate.cadFilePath');
+      const cadName = cadFileName || getValues('coordinate.cadFileName');
 
-    // Blok A Kaveling (dikalkulasi secara relatif dalam koordinat terkalibrasi)
-    const lotAFeature = {
-      type: 'Feature',
-      properties: { label: 'Blok Kaveling A' },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.5, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.5, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1]
-        ]]
+      const previewRes = await SubmissionService.previewCad({
+        cadFilePath: cadPath,
+        cadFileName: cadName,
+        anchorCad1: params.anchorCad1,
+        anchorCad2: params.anchorCad2,
+        anchorMap1: params.anchorMap1,
+        anchorMap2: params.anchorMap2,
+      });
+
+      if (previewRes && previewRes.features && previewRes.features.length > 0) {
+        setUploadedGeoJson(previewRes);
+        const trueBoundary = previewRes.extracted_boundary || params.polygon;
+        setValue('coordinate.polygon', trueBoundary, { shouldDirty: true, shouldValidate: true });
+        setValue('coordinate.coordinatesText', JSON.stringify([trueBoundary], null, 2));
+        const calculatedArea = calculatePolygonAreaM2(trueBoundary);
+        if (calculatedArea > 0) {
+          setValue('location.landArea', calculatedArea, { shouldDirty: true, shouldValidate: true });
+        }
+        toast.success(`Gambar CAD berhasil diselaraskan (${previewRes.features.length} entitas spasial, luas tapak: ${calculatedArea.toLocaleString('id-ID')} m²)`);
+      } else {
+        setValue('coordinate.polygon', params.polygon, { shouldDirty: true, shouldValidate: true });
+        setValue('coordinate.coordinatesText', JSON.stringify([params.polygon], null, 2));
+        const calculatedArea = calculatePolygonAreaM2(params.polygon);
+        if (calculatedArea > 0) {
+          setValue('location.landArea', calculatedArea, { shouldDirty: true, shouldValidate: true });
+        }
+        toast.success(`Batas poligon CAD berhasil diselaraskan (luas: ${calculatedArea.toLocaleString('id-ID')} m²).`);
       }
-    };
-
-    const lotBFeature = {
-      type: 'Feature',
-      properties: { label: 'Blok Kaveling B' },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.6, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.6, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.5],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.6, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.1]
-        ]]
+    } catch (err: any) {
+      console.warn('[CAD Preview Warning, using boundary]', err);
+      setValue('coordinate.polygon', params.polygon, { shouldDirty: true, shouldValidate: true });
+      setValue('coordinate.coordinatesText', JSON.stringify([params.polygon], null, 2));
+      const calculatedArea = calculatePolygonAreaM2(params.polygon);
+      if (calculatedArea > 0) {
+        setValue('location.landArea', calculatedArea, { shouldDirty: true, shouldValidate: true });
       }
-    };
-
-    const roadFeature = {
-      type: 'Feature',
-      properties: { label: 'Lebar Jalan Utama' },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.05, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.52],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.95, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.52],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.95, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.58],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.05, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.58],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.05, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.52]
-        ]]
-      }
-    };
-
-    const rthFeature = {
-      type: 'Feature',
-      properties: { label: 'Rencana Fasum & RTH' },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.6],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.6],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.9, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.9],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.9],
-          [params.polygon[0][0] + (params.polygon[1][0] - params.polygon[0][0]) * 0.1, params.polygon[0][1] + (params.polygon[3][1] - params.polygon[0][1]) * 0.6]
-        ]]
-      }
-    };
-
-    setUploadedGeoJson({
-      type: 'FeatureCollection',
-      features: [boundaryFeature, lotAFeature, lotBFeature, roadFeature, rthFeature]
-    });
+      toast.info(`Batas poligon CAD berhasil diselaraskan (luas: ${calculatedArea.toLocaleString('id-ID')} m²).`);
+    } finally {
+      setSpatialLoading(false);
+    }
   };
 
   const handleMapChange = (coords: number[][][]) => {
     const coordsString = JSON.stringify(coords, null, 2);
     setValue('coordinate.coordinatesText', coordsString);
-    setValue('coordinate.polygon', coords[0]);
+    const ring = coords[0];
+    setValue('coordinate.polygon', ring, { shouldDirty: true, shouldValidate: true });
+    if (ring && ring.length >= 3) {
+      const calculatedArea = calculatePolygonAreaM2(ring);
+      if (calculatedArea > 0) {
+        setValue('location.landArea', calculatedArea, { shouldDirty: true, shouldValidate: true });
+      }
+    }
   };
 
   const handleResetCoordinates = () => {
@@ -452,11 +464,14 @@ export const CoordinateSection = () => {
 
         {/* Input 2: Berkas Gambar Kerja CAD Site Plan [Jakarta 5] */}
         <div className="bg-slate-50 border border-slate-200 p-4 transition-all duration-300 text-left">
-          <LabelWithInfo label="Unggah Gambar Rencana CAD (.dwg / .dxf)" helpText="Unggah berkas gambar tapak AutoCAD. Sistem akan memandu Anda melakukan transformasi Helmert untuk georeferensi denah." />
+          <LabelWithInfo 
+            label="Unggah Gambar Rencana CAD (.dxf)" 
+            helpText="Unggah berkas gambar tapak AutoCAD berformat DXF (.dxf). Buka file .dwg Anda di AutoCAD lalu simpan dengan format AutoCAD DXF." 
+          />
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 mt-2">
             <input
               type="file"
-              accept=".dwg,.dxf"
+              accept=".dxf"
               className="hidden"
               id="cad-file-input"
               onChange={handleCadFileUpload}
@@ -466,65 +481,60 @@ export const CoordinateSection = () => {
               className="inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs cursor-pointer transition-colors"
             >
               <FileUp className="h-4.5 w-4.5" />
-              Pilih Berkas CAD
+              Pilih Berkas CAD (.dxf)
             </label>
             <span className="text-[10px] text-slate-400">
-              {cadFileName ? `Terpilih: ${cadFileName}` : 'Unggah denah autocad untuk memulai penyelarasan koordinat'}
+              {cadFileName ? `Terpilih: ${cadFileName}` : 'Format wajib: AutoCAD DXF (.dxf)'}
             </span>
+          </div>
+          <div className="mt-2.5 text-[10px] text-amber-800 bg-amber-50 border border-amber-200/80 p-2 rounded leading-relaxed">
+            💡 <strong>Panduan Format:</strong> Buka gambar denah di AutoCAD lalu simpan via menu <strong>Save As → AutoCAD 2018/2013 DXF (*.dxf)</strong>.
           </div>
         </div>
       </div>
 
-      {/* Selector SK PKKPR Induk (Untuk Site Plan Bertahap) */}
-      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left shadow-xs">
+      {/* Status SK PKKPR Induk Terpilih (Site Plan Bertahap) */}
+      <div className="p-3.5 bg-gradient-to-r from-emerald-50/70 via-white to-slate-50 border border-emerald-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left shadow-xs">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-emerald-100/70 rounded-lg text-emerald-800 shrink-0">
+          <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0">
             <Building2 className="w-4 h-4" />
           </div>
           <div>
             <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
-              <span>SK PKKPR Induk Acuan (Site Plan Bertahap)</span>
-              {quotaSummary && (
-                <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
-                  Tersinkronisasi
-                </span>
-              )}
+              <span>SK PKKPR Induk Acuan</span>
+              <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold border border-emerald-200">
+                Terhubung Otomatis
+              </span>
             </div>
             <div className="text-[11px] text-slate-500 mt-0.5">
-              Peta otomatis memuat batas poligon izin PKKPR dan bidang Site Plan tahap sebelumnya agar tidak tumpang tindih.
+              Batas izin PKKPR dan bidang Site Plan tahap sebelumnya otomatis dimuat di peta agar bebas tumpang tindih.
             </div>
           </div>
         </div>
 
-        <div className="w-full sm:w-80">
-          {isLoadingSKs ? (
-            <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-              <span>Memeriksa SK PKKPR aktif...</span>
-            </div>
-          ) : approvedSKs.length > 0 ? (
-            <select
-              value={pkkprId || ''}
-              onChange={(e) => {
-                const selectedId = e.target.value;
-                const found = approvedSKs.find((sk) => sk.id === selectedId);
-                setValue('spatial.pkkprId', selectedId || undefined);
-                setValue('spatial.kkprNumber', found?.sk_number || found?.submission_no || '');
-              }}
-              className="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs"
-            >
-              <option value="">-- Pilih SK PKKPR Induk Anda --</option>
-              {approvedSKs.map((sk) => (
-                <option key={sk.id} value={sk.id}>
-                  {sk.sk_number || sk.submission_no} - {sk.applicant_name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="text-[11px] text-slate-400 italic">
-              {pkkprId ? `Terkait SK: ${watch('spatial.kkprNumber') || pkkprId}` : 'Tidak ada SK PKKPR aktif yang terdaftar'}
+        <div className="flex flex-col sm:items-end justify-center">
+          <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase">Nomor SK:</span>
+            <span className="font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold">
+              {watch('spatial.kkprNumber') || pkkprId || 'Belum Terpilih'}
             </span>
-          )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-1.5 sm:justify-end">
+            {quotaSummary && (
+              <div className="text-[11px] text-slate-600 flex items-center gap-1">
+                <span className="text-[10px] text-slate-400">Sisa Kuota:</span>
+                <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[10px]">
+                  {quotaSummary.remaining_area_m2.toLocaleString('id-ID')} m²
+                </span>
+              </div>
+            )}
+            <div className="text-[11px] text-slate-600 flex items-center gap-1">
+              <span className="text-[10px] text-slate-400">Usulan Tahap Ini:</span>
+              <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 text-[10px]">
+                {landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : '0 m²'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -541,37 +551,20 @@ export const CoordinateSection = () => {
 
         <GISMapContainer
           headerExtra={
-            <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1 rounded-lg text-xs">
-              <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span className="font-semibold text-slate-700 hidden sm:inline">SK PKKPR Induk:</span>
-              {approvedSKs.length > 0 ? (
-                <select
-                  value={pkkprId || ''}
-                  onChange={(e) => {
-                    const selectedId = e.target.value;
-                    const found = approvedSKs.find((sk) => sk.id === selectedId);
-                    setValue('spatial.pkkprId', selectedId || undefined);
-                    setValue('spatial.kkprNumber', found?.sk_number || found?.submission_no || '');
-                  }}
-                  className="text-xs font-semibold bg-white border border-slate-300 rounded px-2 py-1 text-slate-800 focus:ring-1 focus:ring-emerald-500 outline-none max-w-xs truncate shadow-xs cursor-pointer"
-                >
-                  <option value="">-- Pilih SK PKKPR Induk --</option>
-                  {approvedSKs.map((sk) => (
-                    <option key={sk.id} value={sk.id}>
-                      {sk.sk_number || sk.submission_no} - {sk.applicant_name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span className="text-[11px] text-slate-400 italic">
-                  {pkkprId ? `Terkait: ${watch('spatial.kkprNumber') || pkkprId}` : 'Tidak ada SK PKKPR aktif'}
-                </span>
-              )}
+            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-xs border border-slate-200 px-3 py-1 rounded-lg text-xs shadow-xs">
+              <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="font-semibold text-slate-700 hidden sm:inline">SK PKKPR:</span>
+              <span className="font-mono font-bold text-slate-800">
+                {watch('spatial.kkprNumber') || pkkprId || '-'}
+              </span>
               {quotaSummary && (
                 <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
-                  Sisa: {quotaSummary.remaining_area_m2.toLocaleString('id-ID')} m²
+                  Sisa Kuota: {quotaSummary.remaining_area_m2.toLocaleString('id-ID')} m²
                 </span>
               )}
+              <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200">
+                Usulan Ini: {landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : '0 m²'}
+              </span>
             </div>
           }
           overlayExtra={
@@ -582,7 +575,7 @@ export const CoordinateSection = () => {
                     <Layers className="w-3.5 h-3.5 text-emerald-600" /> Legenda Spasial
                   </span>
                   <span className="text-[10px] font-mono text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    Sisa Kuota: {quotaSummary.remaining_area_m2.toLocaleString('id-ID')} m²
+                    Sisa: {quotaSummary.remaining_area_m2.toLocaleString('id-ID')} m²
                   </span>
                 </div>
                 <div className="space-y-1.5 text-[11px]">
@@ -593,22 +586,26 @@ export const CoordinateSection = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-2.5 border border-orange-600 bg-orange-400/50 rounded-xs shrink-0" />
                     <span className="text-slate-700 truncate font-medium">
-                      Tahap Sebelumnya: {quotaSummary.used_area_m2.toLocaleString('id-ID')} m² ({quotaSummary.siteplans_count} Tahap)
+                      Tahap Lalu: {quotaSummary.used_area_m2.toLocaleString('id-ID')} m² ({quotaSummary.siteplans_count} Tahap)
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-2.5 border border-emerald-600 bg-emerald-400/50 rounded-xs shrink-0" />
-                    <span className="text-emerald-900 font-semibold truncate">Rencana Site Plan Baru (Tahap Ini)</span>
+                    <span className="text-emerald-900 font-semibold truncate">
+                      Rencana Site Plan Ini: {landArea > 0 ? `${landArea.toLocaleString('id-ID')} m²` : 'Tahap Ini'}
+                    </span>
                   </div>
                 </div>
               </div>
             ) : null
           }
         >
-          {/* 0. Penyesuaian batas otomatis ke geometri PKKPR induk */}
-          {quotaSummary?.pkkpr_geometry && (
+          {/* 0. Penyesuaian batas otomatis ke geometri CAD atau PKKPR induk */}
+          {uploadedGeoJson ? (
+            <MapBoundsFitter geometry={uploadedGeoJson} />
+          ) : quotaSummary?.pkkpr_geometry ? (
             <MapBoundsFitter geometry={quotaSummary.pkkpr_geometry} />
-          )}
+          ) : null}
 
           {/* Layer 1: Batas Luar SK PKKPR Induk (Garis Putus-Putus Biru) */}
           {quotaSummary?.pkkpr_geometry && (
@@ -662,12 +659,36 @@ export const CoordinateSection = () => {
             />
           ))}
 
-          {/* Layer 3: Penggambar Interaktif / Upload CAD GeoJSON (Hijau Aktif) */}
+          {/* Layer 3: Render Real Uploaded CAD Vectors (Jika Ada) */}
+          {uploadedGeoJson && (
+            <GeoJSON
+              key={`cad-preview-${cadFileName}-${uploadedGeoJson.features?.length || 0}`}
+              data={uploadedGeoJson}
+              style={(feature) => {
+                const color = feature?.properties?.color ?? '#14b8a6';
+                return {
+                  color: color,
+                  weight: 1.5,
+                  fillColor: color,
+                  fillOpacity: feature?.properties?.layer_name === 'PTSP_PSU_JALAN' ? 0.35 : 0.65
+                };
+              }}
+              onEachFeature={(feature, layer) => {
+                if (feature?.properties?.label || feature?.properties?.layer_name) {
+                  layer.bindTooltip(
+                    `<div class="text-xs p-1 font-semibold">${feature.properties.label || feature.properties.layer_name}</div>`,
+                    { sticky: true }
+                  );
+                }
+              }}
+            />
+          )}
+
+          {/* Layer 4: Penggambar Interaktif / Boundary Poligon */}
           <GISDrawingMap
             key={`drawing-map-${mapResetKey}`}
             initialValue={landPolygon && landPolygon.length >= 3 ? [landPolygon] : undefined}
             onShapeChange={handleMapChange}
-            initialGeoJson={uploadedGeoJson}
           />
         </GISMapContainer>
       </div>
