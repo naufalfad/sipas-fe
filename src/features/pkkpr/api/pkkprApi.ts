@@ -304,5 +304,34 @@ export const pkkprApi = {
   /** Mengambil URL berkas Lembar Tanda Terima Registrasi PKKPR berformat PDF */
   getReceiptUrl(pkkpr_id: string): string {
     return `${PKKPR_BASE}/${pkkpr_id}/receipt`;
+  },
+
+  /** Verifikasi Keaslian Dokumen SK PKKPR untuk Publik (QR Code Scanner) */
+  async getPublicVerification(params: { id?: string; sk?: string; hash?: string }): Promise<import('../types/pkkpr.types').PKKPRPublicVerificationData> {
+    const searchParams = new URLSearchParams();
+    if (params.id) searchParams.set('id', params.id);
+    if (params.sk) searchParams.set('sk', params.sk);
+    if (params.hash) searchParams.set('hash', params.hash);
+
+    const res = await fetch(`${PKKPR_BASE}/public/verify?${searchParams.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(err, 'Dokumen PKKPR tidak ditemukan atau tidak valid.'));
+    }
+    return res.json();
+  },
+
+  /** Pelacakan Status Berkas PKKPR Daring untuk Publik (Tanda Terima) */
+  async getPublicTracking(params: { id?: string; no?: string }): Promise<import('../types/pkkpr.types').PKKPRPublicTrackingData> {
+    const searchParams = new URLSearchParams();
+    if (params.id) searchParams.set('id', params.id);
+    if (params.no) searchParams.set('no', params.no);
+
+    const res = await fetch(`${PKKPR_BASE}/public/track?${searchParams.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(err, 'Berkas permohonan tidak ditemukan.'));
+    }
+    return res.json();
   }
 };

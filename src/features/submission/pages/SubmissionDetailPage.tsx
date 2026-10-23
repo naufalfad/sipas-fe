@@ -25,7 +25,7 @@ import type { Submission } from '../types';
 import {
   ArrowLeft, Clock, CheckCircle2, Download,
   XCircle, CheckCircle, FileSignature, AlertTriangle, Loader2,
-  Info, ShieldCheck, Camera, Lock, Unlock
+  Info, ShieldCheck, Camera, Lock, Unlock, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -294,8 +294,9 @@ export default function SubmissionDetailPage() {
           </div>
         </div>
 
-        {/* DYNAMIC SLA TRACKER HUD */}
-        <div className="flex items-center gap-3 self-start md:self-auto select-none shrink-0">
+        {/* ACTION BUTTONS & DYNAMIC SLA TRACKER HUD */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto select-none shrink-0">
+
           {isSlaPaused ? (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 animate-pulse text-[10px] font-black uppercase tracking-widest shadow-sm rounded-none">
               <Clock className="h-3.5 w-3.5 text-rose-600" />
@@ -494,20 +495,38 @@ export default function SubmissionDetailPage() {
                 {subData.status}
               </span>
 
-              {/* prominent download button in status card once signed */}
-              {subData.status === 'Disetujui' && subData.signedPdfUrl && (
-                <div className="pt-4 mt-2">
+              {/* DOKUMEN & TANDA TERIMA RESMI */}
+              <div className="pt-4 mt-3 border-t border-slate-100 space-y-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Dokumen Permohonan
+                </span>
+
+                {/* Tombol Cetak Tanda Terima PDF (Selalu Tersedia) */}
+                <a
+                  href={`${API_BASE_URL}/api/v1/submissions/${subData.id}/receipt`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs uppercase tracking-wider rounded-none flex items-center justify-center gap-2 transition-colors shadow-2xs decoration-none cursor-pointer"
+                  title="Cetak Bukti Tanda Terima Permohonan Site Plan Resmi (PDF)"
+                >
+                  <Printer className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Cetak Tanda Terima (PDF)</span>
+                </a>
+
+                {/* Tombol Unduh SK jika status Disetujui */}
+                {subData.status === 'Disetujui' && (
                   <a
-                    href={`${API_BASE_URL}${subData.signedPdfUrl}`}
+                    href={`${API_BASE_URL}/api/v1/submissions/${subData.id}/download`}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 transition-colors decoration-none"
+                    className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-widest rounded-none flex items-center justify-center gap-2 transition-colors shadow-2xs decoration-none cursor-pointer"
+                    title="Unduh Salinan Sah SK Pengesahan Site Plan Resmi (PDF)"
                   >
                     <Download className="h-4 w-4" />
                     <span>Unduh SK Resmi (PDF)</span>
                   </a>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Riwayat Alur Proses (Timeline - Perfectly Aligned & High Contrast) */}

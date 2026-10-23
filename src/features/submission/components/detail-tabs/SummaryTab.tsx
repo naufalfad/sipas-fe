@@ -8,10 +8,11 @@
  * ============================================================================
  */
 
-import { File, MapPin, ChevronDown, ChevronUp, Download, Layers, ExternalLink, ShieldCheck } from 'lucide-react';
+import { File, MapPin, ChevronDown, ChevronUp, Download, Layers, ExternalLink, ShieldCheck, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PKKPRQuotaCard } from '@/features/pkkpr/components/PKKPRQuotaCard';
+import { API_BASE_URL } from '@/config';
 
 const resolveDocUrl = (url?: string | null) => {
   if (!url) return '';
@@ -251,6 +252,66 @@ export const SummaryTab = ({ sub }: SummaryTabProps) => {
 
         {openDocs && (
           <div className="space-y-3">
+            {/* Dokumen Surat Tanda Terima Resmi */}
+            <div className="flex items-center justify-between p-3.5 bg-emerald-50/40 hover:bg-emerald-50/70 border border-emerald-200 transition-colors text-left">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="p-2 bg-emerald-600 text-white shrink-0 shadow-xs">
+                  <Printer className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[8px] font-black uppercase tracking-wider text-emerald-700 block mb-0.5">
+                    Surat Tanda Terima Resmi (Sistem)
+                  </span>
+                  <h5 className="font-bold text-xs text-[#111D13] truncate">
+                    Bukti Tanda Terima Pendaftaran Site Plan
+                  </h5>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    Format: PDF • Dilengkapi Barcode Pelacakan Resmi
+                  </span>
+                </div>
+              </div>
+              <a
+                href={`${API_BASE_URL}/api/v1/submissions/${sub.id}/receipt`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-emerald-800 border border-emerald-300 font-bold text-xs uppercase tracking-wider shadow-2xs shrink-0 decoration-none"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Unduh Tanda Terima</span>
+              </a>
+            </div>
+
+            {/* Dokumen SK Resmi jika Disetujui */}
+            {sub.status === 'Disetujui' && (
+              <div className="flex items-center justify-between p-3.5 bg-emerald-100/50 hover:bg-emerald-100/80 border border-emerald-300 transition-colors text-left">
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="p-2 bg-emerald-700 text-white shrink-0 shadow-xs">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[8px] font-black uppercase tracking-wider text-emerald-800 block mb-0.5">
+                      Surat Keputusan Resmi (Sistem)
+                    </span>
+                    <h5 className="font-bold text-xs text-[#111D13] truncate">
+                      SK Pengesahan Rencana Tapak (Site Plan)
+                    </h5>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                      Format: PDF • Terverifikasi Tanda Tangan Elektronik Kadis
+                    </span>
+                  </div>
+                </div>
+                <a
+                  href={`${API_BASE_URL}/api/v1/submissions/${sub.id}/download`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider shadow-xs shrink-0 decoration-none"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Unduh SK Resmi</span>
+                </a>
+              </div>
+            )}
+
             <div className="max-h-56 overflow-y-auto pr-2">
               {(sub.documents ?? []).map((doc: any) => (
                 <div key={doc?.id ?? doc?.name ?? Math.random()} className="flex items-center justify-between p-3.5 bg-slate-50/50 hover:bg-slate-100/50 border border-border/40 transition-colors text-left">

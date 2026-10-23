@@ -453,6 +453,39 @@ export const SubmissionService = {
       throw new Error(errText || `Gagal memproses preview CAD (HTTP ${response.status})`);
     }
     return await response.json();
+  },
+
+  /**
+   * ─── PEMBARUAN: VERIFIKASI KEABSAHAN SK SITE PLAN (PUBLIK / QR CODE SCANNER) ───
+   */
+  getPublicVerification: async (params: { id?: string; sk?: string; hash?: string }): Promise<any> => {
+    const searchParams = new URLSearchParams();
+    if (params.id) searchParams.set('id', params.id);
+    if (params.sk) searchParams.set('sk', params.sk);
+    if (params.hash) searchParams.set('hash', params.hash);
+
+    const res = await fetch(`${API_BASE_URL}/public/verify?${searchParams.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.message || 'Dokumen SK Site Plan tidak ditemukan atau tidak sah.');
+    }
+    return await res.json();
+  },
+
+  /**
+   * ─── PEMBARUAN: PELACAKAN STATUS BERKAS SITE PLAN DARING (PUBLIK / TANDA TERIMA) ───
+   */
+  getPublicTracking: async (params: { id?: string; no?: string }): Promise<any> => {
+    const searchParams = new URLSearchParams();
+    if (params.id) searchParams.set('id', params.id);
+    if (params.no) searchParams.set('no', params.no);
+
+    const res = await fetch(`${API_BASE_URL}/public/track?${searchParams.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.message || 'Berkas permohonan site plan tidak ditemukan.');
+    }
+    return await res.json();
   }
 };
 

@@ -307,3 +307,63 @@ export interface ValidatePhasedSitePlanResponse {
   };
 }
 
+export interface PKKPRPublicVerificationData {
+  is_valid: boolean;
+  status: string;
+  id: string;
+  submission_no: string;
+  sk_number?: string | null;
+  sk_issued_date?: string | null;
+  applicant_name: string;
+  applicant_type: string;
+  applicant_nib?: string | null;
+  activity_description: string;
+  kbli_code?: string | null;
+  location_address?: string | null;
+  location_village?: string | null;
+  location_district?: string | null;
+  location_city: string;
+  land_ownership_status?: string | null;
+  certificate_number?: string | null;
+  certificate_owner?: string | null;
+  proposed_land_area_m2: number;
+  approved_land_area_m2?: number | null;
+  spatial_zone_code?: string | null;
+  spatial_zone_name?: string | null;
+  approved_kdb_max?: number | null;
+  approved_klb_max?: number | null;
+  approved_kdh_min?: number | null;
+  approved_gsb_min?: number | null;
+  approved_max_floors?: number | null;
+  qr_code_hash?: string | null;
+  hash_matched: boolean;
+  signer_name: string;
+  signer_nip: string;
+  signer_title: string;
+  certification_authority: string;
+  verified_at: string;
+  pdf_download_url: string;
+}
+
+export interface PKKPRPublicTrackingStep {
+  step_number: number;
+  name: string;
+  actor: string;
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING' | 'REJECTED';
+  timestamp?: string | null;
+  note?: string | null;
+}
+
+export interface PKKPRPublicTrackingData {
+  id: string;
+  submission_no: string;
+  status: string;
+  applicant_name: string;
+  activity_description: string;
+  location: string;
+  submitted_at: string;
+  estimated_completion_days: number;
+  receipt_pdf_url: string;
+  steps: PKKPRPublicTrackingStep[];
+}
+

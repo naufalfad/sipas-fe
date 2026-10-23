@@ -37,12 +37,16 @@ import ActivityLogPage from '@/features/users/pages/ActivityLogPage';
 import { PKKPRListPage } from '@/features/pkkpr/pages/PKKPRListPage';
 import { PKKPRCreateWizard } from '@/features/pkkpr/pages/PKKPRCreateWizard';
 import { PKKPRDetailPage } from '@/features/pkkpr/pages/PKKPRDetailPage';
+import { PKKPRPublicVerifyPage } from '@/features/pkkpr/pages/PKKPRPublicVerifyPage';
+import { PKKPRPublicTrackPage } from '@/features/pkkpr/pages/PKKPRPublicTrackPage';
+import { SitePlanPublicVerifyPage } from '@/features/submission/pages/SitePlanPublicVerifyPage';
+import { SitePlanPublicTrackPage } from '@/features/submission/pages/SitePlanPublicTrackPage';
 
 /**
  * KONFIGURASI ROUTER UTAMA (GEOSIPAS)
  * 
  * Sesuai prinsip Low Coupling & High Cohesion, rute dipisahkan menjadi kelompok:
- * 1. Public Routes: Login dan Register (tidak dilindungi)
+ * 1. Public Routes: Login, Register, Verifikasi Naskah SK PKKPR, Pelacakan Berkas (tidak dilindungi)
  * 2. Kelompok Administratif (Dibalut oleh DashboardLayout & ProtectedRoute):
  *    Menyajikan halaman tabular, form administratif, laporan, dan pengelolaan data master.
  * 3. Kelompok Spasial Imersif (GIS Page dilindungi Route Guard):
@@ -62,6 +66,22 @@ export const router = createBrowserRouter([
   {
     path: '/maintenance',
     element: <MaintenancePage />,
+  },
+  {
+    path: '/validasi/pkkpr',
+    element: <PKKPRPublicVerifyPage />,
+  },
+  {
+    path: '/pelacakan/pkkpr',
+    element: <PKKPRPublicTrackPage />,
+  },
+  {
+    path: '/validasi/siteplan',
+    element: <SitePlanPublicVerifyPage />,
+  },
+  {
+    path: '/pelacakan/siteplan',
+    element: <SitePlanPublicTrackPage />,
   },
 
   // 2. KELOMPOK ADMINISTRATIF (Dashboard & Dokumen - Terlindungi)
